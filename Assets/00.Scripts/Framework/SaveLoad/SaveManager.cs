@@ -31,7 +31,13 @@ public sealed class SaveManager : MonoSingleton<SaveManager>
 
         if (_provider == null)
         {
+#if USE_ES3
+        ES3Settings settings = new ES3Settings();
+        settings.path = "save.es3";
+        _provider = new ES3SaveProvider(settings);
+#else
             _provider = new MemorySaveProvider();
+#endif
         }
 
         if (!_core.IsInitialized)
@@ -39,6 +45,7 @@ public sealed class SaveManager : MonoSingleton<SaveManager>
             _core.Initialize(_provider, _currentVersion, new SaveKey(_rootKey));
         }
     }
+
 
     public void Initialize(ISaveProvider provider, int currentVersion, SaveKey rootKey)
     {
