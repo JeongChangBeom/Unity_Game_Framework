@@ -1,26 +1,31 @@
 using System;
-using System.Collections.Generic;
 
 public sealed class SaveCore
 {
     public int CurrentVersion { get; private set; }
     public bool IsInitialized { get; private set; }
 
+    public bool AutoFlushEnabled { get; private set; }
+    public float AutoFlushIntervalSeconds { get; private set; }
+
     private ISaveProvider _provider;
     private SaveKey _root;
-    private readonly List<ISaveMigrator> _migrators = new List<ISaveMigrator>();
 
-    public void RegisterMigrator(ISaveMigrator migrator)
-    {
-        if (migrator == null)
-        {
-            throw new ArgumentNullException(nameof(migrator));
-        }
-
-        _migrators.Add(migrator);
-    }
+    private bool _isDirty;
+    private float _dirtyElapsed;
 
     public void Initialize(ISaveProvider provider, int currentVersion, SaveKey rootKey)
+    {
+        Initialize(provider, currentVersion, rootKey, autoFlushEnabled: false, autoFlushIntervalSeconds: 5f);
+    }
+
+    public void Initialize(
+        ISaveProvider provider,
+        int currentVersion,
+        SaveKey rootKey,
+        bool autoFlushEnabled,
+        float autoFlushIntervalSeconds
+    )
     {
         if (provider == null)
         {
@@ -32,14 +37,65 @@ public sealed class SaveCore
             throw new ArgumentOutOfRangeException(nameof(currentVersion), "CurrentVersion must be >= 1.");
         }
 
+        if (autoFlushIntervalSeconds <= 0f)
+        {
+            autoFlushIntervalSeconds = 1f;
+        }
+
         _provider = provider;
         CurrentVersion = currentVersion;
         _root = rootKey;
 
+        AutoFlushEnabled = autoFlushEnabled;
+        AutoFlushIntervalSeconds = autoFlushIntervalSeconds;
+
+        _isDirty = false;
+        _dirtyElapsed = 0f;
+
         EnsureMetaInitialized();
-        RunMigrationsIfNeeded();
 
         IsInitialized = true;
+    }
+
+    public void ConfigureAutoFlush(bool enabled, float intervalSeconds)
+    {
+        EnsureReady();
+
+        AutoFlushEnabled = enabled;
+
+        if (intervalSeconds <= 0f)
+        {
+            intervalSeconds = 1f;
+        }
+
+        AutoFlushIntervalSeconds = intervalSeconds;
+    }
+
+    public void Tick(float deltaTime)
+    {
+        EnsureReady();
+
+        if (!AutoFlushEnabled)
+        {
+            return;
+        }
+
+        if (!_isDirty)
+        {
+            return;
+        }
+
+        if (deltaTime < 0f)
+        {
+            deltaTime = 0f;
+        }
+
+        _dirtyElapsed += deltaTime;
+
+        if (_dirtyElapsed >= AutoFlushIntervalSeconds)
+        {
+            Flush();
+        }
     }
 
     public SaveKey Domain(string domain)
@@ -64,14 +120,14 @@ public sealed class SaveCore
     {
         EnsureReady();
         _provider.Delete(key.Value);
-        TouchLastSavedUtc();
+        MarkDirty();
     }
 
     public void Save<T>(SaveKey key, T value)
     {
         EnsureReady();
         _provider.Save(key.Value, value);
-        TouchLastSavedUtc();
+        MarkDirty();
     }
 
     public bool TryLoad<T>(SaveKey key, out T value)
@@ -101,7 +157,7 @@ public sealed class SaveCore
         if (saveIfMissing)
         {
             _provider.Save(key.Value, value);
-            TouchLastSavedUtc();
+            MarkDirty();
         }
 
         return value;
@@ -110,7 +166,16 @@ public sealed class SaveCore
     public void Flush()
     {
         EnsureReady();
+
+        if (_isDirty)
+        {
+            _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
+        }
+
         _provider.Flush();
+
+        _isDirty = false;
+        _dirtyElapsed = 0f;
     }
 
     private void EnsureReady()
@@ -135,11 +200,19 @@ public sealed class SaveCore
             return;
         }
 
+        if (savedVersion != CurrentVersion)
+        {
+            _provider.SaveInt(SaveMeta.SaveVersion.Value, CurrentVersion);
+            _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
+            _provider.Flush();
+        }
+
         string createdAt;
         bool hasCreatedAt = _provider.TryLoadString(SaveMeta.CreatedAtUtc.Value, out createdAt);
         if (!hasCreatedAt)
         {
             _provider.SaveString(SaveMeta.CreatedAtUtc.Value, DateTime.UtcNow.ToString("O"));
+            _provider.Flush();
         }
 
         string lastSaved;
@@ -147,73 +220,16 @@ public sealed class SaveCore
         if (!hasLastSaved)
         {
             _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-        }
-
-        _provider.Flush();
-    }
-
-    private void RunMigrationsIfNeeded()
-    {
-        int savedVersion;
-        bool ok = _provider.TryLoadInt(SaveMeta.SaveVersion.Value, out savedVersion);
-
-        if (!ok)
-        {
-            return;
-        }
-
-        if (savedVersion >= CurrentVersion)
-        {
-            return;
-        }
-
-        int version = savedVersion;
-
-        int guard = 0;
-        while (version < CurrentVersion)
-        {
-            guard++;
-            if (guard > 1000)
-            {
-                throw new InvalidOperationException("Migration loop guard triggered.");
-            }
-
-            ISaveMigrator next = FindNextMigrator(version);
-            if (next == null)
-            {
-                throw new InvalidOperationException("No migrator registered for version " + version + ".");
-            }
-
-            next.Migrate(_provider);
-
-            version = next.ToVersion;
-            _provider.SaveInt(SaveMeta.SaveVersion.Value, version);
-            TouchLastSavedUtc();
             _provider.Flush();
         }
     }
 
-    private ISaveMigrator FindNextMigrator(int fromVersion)
+    private void MarkDirty()
     {
-        for (int i = 0; i < _migrators.Count; i++)
+        if (!_isDirty)
         {
-            ISaveMigrator m = _migrators[i];
-            if (m == null)
-            {
-                continue;
-            }
-
-            if (m.FromVersion == fromVersion && m.ToVersion > m.FromVersion)
-            {
-                return m;
-            }
+            _isDirty = true;
+            _dirtyElapsed = 0f;
         }
-
-        return null;
-    }
-
-    private void TouchLastSavedUtc()
-    {
-        _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
     }
 }
