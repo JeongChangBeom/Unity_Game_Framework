@@ -1,4 +1,5 @@
 using UnityEngine;
+using UnityEngine.Audio;
 
 public class SoundPlayer : MonoBehaviour
 {
@@ -11,11 +12,23 @@ public class SoundPlayer : MonoBehaviour
     private void Awake()
     {
         Source = GetComponent<AudioSource>();
-
         if (Source == null)
         {
             Source = gameObject.AddComponent<AudioSource>();
         }
+
+        Source.playOnAwake = false;
+        Source.spatialBlend = 0f;
+    }
+
+    public void SetOutputGroup(AudioMixerGroup group)
+    {
+        if (Source == null)
+        {
+            return;
+        }
+
+        Source.outputAudioMixerGroup = group;
     }
 
     public void Play(ESound sound, AudioClip clip, float volume, float pitch, bool loop)

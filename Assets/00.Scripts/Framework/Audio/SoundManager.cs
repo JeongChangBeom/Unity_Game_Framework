@@ -22,6 +22,10 @@ public class SoundManager : MonoSingleton<SoundManager>
     [SerializeField] private string uiParam = "UI";
     [SerializeField] private string voiceParam = "Voice";
 
+    [Header("Mixer Auto Assign (Resources)")]
+    // Resources 폴더 바로 아래에 MainAudioMixer.mixer 가 있으므로 확장자 없이 이름만.
+    [SerializeField] private string resourcesMixerPath = "MainAudioMixer";
+
     [Header("Pool")]
     [SerializeField] private int initialPoolCount = 10;
     [SerializeField] private int maxPoolCount = 30;
@@ -52,15 +56,25 @@ public class SoundManager : MonoSingleton<SoundManager>
     private bool _databaseResolved;
     private bool _databaseMissingLogged;
 
+    private AudioMixerGroup _groupBgm;
+    private AudioMixerGroup _groupSfx;
+    private AudioMixerGroup _groupUi;
+    private AudioMixerGroup _groupVoice;
+
     protected override void OnInitialize()
     {
         ResolveDatabaseOrError();
+
+        ResolveMixerOrLoad();
+        CacheMixerGroups();
+
         SetupBgmSources();
 
         _playerPool = new SoundPlayerPool(transform, initialPoolCount, maxPoolCount);
 
         LoadSettings();
         ApplyMixerVolumes();
+        ApplyFallbackVolumesIfNoMixer();
     }
 
     private void Update()
@@ -165,6 +179,7 @@ public class SoundManager : MonoSingleton<SoundManager>
     {
         _settings.master = Mathf.Clamp01(v);
         ApplyMixerVolumes();
+        ApplyFallbackVolumesIfNoMixer();
         SaveSettings();
     }
 
@@ -172,6 +187,7 @@ public class SoundManager : MonoSingleton<SoundManager>
     {
         _settings.Set(channel, v);
         ApplyMixerVolumes();
+        ApplyFallbackVolumesIfNoMixer();
         SaveSettings();
     }
 
@@ -262,6 +278,66 @@ public class SoundManager : MonoSingleton<SoundManager>
             "Then run: Framework/Audio/Build Sound Database From Sheet + Folder");
     }
 
+    private void ResolveMixerOrLoad()
+    {
+        if (audioMixer != null)
+        {
+            return;
+        }
+
+        string p = resourcesMixerPath;
+        if (string.IsNullOrEmpty(p))
+        {
+            p = "MainAudioMixer";
+        }
+
+        AudioMixer m = Resources.Load<AudioMixer>(p);
+        if (m != null)
+        {
+            audioMixer = m;
+        }
+    }
+
+    private void CacheMixerGroups()
+    {
+        _groupBgm = null;
+        _groupSfx = null;
+        _groupUi = null;
+        _groupVoice = null;
+
+        if (audioMixer == null)
+        {
+            return;
+        }
+
+        _groupBgm = FindGroup("BGM");
+        _groupSfx = FindGroup("SFX");
+        _groupUi = FindGroup("UI");
+        _groupVoice = FindGroup("Voice");
+    }
+
+    private AudioMixerGroup FindGroup(string name)
+    {
+        if (audioMixer == null)
+        {
+            return null;
+        }
+
+        AudioMixerGroup[] g0 = audioMixer.FindMatchingGroups(name);
+        if (g0 != null && g0.Length > 0)
+        {
+            return g0[0];
+        }
+
+        AudioMixerGroup[] g1 = audioMixer.FindMatchingGroups("Master/" + name);
+        if (g1 != null && g1.Length > 0)
+        {
+            return g1[0];
+        }
+
+        return null;
+    }
+
     private void PlayBgm(SoundDatabaseSO.Entry entry)
     {
         string address = entry.fileName;
@@ -308,7 +384,13 @@ public class SoundManager : MonoSingleton<SoundManager>
             StartCoroutine(FadeOutCoroutine(_currentBgm, t, true));
         }
 
-        StartCoroutine(FadeInCoroutine(_nextBgm, t, 1f));
+        float target = 1f;
+        if (audioMixer == null)
+        {
+            target = Mathf.Clamp01(_settings.master * _settings.bgm);
+        }
+
+        StartCoroutine(FadeInCoroutine(_nextBgm, t, target));
 
         AudioSource temp = _currentBgm;
         _currentBgm = _nextBgm;
@@ -330,10 +412,50 @@ public class SoundManager : MonoSingleton<SoundManager>
             return;
         }
 
+        AudioMixerGroup group = GetGroup(entry.channel);
+        if (group != null)
+        {
+            player.SetOutputGroup(group);
+        }
+        else
+        {
+            player.SetOutputGroup(null);
+        }
+
         float channelVol = _settings.Get(entry.channel);
         float finalVol = entry.defaultVolume * volumeMul * channelVol * _settings.master;
 
         player.Play(sound, clip, finalVol, pitch, entry.loop);
+    }
+
+    private AudioMixerGroup GetGroup(EAudioChannel channel)
+    {
+        if (audioMixer == null)
+        {
+            return null;
+        }
+
+        if (channel == EAudioChannel.BGM)
+        {
+            return _groupBgm;
+        }
+
+        if (channel == EAudioChannel.SFX)
+        {
+            return _groupSfx;
+        }
+
+        if (channel == EAudioChannel.UI)
+        {
+            return _groupUi;
+        }
+
+        if (channel == EAudioChannel.Voice)
+        {
+            return _groupVoice;
+        }
+
+        return null;
     }
 
     private bool CanPlay(ESound sound, int maxConcurrent)
@@ -386,15 +508,30 @@ public class SoundManager : MonoSingleton<SoundManager>
         _bgmA = a.AddComponent<AudioSource>();
         _bgmA.loop = true;
         _bgmA.playOnAwake = false;
+        _bgmA.spatialBlend = 0f;
 
         GameObject b = new GameObject("BGM_B");
         b.transform.SetParent(transform);
         _bgmB = b.AddComponent<AudioSource>();
         _bgmB.loop = true;
         _bgmB.playOnAwake = false;
+        _bgmB.spatialBlend = 0f;
 
         _currentBgm = _bgmA;
         _nextBgm = _bgmB;
+
+        if (_groupBgm != null)
+        {
+            _bgmA.outputAudioMixerGroup = _groupBgm;
+            _bgmB.outputAudioMixerGroup = _groupBgm;
+        }
+        else
+        {
+            _bgmA.outputAudioMixerGroup = null;
+            _bgmB.outputAudioMixerGroup = null;
+        }
+
+        ApplyFallbackVolumesIfNoMixer();
     }
 
     private AudioClip GetCachedClip(string address)
@@ -467,6 +604,26 @@ public class SoundManager : MonoSingleton<SoundManager>
         SetMixerDb(sfxParam, _settings.sfx);
         SetMixerDb(uiParam, _settings.ui);
         SetMixerDb(voiceParam, _settings.voice);
+    }
+
+    private void ApplyFallbackVolumesIfNoMixer()
+    {
+        if (audioMixer != null)
+        {
+            return;
+        }
+
+        float bgmVol = Mathf.Clamp01(_settings.master * _settings.bgm);
+
+        if (_bgmA != null)
+        {
+            _bgmA.volume = bgmVol;
+        }
+
+        if (_bgmB != null)
+        {
+            _bgmB.volume = bgmVol;
+        }
     }
 
     private void SetMixerDb(string param, float linear01)
