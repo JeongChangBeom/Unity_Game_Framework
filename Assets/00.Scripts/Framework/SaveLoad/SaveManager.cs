@@ -47,7 +47,7 @@ public sealed class SaveManager : MonoSingleton<SaveManager>
             settings.path = "save.es3";
             _provider = new ES3SaveProvider(settings);
 #else
-            _provider = new MemorySaveProvider();
+            _provider = new PlayerPrefsSaveProvider();
 #endif
         }
 

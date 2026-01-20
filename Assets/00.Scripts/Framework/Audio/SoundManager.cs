@@ -29,12 +29,14 @@ public class SoundManager : MonoSingleton<SoundManager>
     [Header("BGM")]
     [SerializeField] private float bgmFadeSeconds = 0.8f;
 
-    [Header("Save")]
-    [SerializeField] private string settingsDomain = "settings";
-    [SerializeField] private string audioSettingsKey = "audio";
+    private const string SettingsDomain = "settings";
+    private const string AudioSettingsKey = "audio";
 
     private readonly Dictionary<string, AsyncOperationHandle<AudioClip>> _clipHandles = new Dictionary<string, AsyncOperationHandle<AudioClip>>();
     private readonly Dictionary<string, AudioClip> _clipCache = new Dictionary<string, AudioClip>();
+
+    private readonly Dictionary<string, List<System.Action<AudioClip>>> _pendingCallbacksByAddress =
+        new Dictionary<string, List<System.Action<AudioClip>>>();
 
     private readonly Dictionary<ESound, int> _playingCountBySound = new Dictionary<ESound, int>();
 
@@ -196,6 +198,7 @@ public class SoundManager : MonoSingleton<SoundManager>
 
         _clipHandles.Clear();
         _clipCache.Clear();
+        _pendingCallbacksByAddress.Clear();
     }
 
     private void ResolveDatabaseOrError()
@@ -205,36 +208,37 @@ public class SoundManager : MonoSingleton<SoundManager>
             return;
         }
 
-        _databaseResolved = true;
-
         if (database != null)
         {
+            _databaseResolved = true;
             return;
         }
 
         string p0 = resourcesDatabasePath;
         if (string.IsNullOrEmpty(p0))
         {
-            p0 = "SoundDatabase";
+            p0 = "SoundDatabaseSO";
         }
 
         SoundDatabaseSO a = Resources.Load<SoundDatabaseSO>(p0);
         if (a != null)
         {
             database = a;
+            _databaseResolved = true;
             return;
         }
 
         string p1 = resourcesDatabasePathFallback;
         if (string.IsNullOrEmpty(p1))
         {
-            p1 = "Audio/SoundDatabase";
+            p1 = "Audio/SoundDatabaseSO";
         }
 
         SoundDatabaseSO b = Resources.Load<SoundDatabaseSO>(p1);
         if (b != null)
         {
             database = b;
+            _databaseResolved = true;
             return;
         }
 
@@ -405,25 +409,27 @@ public class SoundManager : MonoSingleton<SoundManager>
 
     private void LoadClipAsync(string address, System.Action<AudioClip> onDone)
     {
+        if (string.IsNullOrEmpty(address))
+        {
+            onDone?.Invoke(null);
+            return;
+        }
+
+        if (_clipCache.ContainsKey(address))
+        {
+            onDone?.Invoke(_clipCache[address]);
+            return;
+        }
+
+        if (_pendingCallbacksByAddress.ContainsKey(address) == false)
+        {
+            _pendingCallbacksByAddress[address] = new List<System.Action<AudioClip>>();
+        }
+
+        _pendingCallbacksByAddress[address].Add(onDone);
+
         if (_clipHandles.ContainsKey(address))
         {
-            AsyncOperationHandle<AudioClip> handle = _clipHandles[address];
-
-            if (handle.IsDone)
-            {
-                AudioClip c = handle.Result;
-                CacheClip(address, c);
-                onDone?.Invoke(c);
-                return;
-            }
-
-            handle.Completed += (h) =>
-            {
-                AudioClip c = h.Result;
-                CacheClip(address, c);
-                onDone?.Invoke(c);
-            };
-
             return;
         }
 
@@ -433,19 +439,20 @@ public class SoundManager : MonoSingleton<SoundManager>
         newHandle.Completed += (h) =>
         {
             AudioClip c = h.Result;
-            CacheClip(address, c);
-            onDone?.Invoke(c);
+
+            if (c != null)
+            {
+                _clipCache[address] = c;
+            }
+
+            List<System.Action<AudioClip>> callbacks = _pendingCallbacksByAddress[address];
+            _pendingCallbacksByAddress.Remove(address);
+
+            for (int i = 0; i < callbacks.Count; i++)
+            {
+                callbacks[i]?.Invoke(c);
+            }
         };
-    }
-
-    private void CacheClip(string address, AudioClip clip)
-    {
-        if (clip == null)
-        {
-            return;
-        }
-
-        _clipCache[address] = clip;
     }
 
     private void ApplyMixerVolumes()
@@ -486,19 +493,7 @@ public class SoundManager : MonoSingleton<SoundManager>
 
     private SaveKey GetAudioSettingsSaveKey()
     {
-        string domain = settingsDomain;
-        if (string.IsNullOrWhiteSpace(domain))
-        {
-            domain = "settings";
-        }
-
-        string key = audioSettingsKey;
-        if (string.IsNullOrWhiteSpace(key))
-        {
-            key = "audio";
-        }
-
-        return SaveManager.Instance.Domain(domain).Join(key);
+        return SaveManager.Instance.Domain(SettingsDomain).Join(AudioSettingsKey);
     }
 
     private void LoadSettings()

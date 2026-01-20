@@ -25,22 +25,56 @@ public class SoundDatabaseSO : ScriptableObject
 
     public bool TryGet(ESound id, out Entry entry)
     {
-        BuildCacheIfNeeded();
+        entry = null;
 
-        if (_cache.ContainsKey(id))
+        if (id == ESound.None)
         {
-            entry = _cache[id];
-            return true;
+            return false;
         }
 
-        entry = null;
-        return false;
+        BuildCacheIfNeeded();
+
+        if (_cache == null)
+        {
+            return false;
+        }
+
+        if (_cache.ContainsKey(id) == false)
+        {
+            return false;
+        }
+
+        entry = _cache[id];
+        if (entry == null)
+        {
+            return false;
+        }
+
+        return true;
     }
 
     public void SetEntries(List<Entry> newEntries)
     {
+        if (newEntries == null)
+        {
+            newEntries = new List<Entry>();
+        }
+
         entries = newEntries;
+
         _cacheBuilt = false;
+        _cache = null;
+    }
+
+    private void OnEnable()
+    {
+        _cacheBuilt = false;
+    }
+
+    private void OnValidate()
+    {
+        _cacheBuilt = false;
+        _cache = null;
     }
 
     private void BuildCacheIfNeeded()
@@ -48,6 +82,13 @@ public class SoundDatabaseSO : ScriptableObject
         if (_cacheBuilt)
         {
             return;
+        }
+
+        _cacheBuilt = true;
+
+        if (entries == null)
+        {
+            entries = new List<Entry>();
         }
 
         if (_cache == null)
@@ -62,8 +103,12 @@ public class SoundDatabaseSO : ScriptableObject
         for (int i = 0; i < entries.Count; i++)
         {
             Entry e = entries[i];
-
             if (e == null)
+            {
+                continue;
+            }
+
+            if (e.id == ESound.None)
             {
                 continue;
             }
@@ -75,7 +120,5 @@ public class SoundDatabaseSO : ScriptableObject
 
             _cache.Add(e.id, e);
         }
-
-        _cacheBuilt = true;
     }
 }
