@@ -29,6 +29,10 @@ public class SoundManager : MonoSingleton<SoundManager>
     [Header("BGM")]
     [SerializeField] private float bgmFadeSeconds = 0.8f;
 
+    [Header("Save")]
+    [SerializeField] private string settingsDomain = "settings";
+    [SerializeField] private string audioSettingsKey = "audio";
+
     private readonly Dictionary<string, AsyncOperationHandle<AudioClip>> _clipHandles = new Dictionary<string, AsyncOperationHandle<AudioClip>>();
     private readonly Dictionary<string, AudioClip> _clipCache = new Dictionary<string, AudioClip>();
 
@@ -40,7 +44,6 @@ public class SoundManager : MonoSingleton<SoundManager>
     private AudioSource _nextBgm;
 
     private AudioSettingsData _settings = new AudioSettingsData();
-    private const string SAVE_KEY = "AudioSettings";
 
     private SoundPlayerPool _playerPool;
 
@@ -51,7 +54,9 @@ public class SoundManager : MonoSingleton<SoundManager>
     {
         ResolveDatabaseOrError();
         SetupBgmSources();
+
         _playerPool = new SoundPlayerPool(transform, initialPoolCount, maxPoolCount);
+
         LoadSettings();
         ApplyMixerVolumes();
     }
@@ -479,38 +484,43 @@ public class SoundManager : MonoSingleton<SoundManager>
         audioMixer.SetFloat(param, db);
     }
 
+    private SaveKey GetAudioSettingsSaveKey()
+    {
+        string domain = settingsDomain;
+        if (string.IsNullOrWhiteSpace(domain))
+        {
+            domain = "settings";
+        }
+
+        string key = audioSettingsKey;
+        if (string.IsNullOrWhiteSpace(key))
+        {
+            key = "audio";
+        }
+
+        return SaveManager.Instance.Domain(domain).Join(key);
+    }
+
     private void LoadSettings()
     {
-#if ES3
-        if (ES3.KeyExists(SAVE_KEY))
-        {
-            _settings = ES3.Load<AudioSettingsData>(SAVE_KEY);
-        }
-        else
+        SaveKey key = GetAudioSettingsSaveKey();
+
+        _settings = SaveManager.Instance.LoadOrCreate(
+            key,
+            () => new AudioSettingsData(),
+            saveIfMissing: true
+        );
+
+        if (_settings == null)
         {
             _settings = new AudioSettingsData();
         }
-#else
-        _settings.master = PlayerPrefs.GetFloat(SAVE_KEY + "_master", 1f);
-        _settings.bgm = PlayerPrefs.GetFloat(SAVE_KEY + "_bgm", 1f);
-        _settings.sfx = PlayerPrefs.GetFloat(SAVE_KEY + "_sfx", 1f);
-        _settings.ui = PlayerPrefs.GetFloat(SAVE_KEY + "_ui", 1f);
-        _settings.voice = PlayerPrefs.GetFloat(SAVE_KEY + "_voice", 1f);
-#endif
     }
 
     private void SaveSettings()
     {
-#if ES3
-        ES3.Save(SAVE_KEY, _settings);
-#else
-        PlayerPrefs.SetFloat(SAVE_KEY + "_master", _settings.master);
-        PlayerPrefs.SetFloat(SAVE_KEY + "_bgm", _settings.bgm);
-        PlayerPrefs.SetFloat(SAVE_KEY + "_sfx", _settings.sfx);
-        PlayerPrefs.SetFloat(SAVE_KEY + "_ui", _settings.ui);
-        PlayerPrefs.SetFloat(SAVE_KEY + "_voice", _settings.voice);
-        PlayerPrefs.Save();
-#endif
+        SaveKey key = GetAudioSettingsSaveKey();
+        SaveManager.Instance.Save(key, _settings);
     }
 
     private IEnumerator FadeOutCoroutine(AudioSource src, float seconds, bool stopAfter)
