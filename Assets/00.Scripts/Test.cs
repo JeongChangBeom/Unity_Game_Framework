@@ -1,440 +1,376 @@
 using System;
-using System.Collections.Generic;
 using UnityEngine;
 
-public class SoundPlayTester : MonoBehaviour
+public sealed class TimeFrameworkTester : MonoBehaviour
 {
-    [Header("Database")]
-    [SerializeField] private SoundDatabaseSO database;
+    [Header("Cooldown Test")]
+    [SerializeField] private string _cooldownId = "skill_test_30s";
+    [SerializeField] private int _cooldownSeconds = 30;
 
-    [Header("Play")]
-    [SerializeField] private bool playOnStart;
-    [SerializeField] private int startIndex;
-    [SerializeField] private float sfxVolumeMul = 1f;
-    [SerializeField] private float sfxPitch = 1f;
-
-    [Header("Mixer Volumes (Saved)")]
-    [SerializeField] private float masterVolume = 1f;
-    [SerializeField] private float bgmVolume = 1f;
-    [SerializeField] private float sfxVolume = 1f;
-    [SerializeField] private float uiVolume = 1f;
-    [SerializeField] private float voiceVolume = 1f;
-
-    private readonly List<Item> _items = new List<Item>();
-    private int _index;
-
-    private struct Item
-    {
-        public SoundDatabaseSO.Entry entry;
-        public ESound sound;
-        public bool valid;
-    }
-
-    private void Start()
-    {
-        BuildList();
-
-        if (_items.Count <= 0)
-        {
-            Debug.LogError("[SoundPlayTester] No valid entries. Assign SoundDatabaseSO and run Build Sound Database first. " +
-                           "Also ensure entry.id matches ESound enum name.");
-            return;
-        }
-
-        _index = Mathf.Clamp(startIndex, 0, _items.Count - 1);
-
-        SyncFromSoundManager();
-
-        if (playOnStart)
-        {
-            PlaySelected();
-        }
-    }
+    private string _log = "";
+    private Vector2 _scroll;
 
     private void Update()
     {
-        if (_items.Count <= 0)
+        if (Input.GetKeyDown(KeyCode.F1))
         {
-            return;
-        }
-
-        if (Input.GetKeyDown(KeyCode.UpArrow))
-        {
-            Prev();
-        }
-
-        if (Input.GetKeyDown(KeyCode.DownArrow))
-        {
-            Next();
-        }
-
-        if (Input.GetKeyDown(KeyCode.Return) || Input.GetKeyDown(KeyCode.Space))
-        {
-            PlaySelected();
-        }
-
-        if (Input.GetKeyDown(KeyCode.BackQuote))
-        {
-            StopBgm();
-        }
-
-        if (Input.GetKeyDown(KeyCode.R))
-        {
-            BuildList();
-        }
-
-        if (Input.GetKeyDown(KeyCode.F))
-        {
-            ForceFlush();
-        }
-
-        for (int i = 0; i < 10; i++)
-        {
-            KeyCode key = KeyCode.Alpha0 + i;
-            if (Input.GetKeyDown(key))
-            {
-                JumpByNumber(i);
-            }
+            SafeLog("F1: Print Snapshot");
+            PrintSnapshot();
         }
     }
 
     private void OnGUI()
     {
-        if (_items.Count <= 0)
+        GUI.skin.label.fontSize = 14;
+        GUI.skin.button.fontSize = 14;
+
+        GUILayout.BeginArea(new Rect(20, 20, 520, Screen.height - 40));
+        GUILayout.Label("Time Framework Tester (UTC)");
+
+        if (GUILayout.Button("1) Snapshot (UtcNow / Mode / Trusted / CheatFlag)"))
         {
-            GUI.Label(new Rect(10, 10, 900, 25),
-                "SoundPlayTester: No valid entries. Assign SoundDatabaseSO and ensure entry.id == ESound name.");
-            return;
+            PrintSnapshot();
         }
 
-        int x = 10;
-        int y = 10;
+        GUILayout.Space(10);
 
-        GUI.Label(new Rect(x, y, 1000, 25),
-            "↑/↓: Select | Enter/Space: Play | `: Stop BGM | R: Reload DB | 0~9: Jump | F: Flush Save");
+        GUILayout.Label("Cooldown: id = " + _cooldownId + ", duration = " + _cooldownSeconds + "s");
 
-        y += 30;
-
-        Item it = _items[_index];
-        SoundDatabaseSO.Entry e = it.entry;
-
-        GUI.Label(new Rect(x, y, 1200, 25),
-            "Selected [" + _index + "/" + (_items.Count - 1) + "] : " +
-            it.sound + " / " + e.fileName + " / " + e.channel);
-
-        y += 30;
-
-        if (GUI.Button(new Rect(x, y, 140, 30), "Play Selected"))
+        if (GUILayout.Button("2) Try Use Skill (Start 30s if ready)"))
         {
-            PlaySelected();
+            TryUseSkill();
         }
 
-        if (GUI.Button(new Rect(x + 150, y, 140, 30), "Prev"))
+        if (GUILayout.Button("3) Print Cooldown Remaining"))
         {
-            Prev();
+            PrintCooldown();
         }
 
-        if (GUI.Button(new Rect(x + 300, y, 140, 30), "Next"))
+        if (GUILayout.Button("4) Clear Cooldown"))
         {
-            Next();
+            ClearCooldown();
         }
 
-        if (GUI.Button(new Rect(x + 450, y, 140, 30), "Stop BGM"))
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("5) Print Reset Keys (Daily/Weekly/Monthly)"))
         {
-            StopBgm();
+            PrintResetKeys();
         }
 
-        if (GUI.Button(new Rect(x + 600, y, 140, 30), "Flush Save"))
+        if (GUILayout.Button("6) Print Remaining To Resets"))
         {
-            ForceFlush();
+            PrintResetRemaining();
         }
 
-        y += 45;
+        GUILayout.Space(10);
 
-        GUI.Label(new Rect(x, y, 300, 25), "SFX VolumeMul: " + sfxVolumeMul.ToString("0.00"));
-        sfxVolumeMul = GUI.HorizontalSlider(new Rect(x + 140, y + 8, 200, 20), sfxVolumeMul, 0f, 2f);
+        GUILayout.Label("Server Time");
 
-        y += 25;
-
-        GUI.Label(new Rect(x, y, 300, 25), "SFX Pitch: " + sfxPitch.ToString("0.00"));
-        sfxPitch = GUI.HorizontalSlider(new Rect(x + 140, y + 8, 200, 20), sfxPitch, 0.5f, 2f);
-
-        y += 35;
-
-        GUI.Box(new Rect(x, y, 620, 165), "Saved Mixer Volumes (change -> saved via SoundManager)");
-        y += 25;
-
-        DrawSavedVolumeSlider(x, ref y, "Master", ref masterVolume, 0f, 1f, ApplyMaster);
-        DrawSavedVolumeSlider(x, ref y, "BGM", ref bgmVolume, 0f, 1f, ApplyBgm);
-        DrawSavedVolumeSlider(x, ref y, "SFX", ref sfxVolume, 0f, 1f, ApplySfx);
-        DrawSavedVolumeSlider(x, ref y, "UI", ref uiVolume, 0f, 1f, ApplyUi);
-        DrawSavedVolumeSlider(x, ref y, "Voice", ref voiceVolume, 0f, 1f, ApplyVoice);
-
-        y += 10;
-
-        int listHeight = Mathf.Min(18, _items.Count) * 20;
-        GUI.Box(new Rect(x, y, 620, listHeight + 10), "Entries (top 18)");
-
-        int showCount = Mathf.Min(18, _items.Count);
-        int start = Mathf.Clamp(_index - showCount / 2, 0, Mathf.Max(0, _items.Count - showCount));
-
-        for (int i = 0; i < showCount; i++)
+        if (GUILayout.Button("7) Apply Server Utc = Device Utc + 120s"))
         {
-            int idx = start + i;
-            Item row = _items[idx];
-            SoundDatabaseSO.Entry rowEntry = row.entry;
-
-            Rect r = new Rect(x + 10, y + 20 + i * 20, 600, 20);
-            string text = idx + ": " + row.sound + " (" + rowEntry.fileName + ") [" + rowEntry.channel + "]";
-
-            if (idx == _index)
-            {
-                GUI.Label(r, "▶ " + text);
-            }
-            else
-            {
-                if (GUI.Button(r, text))
-                {
-                    _index = idx;
-                    PlaySelected();
-                }
-            }
+            ApplyServerPlusSeconds(120);
         }
+
+        if (GUILayout.Button("8) Clear Server Sync"))
+        {
+            ClearServerSync();
+        }
+
+        GUILayout.Space(10);
+
+        GUILayout.Label("Mock Time");
+
+        if (GUILayout.Button("9) Enable Mock"))
+        {
+            EnableMock();
+        }
+
+        if (GUILayout.Button("10) Disable Mock"))
+        {
+            DisableMock();
+        }
+
+        if (GUILayout.Button("11) Add Mock +60s"))
+        {
+            AddMockSeconds(60);
+        }
+
+        if (GUILayout.Button("12) Add Mock -60s (Backward Test)"))
+        {
+            AddMockSeconds(-60);
+        }
+
+        if (GUILayout.Button("13) Jump To Next Daily Reset (Test)"))
+        {
+            JumpToNextDailyReset();
+        }
+
+        GUILayout.Space(10);
+
+        GUILayout.Label("Cheat / Offline");
+
+        if (GUILayout.Button("14) Print Offline Delta"))
+        {
+            PrintOfflineDelta();
+        }
+
+        if (GUILayout.Button("15) Clear Cheat Flag"))
+        {
+            ClearCheatFlag();
+        }
+
+        GUILayout.Space(10);
+
+        if (GUILayout.Button("Clear Log"))
+        {
+            _log = "";
+        }
+
+        GUILayout.Space(10);
+
+        _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(260));
+        GUILayout.TextArea(_log);
+        GUILayout.EndScrollView();
+
+        GUILayout.EndArea();
     }
 
-    private void DrawSavedVolumeSlider(
-        int x,
-        ref int y,
-        string label,
-        ref float value,
-        float min,
-        float max,
-        Action<float> onChanged
-    )
+    private bool IsReady()
     {
-        GUI.Label(new Rect(x + 10, y, 200, 25), label + ": " + value.ToString("0.00"));
+        TimeManager tm;
 
-        float next = GUI.HorizontalSlider(new Rect(x + 140, y + 8, 200, 20), value, min, max);
-
-        if (Mathf.Abs(next - value) > 0.0001f)
+        try
         {
-            value = next;
-            if (onChanged != null)
-            {
-                onChanged(value);
-            }
+            tm = TimeManager.Instance;
+        }
+        catch (Exception e)
+        {
+            SafeLog("TimeManager.Instance exception: " + e.Message);
+            return false;
         }
 
-        y += 25;
+        if (tm == null)
+        {
+            SafeLog("TimeManager.Instance is null.");
+            return false;
+        }
+
+        return true;
     }
 
-    private void SyncFromSoundManager()
+    private void PrintSnapshot()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        masterVolume = SoundManager.Instance.GetMasterVolume();
-        bgmVolume = SoundManager.Instance.GetChannelVolume(EAudioChannel.BGM);
-        sfxVolume = SoundManager.Instance.GetChannelVolume(EAudioChannel.SFX);
-        uiVolume = SoundManager.Instance.GetChannelVolume(EAudioChannel.UI);
-        voiceVolume = SoundManager.Instance.GetChannelVolume(EAudioChannel.Voice);
+        DateTimeOffset now = TimeManager.Instance.UtcNow;
+        bool trusted = TimeManager.Instance.IsTrusted;
+        TimeMode mode = TimeManager.Instance.Mode;
+        bool cheat = TimeManager.Instance.IsCheatDetected;
+
+        SafeLog("Snapshot:");
+        SafeLog("  UtcNow: " + now.ToString("O"));
+        SafeLog("  Mode: " + mode);
+        SafeLog("  Trusted: " + trusted);
+        SafeLog("  CheatDetected: " + cheat);
     }
 
-    private void ApplyMaster(float v)
+    private void TryUseSkill()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SoundManager.Instance.SetMasterVolume(v);
+        bool ready = TimeManager.Instance.IsCooldownReady(_cooldownId);
+        if (!ready)
+        {
+            TimeSpan remain = TimeManager.Instance.GetCooldownRemaining(_cooldownId);
+            SafeLog("Skill NOT ready. Remaining: " + remain.TotalSeconds.ToString("0.00") + "s");
+            return;
+        }
+
+        TimeManager.Instance.StartCooldown(_cooldownId, TimeSpan.FromSeconds(_cooldownSeconds));
+        SafeLog("Skill USED. Cooldown started: " + _cooldownSeconds + "s");
     }
 
-    private void ApplyBgm(float v)
+    private void PrintCooldown()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SoundManager.Instance.SetChannelVolume(EAudioChannel.BGM, v);
+        bool ready = TimeManager.Instance.IsCooldownReady(_cooldownId);
+        TimeSpan remain = TimeManager.Instance.GetCooldownRemaining(_cooldownId);
+
+        SafeLog("Cooldown:");
+        SafeLog("  Ready: " + ready);
+        SafeLog("  Remaining: " + remain.TotalSeconds.ToString("0.00") + "s");
+        SafeLog("  RemainingText(HH:MM:SS): " + TimeUtil.FormatHhMmSs(remain));
     }
 
-    private void ApplySfx(float v)
+    private void ClearCooldown()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SoundManager.Instance.SetChannelVolume(EAudioChannel.SFX, v);
+        TimeManager.Instance.ClearCooldown("skill_test_30s");
+        SafeLog("Cooldown cleared: " + _cooldownId);
     }
 
-    private void ApplyUi(float v)
+    private void PrintResetKeys()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SoundManager.Instance.SetChannelVolume(EAudioChannel.UI, v);
+        int d = TimeManager.Instance.GetDailyKey();
+        int w = TimeManager.Instance.GetWeeklyKey();
+        int m = TimeManager.Instance.GetMonthlyKey();
+
+        SafeLog("Reset Keys:");
+        SafeLog("  DailyKey: " + d);
+        SafeLog("  WeeklyKey: " + w);
+        SafeLog("  MonthlyKey: " + m);
     }
 
-    private void ApplyVoice(float v)
+    private void PrintResetRemaining()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SoundManager.Instance.SetChannelVolume(EAudioChannel.Voice, v);
+        TimeSpan d = TimeManager.Instance.GetRemainingToDailyReset();
+        TimeSpan w = TimeManager.Instance.GetRemainingToWeeklyReset();
+        TimeSpan m = TimeManager.Instance.GetRemainingToMonthlyReset();
+
+        SafeLog("Remaining To Reset:");
+        SafeLog("  Daily: " + d.TotalSeconds.ToString("0.00") + "s (" + TimeUtil.FormatDaysHoursMinutes(d) + ")");
+        SafeLog("  Weekly: " + w.TotalSeconds.ToString("0.00") + "s (" + TimeUtil.FormatDaysHoursMinutes(w) + ")");
+        SafeLog("  Monthly: " + m.TotalSeconds.ToString("0.00") + "s (" + TimeUtil.FormatDaysHoursMinutes(m) + ")");
     }
 
-    private void ForceFlush()
+    private void ApplyServerPlusSeconds(int seconds)
     {
-        if (SaveManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SaveManager.Instance.Flush();
+        DateTimeOffset serverUtc = DateTimeOffset.UtcNow.AddSeconds(seconds);
+        TimeManager.Instance.ApplyServerUtc(serverUtc);
+
+        SafeLog("ApplyServerUtc: DeviceUtc + " + seconds + "s");
+        SafeLog("  Applied: " + serverUtc.ToString("O"));
+        PrintSnapshot();
     }
 
-    private void BuildList()
+    private void ClearServerSync()
     {
-        _items.Clear();
-
-        if (database == null)
+        if (!IsReady())
         {
-            Debug.LogWarning("[SoundPlayTester] database is null. Please assign SoundDatabaseSO.");
-            _index = 0;
             return;
         }
 
-        IReadOnlyList<SoundDatabaseSO.Entry> src = database.Entries;
-        if (src == null)
-        {
-            Debug.LogWarning("[SoundPlayTester] database.Entries is null.");
-            _index = 0;
-            return;
-        }
-
-        int invalidIdCount = 0;
-
-        for (int i = 0; i < src.Count; i++)
-        {
-            SoundDatabaseSO.Entry e = src[i];
-            if (e == null)
-            {
-                continue;
-            }
-
-            if (e.id == ESound.None)
-            {
-                continue;
-            }
-
-            Item item = new Item();
-            item.entry = e;
-            item.sound = e.id;
-            item.valid = true;
-
-            _items.Add(item);
-        }
-
-
-        if (invalidIdCount > 0)
-        {
-            Debug.LogWarning("[SoundPlayTester] Skipped " + invalidIdCount +
-                             " entries because entry.id could not be parsed to ESound. " +
-                             "Ensure entry.id exactly matches the ESound enum name.");
-        }
-
-        if (_items.Count > 0)
-        {
-            _index = Mathf.Clamp(_index, 0, _items.Count - 1);
-        }
-        else
-        {
-            _index = 0;
-        }
+        TimeManager.Instance.ClearServerSync();
+        SafeLog("Server sync cleared.");
+        PrintSnapshot();
     }
 
-    private void Prev()
+    private void EnableMock()
     {
-        _index--;
-        if (_index < 0)
+        if (!IsReady())
         {
-            _index = _items.Count - 1;
+            return;
         }
+
+        TimeManager.Instance.EnableMockTime();
+        SafeLog("Mock enabled.");
+        PrintSnapshot();
     }
 
-    private void Next()
+    private void DisableMock()
     {
-        _index++;
-        if (_index >= _items.Count)
+        if (!IsReady())
         {
-            _index = 0;
+            return;
         }
+
+        TimeManager.Instance.DisableMockTime();
+        SafeLog("Mock disabled.");
+        PrintSnapshot();
     }
 
-    private void JumpByNumber(int n)
+    private void AddMockSeconds(long seconds)
     {
-        if (_items.Count <= 0)
+        if (!IsReady())
         {
             return;
         }
 
-        int chunk = Mathf.Max(1, _items.Count / 10);
-        int target = n * chunk;
-        if (target >= _items.Count)
-        {
-            target = _items.Count - 1;
-        }
+        TimeManager.Instance.EnableMockTime();
+        TimeManager.Instance.AddMockSeconds(seconds);
 
-        _index = target;
-        PlaySelected();
+        SafeLog("Mock offset changed: " + (seconds >= 0 ? "+" : "") + seconds + "s");
+        PrintSnapshot();
     }
 
-    private void PlaySelected()
+    private void JumpToNextDailyReset()
     {
-        if (_items.Count <= 0)
+        if (!IsReady())
         {
             return;
         }
 
-        if (SoundManager.Instance == null)
-        {
-            Debug.LogError("[SoundPlayTester] SoundManager.Instance is null.");
-            return;
-        }
-
-        Item it = _items[_index];
-        SoundDatabaseSO.Entry e = it.entry;
-
-        if (e == null)
-        {
-            return;
-        }
-
-        if (e.channel == EAudioChannel.BGM)
-        {
-            SoundManager.Instance.PlaySound(it.sound);
-            return;
-        }
-
-        SoundManager.Instance.PlaySound(it.sound, sfxVolumeMul, sfxPitch);
+        TimeManager.Instance.JumpToNextDailyResetForTest();
+        SafeLog("Jumped to next daily reset (mock enabled).");
+        PrintSnapshot();
+        PrintResetKeys();
+        PrintResetRemaining();
     }
 
-    private void StopBgm()
+    private void PrintOfflineDelta()
     {
-        if (SoundManager.Instance == null)
+        if (!IsReady())
         {
             return;
         }
 
-        SoundManager.Instance.StopBgm();
+        TimeSpan offline = TimeManager.Instance.GetOfflineDelta();
+        SafeLog("OfflineDelta: " + offline.TotalSeconds.ToString("0.00") + "s");
+    }
+
+    private void ClearCheatFlag()
+    {
+        if (!IsReady())
+        {
+            return;
+        }
+
+        TimeManager.Instance.ClearCheatFlag();
+        SafeLog("Cheat flag cleared.");
+        PrintSnapshot();
+    }
+
+    private void SafeLog(string msg)
+    {
+        string line = DateTime.Now.ToString("HH:mm:ss") + " | " + msg;
+        Debug.Log(line);
+
+        if (string.IsNullOrEmpty(_log))
+        {
+            _log = line;
+            return;
+        }
+
+        _log = _log + "\n" + line;
     }
 }
