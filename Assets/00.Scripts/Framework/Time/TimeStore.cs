@@ -1,4 +1,5 @@
 using System;
+using System.Globalization;
 
 public sealed class TimeStore
 {
@@ -55,9 +56,16 @@ public sealed class TimeStore
 
     public long GetLong(string localKey, long defaultValue)
     {
+        string raw;
+        bool ok = _save.TryLoad(K(localKey), out raw);
+        if (!ok || string.IsNullOrWhiteSpace(raw))
+        {
+            return defaultValue;
+        }
+
         long v;
-        bool ok = _save.TryLoad(K(localKey), out v);
-        if (!ok)
+        bool parsed = long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out v);
+        if (!parsed)
         {
             return defaultValue;
         }
@@ -67,7 +75,8 @@ public sealed class TimeStore
 
     public void SetLong(string localKey, long value)
     {
-        _save.Save(K(localKey), value);
+        string s = value.ToString(CultureInfo.InvariantCulture);
+        _save.Save(K(localKey), s);
     }
 
     public string GetString(string localKey, string defaultValue)
