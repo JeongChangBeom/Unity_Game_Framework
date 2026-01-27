@@ -1,168 +1,250 @@
 using System;
 using System.Collections.Generic;
+using UnityEngine;
 
-public sealed class TimeManager
+public sealed class TimeManager : MonoSingleton<TimeManager>
 {
-    private readonly TimeFrameworkConfig _config;
-    private readonly TimeStore _store;
-
-    private readonly TimeService _time;
-    private readonly TimeCheatGuard _guard;
-
-    private readonly ResetRule _dailyRule;
-    private readonly ResetRule _weeklyRule;
-    private readonly ResetRule _monthlyRule;
-
-    private readonly Dictionary<string, CooldownTimer> _cooldowns = new Dictionary<string, CooldownTimer>(64);
-
-    public TimeManager(TimeFrameworkConfig config, SaveManager save, IMonotonicClock monotonicClock)
+    public DateTimeOffset UtcNow
     {
-        if (config == null)
+        get
         {
-            throw new ArgumentNullException(nameof(config));
+            EnsureReady();
+            return _time.UtcNow;
         }
-
-        if (save == null)
-        {
-            throw new ArgumentNullException(nameof(save));
-        }
-
-        if (monotonicClock == null)
-        {
-            throw new ArgumentNullException(nameof(monotonicClock));
-        }
-
-        _config = config;
-        _store = new TimeStore(save);
-
-        EnsureSchema(config.SchemaVersion);
-
-        _time = new TimeService(config, _store, monotonicClock);
-        _guard = new TimeCheatGuard(_store, config.BackwardToleranceSeconds);
-
-        _dailyRule = new ResetRule(ResetType.Daily, config.DailyResetHour, config.WeeklyResetDay);
-        _weeklyRule = new ResetRule(ResetType.Weekly, config.DailyResetHour, config.WeeklyResetDay);
-        _monthlyRule = new ResetRule(ResetType.Monthly, config.DailyResetHour, config.WeeklyResetDay);
     }
 
-    public DateTimeOffset UtcNow => _time.UtcNow;
-    public bool IsTrusted => _time.IsTrusted;
+    public bool IsTrusted
+    {
+        get
+        {
+            EnsureReady();
+            return _time.IsTrusted;
+        }
+    }
 
     public TimeMode Mode
     {
-        get => _time.Mode;
-        set => _time.Mode = value;
+        get
+        {
+            EnsureReady();
+            return _time.Mode;
+        }
+        set
+        {
+            EnsureReady();
+            _time.Mode = value;
+        }
+    }
+
+    public bool IsCheatDetected
+    {
+        get
+        {
+            EnsureReady();
+            return _guard.IsCheatDetected();
+        }
+    }
+
+    [Header("Config (UTC)")]
+    [SerializeField] private TimeMode _mode = TimeMode.PreferServer;
+    [SerializeField] private int _dailyResetHour = 0;
+    [SerializeField] private DayOfWeek _weeklyResetDay = DayOfWeek.Monday;
+
+    [Header("Security")]
+    [SerializeField] private int _backwardToleranceSeconds = 120;
+
+    [Header("Server Time Trust Window")]
+    [SerializeField] private int _serverTrustWindowSeconds = 24 * 60 * 60;
+
+    [Header("Schema")]
+    [SerializeField] private int _schemaVersion = 1;
+
+    private bool _ready;
+
+    private TimeFrameworkConfig _config;
+    private TimeStore _store;
+
+    private TimeService _time;
+    private TimeCheatGuard _guard;
+
+    private ResetRule _dailyRule;
+    private ResetRule _weeklyRule;
+    private ResetRule _monthlyRule;
+
+    private IMonotonicClock _mono;
+
+    private readonly Dictionary<string, CooldownTimer> _cooldowns = new Dictionary<string, CooldownTimer>(64);
+
+    protected override void OnInitialize()
+    {
+        if (_ready)
+        {
+            return;
+        }
+
+        if (SaveManager.Instance == null || !SaveManager.Instance.IsInitialized)
+        {
+            return;
+        }
+
+        _config = new TimeFrameworkConfig(
+            _mode,
+            _dailyResetHour,
+            _weeklyResetDay,
+            _backwardToleranceSeconds,
+            _serverTrustWindowSeconds,
+            _schemaVersion
+        );
+
+        _mono = new StopwatchMonotonicClock();
+        _store = new TimeStore(SaveManager.Instance);
+
+        EnsureSchema(_config.SchemaVersion);
+
+        _time = new TimeService(_config, _store, _mono);
+        _guard = new TimeCheatGuard(_store, _config.BackwardToleranceSeconds);
+
+        _dailyRule = new ResetRule(ResetType.Daily, _config.DailyResetHour, _config.WeeklyResetDay);
+        _weeklyRule = new ResetRule(ResetType.Weekly, _config.DailyResetHour, _config.WeeklyResetDay);
+        _monthlyRule = new ResetRule(ResetType.Monthly, _config.DailyResetHour, _config.WeeklyResetDay);
+
+        _ready = true;
+    }
+
+    private void OnApplicationPause(bool pause)
+    {
+        if (!_ready)
+        {
+            return;
+        }
+
+        if (pause)
+        {
+            _guard.RecordLastSeen(_time.UtcNow);
+        }
+        else
+        {
+            _guard.CheckBackward(_time.UtcNow, _time.IsTrusted);
+        }
     }
 
     public void ApplyServerUtc(DateTimeOffset serverUtc)
     {
+        EnsureReady();
         _time.Server.ApplyServerUtc(serverUtc);
     }
 
     public void ClearServerSync()
     {
+        EnsureReady();
         _time.Server.Clear();
     }
 
-    public bool IsCheatDetected => _guard.IsCheatDetected();
-
     public void ClearCheatFlag()
     {
+        EnsureReady();
         _guard.ClearCheatFlag();
-    }
-
-    public void OnAppPause()
-    {
-        _guard.RecordLastSeen(UtcNow);
-    }
-
-    public bool OnAppResume()
-    {
-        return _guard.CheckBackward(UtcNow, IsTrusted);
     }
 
     public TimeSpan GetOfflineDelta()
     {
-        return _guard.GetOfflineDelta(UtcNow);
+        EnsureReady();
+        return _guard.GetOfflineDelta(_time.UtcNow);
     }
 
     public TimeSpan GetRemainingToDailyReset()
     {
-        return ResetCalculator.GetRemainingToNextReset(UtcNow, _dailyRule);
+        EnsureReady();
+        return ResetCalculator.GetRemainingToNextReset(_time.UtcNow, _dailyRule);
     }
 
     public TimeSpan GetRemainingToWeeklyReset()
     {
-        return ResetCalculator.GetRemainingToNextReset(UtcNow, _weeklyRule);
+        EnsureReady();
+        return ResetCalculator.GetRemainingToNextReset(_time.UtcNow, _weeklyRule);
     }
 
     public TimeSpan GetRemainingToMonthlyReset()
     {
-        return ResetCalculator.GetRemainingToNextReset(UtcNow, _monthlyRule);
+        EnsureReady();
+        return ResetCalculator.GetRemainingToNextReset(_time.UtcNow, _monthlyRule);
     }
 
     public string GetDailyResetRemainingText()
     {
+        EnsureReady();
         return TimeUtil.FormatDaysHoursMinutes(GetRemainingToDailyReset());
     }
 
     public int GetDailyKey()
     {
-        return ResetKey.GetDailyKey(UtcNow, _dailyRule.ResetHour);
+        EnsureReady();
+        return ResetKey.GetDailyKey(_time.UtcNow, _dailyRule.ResetHour);
     }
 
     public int GetWeeklyKey()
     {
-        return ResetKey.GetWeeklyKey(UtcNow, _weeklyRule.ResetHour, _weeklyRule.WeekStart);
+        EnsureReady();
+        return ResetKey.GetWeeklyKey(_time.UtcNow, _weeklyRule.ResetHour, _weeklyRule.WeekStart);
     }
 
     public int GetMonthlyKey()
     {
-        return ResetKey.GetMonthlyKey(UtcNow, _monthlyRule.ResetHour);
+        EnsureReady();
+        return ResetKey.GetMonthlyKey(_time.UtcNow, _monthlyRule.ResetHour);
     }
 
     public void StartCooldown(string id, TimeSpan duration)
     {
+        EnsureReady();
         CooldownTimer cd = GetOrCreateCooldown(id);
-        cd.Start(UtcNow, duration);
+        cd.Start(_time.UtcNow, duration);
     }
 
     public bool IsCooldownReady(string id)
     {
+        EnsureReady();
         CooldownTimer cd = GetOrCreateCooldown(id);
-        return cd.IsReady(UtcNow);
+        return cd.IsReady(_time.UtcNow);
     }
 
     public TimeSpan GetCooldownRemaining(string id)
     {
+        EnsureReady();
         CooldownTimer cd = GetOrCreateCooldown(id);
-        return cd.GetRemaining(UtcNow);
+        return cd.GetRemaining(_time.UtcNow);
     }
 
     public void ClearCooldown(string id)
     {
+        EnsureReady();
         CooldownTimer cd = GetOrCreateCooldown(id);
         cd.Clear();
     }
 
     public void EnableMockTime()
     {
+        EnsureReady();
         _time.UseMock = true;
     }
 
     public void DisableMockTime()
     {
+        EnsureReady();
         _time.UseMock = false;
     }
 
     public void AddMockSeconds(long seconds)
     {
+        EnsureReady();
         _time.Mock.AddSeconds(seconds);
     }
 
     public void JumpToNextDailyResetForTest()
     {
-        DateTimeOffset nowUtc = UtcNow;
+        EnsureReady();
+
+        DateTimeOffset nowUtc = _time.UtcNow;
         DateTime now = nowUtc.UtcDateTime;
 
         int hour = _config.DailyResetHour;
@@ -239,6 +321,14 @@ public sealed class TimeManager
         if (to < from)
         {
             return;
+        }
+    }
+
+    private void EnsureReady()
+    {
+        if (!_ready)
+        {
+            throw new InvalidOperationException("TimeManager is not initialized yet. Ensure SaveManager is initialized before TimeManager.");
         }
     }
 }
