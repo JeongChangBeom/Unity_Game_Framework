@@ -27,7 +27,10 @@
 - **Save / Load Framework**  
   Provider 기반 저장/로드 시스템 (AutoFlush / Backup / Restore 지원)
 
-> 새로운 프레임워크는 지속적으로 추가될 예정입니다.
+- **Time Framework**
+  UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
+
+> 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
 
@@ -438,8 +441,165 @@ SaveManager.Instance.Save(key, _settings);
 
 ```
 
+---
 
+## 6️⃣ Time Framework
 
+### 기능
+Time Framework는 **게임 전반의 시간 흐름을 통합 관리**하는 시스템입니다.
+모든 시간 계산은 **UTC 기준**으로 동작하며, 서버 시간·쿨타임·리셋·오프라인 경과 시간을 안정저긍로 처리합니다.
 
+---
 
+핵심 기능 요약
+
+|기능|설명|
+|-|-|
+|UTC 기준 시간 제공|`TimeManager.Instance.UtcNow`로 현재 시간 제공|
+|서버 시간 동기화|서버 UTC를 받아 로컬 시간 왜곡 없이 보정|
+|시간 신뢰도 판단|서버 시간 유효 기간 관리(`Trust Window`)|
+|일/주/월 리셋 계산|리셋 시각 기준 키 및 남은 시간 계산|
+|쿨타임 시스템|스킬,상점,보상 등에 사용되는 타이머|
+|오프라인 경과 시간|앱 종료 후 경과 시간 계산|
+|시간 역행(치트) 감지|기기 시간 되돌림 탐지|
+|테스트용 Mock 시간|시간 점프 및 리셋 테스트 지원|
+|Save Framework 연동|모든 시간 데이터 영구 저장|
+
+---
+
+## 씬 배치
+Time Framework는 `MonoSingleton<TimeManager>` 기반입니다.
+
+```text
+⚠ SaveManager보다 먼저 초기화되면 안 되므로
+Boot 씬에 SaveManager와 함께 배치하는 것을 권장합니다.
+```
+
+---
+
+현재 시간 사용
+`DataTimeOffset now = TimeManager.Instance.UtcNow;`
+
+---
+
+서버 시간 적용
+`TimeManager.Instance.ApplyServerUtc(serverUtc);`
+서버 시간이 신뢰 가능할 경우 `PreferServer` 모드에서 자동으로 서버 시간이 사용됩니다.
+
+---
+
+쿨타임 사용
+
+```cs
+// 쿨타임 시작
+TimeManager.Instance.StartCooldown("skill_A", TimeSpan.FromSeconds(30));
+
+// 사용 가능 여부
+bool ready = TimeManager.Instance.IsCooldownReady("skill_A");
+
+// 남은 시간
+TimeSpan remain = TimeManager.Instance.GetCooldownremaining("skill_A");
+
+// 강제 초기화
+TimeManager.Instance.ClearCooldown("skill_A");
+```
+
+---
+
+리셋 키 (Daily / Weekly / Monthly)
+
+```cs
+int dailyKey = TimeManager.Instance.GetDailyKey();
+int weeklyKey = TimeManager.Instance.GetWeeklyKey();
+int monthlyKey = TimeManager.Instance.GetMonthlyKey();
+```
+
+이 키는 **보상 중복 지급 방지**에 사용할 수 있습니다.
+
+---
+
+리셋까지 남은 시간
+
+```cs
+TimeSpan remain = TimeManager.Instance.GetRemainingToDailyReset();
+string text = TimeManager.Instance.GetDailyResetRemainingText();
+```
+
+---
+
+오프라인 경과 시간
+`TimeSpan offline = TimeManager.Instance.GetOfflineDelta();`
+
+스태미나 회복, 생산 정산 등 여러가지 기능을 구현할 때 활용 가능합니다.
+
+---
+
+시간 역행 감지
+bool cheated = TimeManager.Instance.IsCheatDetected;
+TimeManager.Instance.ClearCheatFlag();
+
+---
+
+테스트용 Mock 시간
+
+```cs
+TimeManager.Instance.EnableMockTime();
+TimeManager.Instance.AddMockSeconds(3600); // +1시간
+
+TimeManager.Instance.JumpToNextDailyResetForTest();
+TimeManager.Instnace.DisableMockTime();
+```
+
+---
+
+저장 구조
+Time Framework의 모든 데이터는 Save Framework의 Domain을 사용하여 저장됩니다.
+
+```text
+game/time/...
+```
+
+저장 항목 예:
+* 서버 동기화 시각
+* 마지막 접속 시간
+* 쿨타임 종료 시각
+* Mock 시간 오프셋
+* 치트 플래그
+
+---
+
+## TimeManager Inspector 설정
+
+<img width="539" height="302" alt="image" src="https://github.com/user-attachments/assets/565251e6-2ed5-480e-85f7-f6d55c817576" />
+
+|항목|설명|
+|-|-|
+|Mode|LocalOnly / ServerOnly / PreferServer|
+|Daily reset Hour|일일 리셋 기준 UTC 시각|
+|Weekly Reset Day|주간 리셋 시작 요일|
+|Backward Tolerance Sec|시간 역행 허용 오차|
+|Server Trust Window|서버 시간 신뢰 유효 기간|
+|Schema Version|타임 저장 데이터 버전|
+
+---
+
+## 실제 활용 예시
+
+```cs
+// 스킬 쿨타임
+if(TimeManager.Instance.IsCooldownReady("skill_A"))
+{
+    TimeManager.Instance.StartCooldown("skill_A", TimeSpan.FromSeconds(10));
+    UseDash();
+}
+
+// 일일 보상 리셋 판단
+int todayKey = TimeManager.Instance.GetDailykey();
+if(lastRewardKey != todayKey)
+{
+    GiveDailyReward(); // 일일 보상 주는 보상(미구현)
+}
+```
+
+---
 
