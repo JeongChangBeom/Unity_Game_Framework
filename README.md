@@ -27,7 +27,7 @@
 - **Save / Load Framework**  
   Provider 기반 저장/로드 시스템 (AutoFlush / Backup / Restore 지원)
 
-- **Time Framework**
+- **Time Framework**  
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
 > 프레임워크는 지속적으로 추가될 예정입니다.
