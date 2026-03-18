@@ -1,10 +1,9 @@
 using System;
-using System.Globalization;
 
 public sealed class TimeStore
 {
-    private readonly SaveManager _save;
-    private readonly SaveKey _root;
+    private const string ROOT = "time";
+    private SaveManager _save;
 
     public TimeStore(SaveManager save)
     {
@@ -14,81 +13,51 @@ public sealed class TimeStore
         }
 
         _save = save;
-        _root = _save.Domain("time");
     }
 
-    public SaveKey K(string localKey)
+    private string MakeKey(string localKey)
     {
         if (string.IsNullOrWhiteSpace(localKey))
         {
             throw new ArgumentException("Key is null or whitespace.", nameof(localKey));
         }
 
-        return _root.Join(localKey);
+        return $"{ROOT}/{localKey}";
     }
 
     public bool Has(string localKey)
     {
-        return _save.HasKey(K(localKey));
+        return _save.Has(MakeKey(localKey));
     }
 
     public void Delete(string localKey)
     {
-        _save.Delete(K(localKey));
+        _save.Delete(MakeKey(localKey));
     }
 
     public int GetInt(string localKey, int defaultValue)
     {
-        int v;
-        bool ok = _save.TryLoad(K(localKey), out v);
-        if (!ok)
-        {
-            return defaultValue;
-        }
-
-        return v;
+        return _save.GetOrDefault(MakeKey(localKey), defaultValue);
     }
 
     public void SetInt(string localKey, int value)
     {
-        _save.Save(K(localKey), value);
+        _save.Set(MakeKey(localKey), value);
     }
 
     public long GetLong(string localKey, long defaultValue)
     {
-        string raw;
-        bool ok = _save.TryLoad(K(localKey), out raw);
-        if (!ok || string.IsNullOrWhiteSpace(raw))
-        {
-            return defaultValue;
-        }
-
-        long v;
-        bool parsed = long.TryParse(raw, NumberStyles.Integer, CultureInfo.InvariantCulture, out v);
-        if (!parsed)
-        {
-            return defaultValue;
-        }
-
-        return v;
+        return _save.GetOrDefault(MakeKey(localKey), defaultValue);
     }
 
     public void SetLong(string localKey, long value)
     {
-        string s = value.ToString(CultureInfo.InvariantCulture);
-        _save.Save(K(localKey), s);
+        _save.Set(MakeKey(localKey), value);
     }
 
     public string GetString(string localKey, string defaultValue)
     {
-        string v;
-        bool ok = _save.TryLoad(K(localKey), out v);
-        if (!ok || v == null)
-        {
-            return defaultValue;
-        }
-
-        return v;
+        return _save.GetOrDefault(MakeKey(localKey), defaultValue);
     }
 
     public void SetString(string localKey, string value)
@@ -98,11 +67,11 @@ public sealed class TimeStore
             value = string.Empty;
         }
 
-        _save.Save(K(localKey), value);
+        _save.Set(MakeKey(localKey), value);
     }
 
     public void Flush()
     {
-        _save.Flush();
+        _save.Save();
     }
 }

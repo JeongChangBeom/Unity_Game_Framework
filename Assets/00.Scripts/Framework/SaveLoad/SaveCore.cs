@@ -1,235 +1,125 @@
 using System;
+using System.Collections.Generic;
+using Newtonsoft.Json;
 
 public sealed class SaveCore
 {
-    public int CurrentVersion { get; private set; }
-    public bool IsInitialized { get; private set; }
-
-    public bool AutoFlushEnabled { get; private set; }
-    public float AutoFlushIntervalSeconds { get; private set; }
-
-    private ISaveProvider _provider;
-    private SaveKey _root;
+    private readonly ISaveStorage _storage;
+    private Dictionary<string, object> _data;
 
     private bool _isDirty;
-    private float _dirtyElapsed;
 
-    public void Initialize(ISaveProvider provider, int currentVersion, SaveKey rootKey)
+    public SaveCore(ISaveStorage storage)
     {
-        Initialize(provider, currentVersion, rootKey, autoFlushEnabled: false, autoFlushIntervalSeconds: 5f);
+        _storage = storage ?? throw new ArgumentNullException(nameof(storage));
+        Load();
     }
 
-    public void Initialize(
-        ISaveProvider provider,
-        int currentVersion,
-        SaveKey rootKey,
-        bool autoFlushEnabled,
-        float autoFlushIntervalSeconds
-    )
+    public void Set<T>(string key, T value)
     {
-        if (provider == null)
+        if (string.IsNullOrWhiteSpace(key))
         {
-            throw new ArgumentNullException(nameof(provider));
+            throw new ArgumentException("Key is null or empty.", nameof(key));
         }
 
-        if (currentVersion < 1)
-        {
-            throw new ArgumentOutOfRangeException(nameof(currentVersion), "CurrentVersion must be >= 1.");
-        }
-
-        if (autoFlushIntervalSeconds <= 0f)
-        {
-            autoFlushIntervalSeconds = 1f;
-        }
-
-        _provider = provider;
-        CurrentVersion = currentVersion;
-        _root = rootKey;
-
-        AutoFlushEnabled = autoFlushEnabled;
-        AutoFlushIntervalSeconds = autoFlushIntervalSeconds;
-
-        _isDirty = false;
-        _dirtyElapsed = 0f;
-
-        EnsureMetaInitialized();
-
-        IsInitialized = true;
+        _data[key] = value;
+        _isDirty = true;
     }
 
-    public void ConfigureAutoFlush(bool enabled, float intervalSeconds)
+    public bool TryGet<T>(string key, out T value)
     {
-        EnsureReady();
+        value = default;
 
-        AutoFlushEnabled = enabled;
-
-        if (intervalSeconds <= 0f)
+        if (!_data.TryGetValue(key, out object obj))
         {
-            intervalSeconds = 1f;
+            return false;
         }
 
-        AutoFlushIntervalSeconds = intervalSeconds;
-    }
-
-    public void Tick(float deltaTime)
-    {
-        EnsureReady();
-
-        if (!AutoFlushEnabled)
+        try
         {
-            return;
+            if (obj is T casted)
+            {
+                value = casted;
+                return true;
+            }
+
+            value = JsonConvert.DeserializeObject<T>(
+                JsonConvert.SerializeObject(obj)
+            );
+
+            return true;
         }
-
-        if (!_isDirty)
+        catch
         {
-            return;
-        }
-
-        if (deltaTime < 0f)
-        {
-            deltaTime = 0f;
-        }
-
-        _dirtyElapsed += deltaTime;
-
-        if (_dirtyElapsed >= AutoFlushIntervalSeconds)
-        {
-            Flush();
+            return false;
         }
     }
 
-    public SaveKey Domain(string domain)
+    public T GetOrDefault<T>(string key, T defaultValue)
     {
-        EnsureReady();
-
-        if (string.IsNullOrWhiteSpace(domain))
-        {
-            throw new ArgumentException("Domain cannot be null or whitespace.", nameof(domain));
-        }
-
-        return _root.Join(domain);
-    }
-
-    public bool HasKey(SaveKey key)
-    {
-        EnsureReady();
-        return _provider.HasKey(key.Value);
-    }
-
-    public void Delete(SaveKey key)
-    {
-        EnsureReady();
-        _provider.Delete(key.Value);
-        MarkDirty();
-    }
-
-    public void Save<T>(SaveKey key, T value)
-    {
-        EnsureReady();
-        _provider.Save(key.Value, value);
-        MarkDirty();
-    }
-
-    public bool TryLoad<T>(SaveKey key, out T value)
-    {
-        EnsureReady();
-        return _provider.TryLoad(key.Value, out value);
-    }
-
-    public T LoadOrCreate<T>(SaveKey key, Func<T> createDefault, bool saveIfMissing = true)
-    {
-        EnsureReady();
-
-        T value;
-        bool ok = _provider.TryLoad(key.Value, out value);
-        if (ok)
+        if (TryGet(key, out T value))
         {
             return value;
         }
 
-        if (createDefault == null)
-        {
-            throw new ArgumentNullException(nameof(createDefault));
-        }
-
-        value = createDefault();
-
-        if (saveIfMissing)
-        {
-            _provider.Save(key.Value, value);
-            MarkDirty();
-        }
-
-        return value;
+        Set(key, defaultValue);
+        return defaultValue;
     }
 
-    public void Flush()
+    public bool Has(string key)
     {
-        EnsureReady();
-
-        if (_isDirty)
-        {
-            _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-        }
-
-        _provider.Flush();
-
-        _isDirty = false;
-        _dirtyElapsed = 0f;
+        return _data.ContainsKey(key);
     }
 
-    private void EnsureReady()
+    public void Delete(string key)
     {
-        if (_provider == null)
+        if (_data.Remove(key))
         {
-            throw new InvalidOperationException("SaveCore is not initialized.");
+            _isDirty = true;
         }
     }
 
-    private void EnsureMetaInitialized()
-    {
-        int savedVersion;
-        bool hasVersion = _provider.TryLoadInt(SaveMeta.SaveVersion.Value, out savedVersion);
-
-        if (!hasVersion)
-        {
-            _provider.SaveInt(SaveMeta.SaveVersion.Value, CurrentVersion);
-            _provider.SaveString(SaveMeta.CreatedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-            _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-            _provider.Flush();
-            return;
-        }
-
-        if (savedVersion != CurrentVersion)
-        {
-            _provider.SaveInt(SaveMeta.SaveVersion.Value, CurrentVersion);
-            _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-            _provider.Flush();
-        }
-
-        string createdAt;
-        bool hasCreatedAt = _provider.TryLoadString(SaveMeta.CreatedAtUtc.Value, out createdAt);
-        if (!hasCreatedAt)
-        {
-            _provider.SaveString(SaveMeta.CreatedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-            _provider.Flush();
-        }
-
-        string lastSaved;
-        bool hasLastSaved = _provider.TryLoadString(SaveMeta.LastSavedAtUtc.Value, out lastSaved);
-        if (!hasLastSaved)
-        {
-            _provider.SaveString(SaveMeta.LastSavedAtUtc.Value, DateTime.UtcNow.ToString("O"));
-            _provider.Flush();
-        }
-    }
-
-    private void MarkDirty()
+    public void Save()
     {
         if (!_isDirty)
         {
-            _isDirty = true;
-            _dirtyElapsed = 0f;
+            return;
+        }
+
+        string json = JsonConvert.SerializeObject(_data, Formatting.Indented);
+        _storage.Save(json);
+
+        _isDirty = false;
+    }
+
+    private void Load()
+    {
+        if (!_storage.Exists())
+        {
+            _data = new Dictionary<string, object>();
+            return;
+        }
+
+        string json = _storage.Load();
+
+        if (string.IsNullOrEmpty(json))
+        {
+            _data = new Dictionary<string, object>();
+            return;
+        }
+
+        try
+        {
+            _data = JsonConvert.DeserializeObject<Dictionary<string, object>>(json);
+
+            if (_data == null)
+            {
+                _data = new Dictionary<string, object>();
+            }
+        }
+        catch
+        {
+            _data = new Dictionary<string, object>();
         }
     }
 }

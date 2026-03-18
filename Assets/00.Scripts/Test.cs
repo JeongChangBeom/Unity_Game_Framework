@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-public sealed class TimeFrameworkTester : MonoBehaviour
+public sealed class Test : MonoBehaviour
 {
     [Header("Cooldown Test")]
     [SerializeField] private string _cooldownId = "skill_test_30s";
@@ -10,38 +10,39 @@ public sealed class TimeFrameworkTester : MonoBehaviour
     private string _log = "";
     private Vector2 _scroll;
 
-    private void Update()
+    private TimeManager _tm;
+
+    private void Awake()
     {
-        if (Input.GetKeyDown(KeyCode.F1))
+        _tm = TimeManager.Instance;
+
+        if (_tm == null)
         {
-            SafeLog("F1: Print Snapshot");
-            PrintSnapshot();
+            Debug.LogError("TimeManager is not initialized.");
         }
     }
 
     private void OnGUI()
     {
-        GUI.skin.label.fontSize = 14;
-        GUI.skin.button.fontSize = 14;
-
         GUILayout.BeginArea(new Rect(20, 20, 520, Screen.height - 40));
-        GUILayout.Label("Time Framework Tester (UTC)");
 
-        if (GUILayout.Button("1) Snapshot (UtcNow / Mode / Trusted / CheatFlag)"))
+        GUILayout.Label("Time Tester");
+
+        if (GUILayout.Button("1) Snapshot"))
         {
             PrintSnapshot();
         }
 
         GUILayout.Space(10);
 
-        GUILayout.Label("Cooldown: id = " + _cooldownId + ", duration = " + _cooldownSeconds + "s");
+        GUILayout.Label("Cooldown");
 
-        if (GUILayout.Button("2) Try Use Skill (Start 30s if ready)"))
+        if (GUILayout.Button("2) Try Use"))
         {
             TryUseSkill();
         }
 
-        if (GUILayout.Button("3) Print Cooldown Remaining"))
+        if (GUILayout.Button("3) Print Cooldown"))
         {
             PrintCooldown();
         }
@@ -53,69 +54,52 @@ public sealed class TimeFrameworkTester : MonoBehaviour
 
         GUILayout.Space(10);
 
-        if (GUILayout.Button("5) Print Reset Keys (Daily/Weekly/Monthly)"))
-        {
-            PrintResetKeys();
-        }
+        GUILayout.Label("Server");
 
-        if (GUILayout.Button("6) Print Remaining To Resets"))
-        {
-            PrintResetRemaining();
-        }
-
-        GUILayout.Space(10);
-
-        GUILayout.Label("Server Time");
-
-        if (GUILayout.Button("7) Apply Server Utc = Device Utc + 120s"))
+        if (GUILayout.Button("5) Apply Server +120s"))
         {
             ApplyServerPlusSeconds(120);
         }
 
-        if (GUILayout.Button("8) Clear Server Sync"))
+        if (GUILayout.Button("6) Clear Server"))
         {
             ClearServerSync();
         }
 
         GUILayout.Space(10);
 
-        GUILayout.Label("Mock Time");
+        GUILayout.Label("Mock");
 
-        if (GUILayout.Button("9) Enable Mock"))
+        if (GUILayout.Button("7) Enable Mock"))
         {
             EnableMock();
         }
 
-        if (GUILayout.Button("10) Disable Mock"))
+        if (GUILayout.Button("8) Disable Mock"))
         {
             DisableMock();
         }
 
-        if (GUILayout.Button("11) Add Mock +60s"))
+        if (GUILayout.Button("9) Add +60s"))
         {
             AddMockSeconds(60);
         }
 
-        if (GUILayout.Button("12) Add Mock -60s (Backward Test)"))
+        if (GUILayout.Button("10) Add -60s"))
         {
             AddMockSeconds(-60);
         }
 
-        if (GUILayout.Button("13) Jump To Next Daily Reset (Test)"))
-        {
-            JumpToNextDailyReset();
-        }
-
         GUILayout.Space(10);
 
-        GUILayout.Label("Cheat / Offline");
+        GUILayout.Label("Etc");
 
-        if (GUILayout.Button("14) Print Offline Delta"))
+        if (GUILayout.Button("11) Offline Delta"))
         {
             PrintOfflineDelta();
         }
 
-        if (GUILayout.Button("15) Clear Cheat Flag"))
+        if (GUILayout.Button("12) Clear Cheat"))
         {
             ClearCheatFlag();
         }
@@ -127,237 +111,153 @@ public sealed class TimeFrameworkTester : MonoBehaviour
             _log = "";
         }
 
-        GUILayout.Space(10);
-
-        _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(260));
+        _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(250));
         GUILayout.TextArea(_log);
         GUILayout.EndScrollView();
 
         GUILayout.EndArea();
     }
 
+    // -------------------------
+    // Safety
+    // -------------------------
+
     private bool IsReady()
     {
-        TimeManager tm;
-
-        try
+        if (_tm == null)
         {
-            tm = TimeManager.Instance;
-        }
-        catch (Exception e)
-        {
-            SafeLog("TimeManager.Instance exception: " + e.Message);
-            return false;
-        }
-
-        if (tm == null)
-        {
-            SafeLog("TimeManager.Instance is null.");
+            SafeLog("TimeManager is null");
             return false;
         }
 
         return true;
     }
 
+    // -------------------------
+    // Snapshot
+    // -------------------------
+
     private void PrintSnapshot()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        DateTimeOffset now = TimeManager.Instance.UtcNow;
-        bool trusted = TimeManager.Instance.IsTrusted;
-        TimeMode mode = TimeManager.Instance.Mode;
-        bool cheat = TimeManager.Instance.IsCheatDetected;
+        SafeLog("UtcNow: " + _tm.UtcNow.ToString("O"));
 
-        SafeLog("Snapshot:");
-        SafeLog("  UtcNow: " + now.ToString("O"));
-        SafeLog("  Mode: " + mode);
-        SafeLog("  Trusted: " + trusted);
-        SafeLog("  CheatDetected: " + cheat);
+        // 존재하는 경우만 사용
+        SafeLog("Trusted: " + _tm.IsTrusted);
+        SafeLog("Cheat: " + _tm.IsCheatDetected);
     }
+
+    // -------------------------
+    // Cooldown
+    // -------------------------
 
     private void TryUseSkill()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        bool ready = TimeManager.Instance.IsCooldownReady(_cooldownId);
+        bool ready = _tm.IsCooldownReady(_cooldownId);
+
         if (!ready)
         {
-            TimeSpan remain = TimeManager.Instance.GetCooldownRemaining(_cooldownId);
-            SafeLog("Skill NOT ready. Remaining: " + remain.TotalSeconds.ToString("0.00") + "s");
+            TimeSpan remain = _tm.GetCooldownRemaining(_cooldownId);
+            SafeLog("NOT READY: " + remain.TotalSeconds.ToString("0.00"));
             return;
         }
 
-        TimeManager.Instance.StartCooldown(_cooldownId, TimeSpan.FromSeconds(_cooldownSeconds));
-        SafeLog("Skill USED. Cooldown started: " + _cooldownSeconds + "s");
+        _tm.StartCooldown(_cooldownId, TimeSpan.FromSeconds(_cooldownSeconds));
+        SafeLog("USED");
     }
 
     private void PrintCooldown()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        bool ready = TimeManager.Instance.IsCooldownReady(_cooldownId);
-        TimeSpan remain = TimeManager.Instance.GetCooldownRemaining(_cooldownId);
+        bool ready = _tm.IsCooldownReady(_cooldownId);
+        TimeSpan remain = _tm.GetCooldownRemaining(_cooldownId);
 
-        SafeLog("Cooldown:");
-        SafeLog("  Ready: " + ready);
-        SafeLog("  Remaining: " + remain.TotalSeconds.ToString("0.00") + "s");
-        SafeLog("  RemainingText(HH:MM:SS): " + TimeUtil.FormatHhMmSs(remain));
+        SafeLog("Ready: " + ready);
+        SafeLog("Remain: " + remain.TotalSeconds.ToString("0.00"));
     }
 
     private void ClearCooldown()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeManager.Instance.ClearCooldown("skill_test_30s");
-        SafeLog("Cooldown cleared: " + _cooldownId);
+        _tm.ClearCooldown(_cooldownId);
+        SafeLog("Cooldown cleared");
     }
 
-    private void PrintResetKeys()
-    {
-        if (!IsReady())
-        {
-            return;
-        }
-
-        int d = TimeManager.Instance.GetDailyKey();
-        int w = TimeManager.Instance.GetWeeklyKey();
-        int m = TimeManager.Instance.GetMonthlyKey();
-
-        SafeLog("Reset Keys:");
-        SafeLog("  DailyKey: " + d);
-        SafeLog("  WeeklyKey: " + w);
-        SafeLog("  MonthlyKey: " + m);
-    }
-
-    private void PrintResetRemaining()
-    {
-        if (!IsReady())
-        {
-            return;
-        }
-
-        TimeSpan d = TimeManager.Instance.GetRemainingToDailyReset();
-        TimeSpan w = TimeManager.Instance.GetRemainingToWeeklyReset();
-        TimeSpan m = TimeManager.Instance.GetRemainingToMonthlyReset();
-
-        SafeLog("Remaining To Reset:");
-        SafeLog("  Daily: " + d.TotalSeconds.ToString("0.00") + "s (" + TimeUtil.FormatDaysHoursMinutes(d) + ")");
-        SafeLog("  Weekly: " + w.TotalSeconds.ToString("0.00") + "s (" + TimeUtil.FormatDaysHoursMinutes(w) + ")");
-        SafeLog("  Monthly: " + m.TotalSeconds.ToString("0.00") + "s (" + TimeUtil.FormatDaysHoursMinutes(m) + ")");
-    }
+    // -------------------------
+    // Server
+    // -------------------------
 
     private void ApplyServerPlusSeconds(int seconds)
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
         DateTimeOffset serverUtc = DateTimeOffset.UtcNow.AddSeconds(seconds);
-        TimeManager.Instance.ApplyServerUtc(serverUtc);
+        _tm.ApplyServerUtc(serverUtc);
 
-        SafeLog("ApplyServerUtc: DeviceUtc + " + seconds + "s");
-        SafeLog("  Applied: " + serverUtc.ToString("O"));
-        PrintSnapshot();
+        SafeLog("Server + " + seconds);
     }
 
     private void ClearServerSync()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeManager.Instance.ClearServerSync();
-        SafeLog("Server sync cleared.");
-        PrintSnapshot();
+        _tm.ClearServerSync();
+        SafeLog("Server cleared");
     }
+
+    // -------------------------
+    // Mock
+    // -------------------------
 
     private void EnableMock()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeManager.Instance.EnableMockTime();
-        SafeLog("Mock enabled.");
-        PrintSnapshot();
+        _tm.EnableMockTime();
+        SafeLog("Mock ON");
     }
 
     private void DisableMock()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeManager.Instance.DisableMockTime();
-        SafeLog("Mock disabled.");
-        PrintSnapshot();
+        _tm.DisableMockTime();
+        SafeLog("Mock OFF");
     }
 
     private void AddMockSeconds(long seconds)
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeManager.Instance.EnableMockTime();
-        TimeManager.Instance.AddMockSeconds(seconds);
+        _tm.EnableMockTime();
+        _tm.AddMockSeconds(seconds);
 
-        SafeLog("Mock offset changed: " + (seconds >= 0 ? "+" : "") + seconds + "s");
-        PrintSnapshot();
+        SafeLog("Mock += " + seconds);
     }
 
-    private void JumpToNextDailyReset()
-    {
-        if (!IsReady())
-        {
-            return;
-        }
-
-        TimeManager.Instance.JumpToNextDailyResetForTest();
-        SafeLog("Jumped to next daily reset (mock enabled).");
-        PrintSnapshot();
-        PrintResetKeys();
-        PrintResetRemaining();
-    }
+    // -------------------------
+    // Etc
+    // -------------------------
 
     private void PrintOfflineDelta()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeSpan offline = TimeManager.Instance.GetOfflineDelta();
-        SafeLog("OfflineDelta: " + offline.TotalSeconds.ToString("0.00") + "s");
+        TimeSpan offline = _tm.GetOfflineDelta();
+        SafeLog("Offline: " + offline.TotalSeconds.ToString("0.00"));
     }
 
     private void ClearCheatFlag()
     {
-        if (!IsReady())
-        {
-            return;
-        }
+        if (!IsReady()) return;
 
-        TimeManager.Instance.ClearCheatFlag();
-        SafeLog("Cheat flag cleared.");
-        PrintSnapshot();
+        _tm.ClearCheatFlag();
+        SafeLog("Cheat cleared");
     }
 
     private void SafeLog(string msg)
@@ -368,9 +268,10 @@ public sealed class TimeFrameworkTester : MonoBehaviour
         if (string.IsNullOrEmpty(_log))
         {
             _log = line;
-            return;
         }
-
-        _log = _log + "\n" + line;
+        else
+        {
+            _log += "\n" + line;
+        }
     }
 }
