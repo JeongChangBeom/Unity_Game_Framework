@@ -1,0 +1,19 @@
+{
+    "name": "GameFramework.Sound",
+    "rootNamespace": "GameFramework.Sound",
+    "references": [
+        "GameFramework.Core",
+        "GameFramework.SaveLoad",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

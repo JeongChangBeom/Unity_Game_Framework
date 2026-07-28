@@ -1,0 +1,108 @@
+using GameFramework.Sound;
+using UnityEngine;
+
+namespace GameFramework.Tests
+{
+    public sealed class SoundTester : MonoBehaviour
+    {
+        [SerializeField] private ESound _bgmSound = ESound.BGM_Test;
+        [SerializeField] private ESound _oneShotSound = ESound.SFX_Test;
+
+        private string _log = "";
+        private Vector2 _scroll;
+
+        private void OnGUI()
+        {
+            GUILayout.BeginArea(new Rect(20, 20, 560, Screen.height - 40));
+            GUILayout.Box("Sound Tester");
+
+            GUILayout.Label("Playback");
+            if (GUILayout.Button("1) Play BGM"))
+            {
+                SoundManager.Instance.PlaySound(_bgmSound);
+                Log("PlaySound(" + _bgmSound + ")");
+            }
+
+            if (GUILayout.Button("2) Stop BGM"))
+            {
+                SoundManager.Instance.StopBgm();
+                Log("StopBgm()");
+            }
+
+            if (GUILayout.Button("3) Play One-Shot"))
+            {
+                SoundManager.Instance.PlaySound(_oneShotSound);
+                Log("PlaySound(" + _oneShotSound + ")");
+            }
+
+            if (GUILayout.Button("4) Stop This Sound (all instances)"))
+            {
+                SoundManager.Instance.StopSound(_oneShotSound);
+                Log("StopSound(" + _oneShotSound + ")");
+            }
+
+            if (GUILayout.Button("5) Stop All One-Shots"))
+            {
+                SoundManager.Instance.StopAllOneShots();
+                Log("StopAllOneShots()");
+            }
+
+            GUILayout.Space(10);
+            GUILayout.Label("Volume");
+            if (GUILayout.Button("6) Master 0.5"))
+            {
+                SoundManager.Instance.SetMasterVolume(0.5f);
+                Log("MasterVolume=0.5");
+            }
+
+            if (GUILayout.Button("7) Master 1.0"))
+            {
+                SoundManager.Instance.SetMasterVolume(1f);
+                Log("MasterVolume=1.0");
+            }
+
+            if (GUILayout.Button("8) BGM Channel 0.3"))
+            {
+                SoundManager.Instance.SetChannelVolume(ESoundChannel.BGM, 0.3f);
+                Log("BGM Channel Volume=0.3");
+            }
+
+            if (GUILayout.Button("9) Print Current Volumes"))
+            {
+                SoundManager sm = SoundManager.Instance;
+                Log("Master=" + sm.GetMasterVolume()
+                    + " BGM=" + sm.GetChannelVolume(ESoundChannel.BGM)
+                    + " SFX=" + sm.GetChannelVolume(ESoundChannel.SFX)
+                    + " UI=" + sm.GetChannelVolume(ESoundChannel.UI)
+                    + " Voice=" + sm.GetChannelVolume(ESoundChannel.Voice));
+            }
+
+            GUILayout.Space(10);
+            GUILayout.Label("Ducking (play a Voice-channel sound to test)");
+            if (GUILayout.Button("10) Play BGM then simulate Voice ducking"))
+            {
+                SoundManager.Instance.PlaySound(_bgmSound);
+                Log("BGM started. Play a Voice-channel ESound to hear ducking.");
+            }
+
+            GUILayout.Space(10);
+            if (GUILayout.Button("Clear Log"))
+            {
+                _log = "";
+            }
+
+            _scroll = GUILayout.BeginScrollView(_scroll, GUILayout.Height(260));
+            GUILayout.TextArea(_log);
+            GUILayout.EndScrollView();
+
+            GUILayout.EndArea();
+        }
+
+        private void Log(string msg)
+        {
+            string line = System.DateTime.Now.ToString("HH:mm:ss") + " | " + msg;
+            Debug.Log(line);
+            _log = string.IsNullOrEmpty(_log) ? line : _log + "\n" + line;
+        }
+    }
+}

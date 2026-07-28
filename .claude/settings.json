@@ -1,0 +1,9 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(git -C D:/Unity/Unity_Game_Framework log --all -p -- Packages/manifest.json)",
+      "Bash(echo \"---exit code: $?---\")",
+      "Bash(git -C D:/Unity/Unity_Game_Framework diff Packages/manifest.json Packages/packages-lock.json)"
+    ]
+  }
+}

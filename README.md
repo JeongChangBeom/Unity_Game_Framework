@@ -24,7 +24,7 @@
 - **UI System**  
   우선순위 / 선점 기반 UI 흐름 관리 시스템
 
-- **Audio System**  
+- **Sound System**  
   Addressables + Sheet 기반 사운드 재생/관리 시스템
 
 - **Save / Load**  
@@ -42,7 +42,7 @@
 - [1️⃣ Data Parsing](#data)
 - [2️⃣ Pooling](#pooling)
 - [3️⃣ UI System](#ui)
-- [4️⃣ Audio System](#audio)
+- [4️⃣ Sound System](#sound)
 - [5️⃣ Save / Load](#saveload)
 - [6️⃣ Time System](#time)
 
@@ -58,10 +58,11 @@
 |Pooling|프리팹 기반 오브젝트 풀링|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.pooling`|
 |Data Parsing|Google Sheet 데이터 파이프라인|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.data`|
 |UI System|패키지화 예정|-|
-|Audio System|패키지화 예정|-|
+|Sound System|Addressables + Sheet 기반 사운드 재생|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sound`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
 
 > Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
+> Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
 
 ---
 
@@ -288,8 +289,8 @@ UIManager.Instance.CloseTopPopup();
 
 ---
 
-<details id="audio">
-<summary><h2>4️⃣ Audio System</h2></summary>
+<details id="sound">
+<summary><h2>4️⃣ Sound System</h2></summary>
 
 ### 기능
 - Sound Sheet 기반 사운드 관리
@@ -297,26 +298,40 @@ UIManager.Instance.CloseTopPopup();
 - ESound 자동 생성
   * Sheet의 `FileName`을 기반으로 `ESound` enum 자동 생성
 - Addressables 자동 등록
-  * Audio 폴더 스캔 후 Addressables 그룹에 자동 등록
+  * Sound 폴더 스캔 후 Addressables 그룹에 자동 등록
   * Addressables address = fileName 규칙 강제
 - 사운드 재생 통합 API
   * `SoundManager.Instance.PlaySound(ESound.xxx)` 형태로 단순 사용
+  * Channel이 BGM이면 자동으로 크로스페이드 전환, 그 외에는 원샷 재생
 - BGM 크로스페이드
 - 동시 재생 제한
   * 사운드별 MaxConcurrent 설정 지원
+- 개별 사운드 정지
+  * `StopSound(ESound id)`로 현재 재생 중인 특정 사운드(BGM/원샷 불문)만 골라서 정지
+- Voice 재생 시 BGM 자동 더킹(Ducking)
+  * Voice 채널 사운드가 재생되는 동안 BGM 볼륨을 자동으로 낮추고, 끝나면 원복
+- 사운드 프리로드(Preload)
+  * 부팅 시 지정한 사운드 목록을 미리 로드해 첫 재생 지연 제거
+- 볼륨은 Master × Channel × Sound별 기본 볼륨의 곱으로 계산되며, Master/Channel 볼륨은 SaveManager를 통해 영구 저장
+- Settings ScriptableObject 기반 설정 (씬 배치 불필요)
+
+---
+
+### 외부 패키지
+사운드 클립 스트리밍/로딩에 **Unity 공식 Addressables 패키지**(`com.unity.addressables`)를 사용합니다. 비동기 처리는 전부 Unity 6 네이티브 `Awaitable`을 사용하며, 별도의 async 라이브러리(UniTask 등)는 사용하지 않습니다.
 
 ---
 
 ### 사용 방법
 
 #### 1) 사운드 파일 추가
-오디오 파일을 아래 주소 폴더에 추가
+오디오 파일을 아래 폴더에 추가
 
-`Assets/Audio/`
+`Assets/03.Sound/`
 
 예)
-* Assets/Audio/SFX_Test.wav
-* Assets/Audio/BGM_Test.mp3
+* Assets/03.Sound/SFX_Test.wav
+* Assets/03.Sound/BGM_Test.wav
 
 ---
 
@@ -331,17 +346,19 @@ UIManager.Instance.CloseTopPopup();
 ---
 
 #### 3) ESound 생성
-SoundSO가 준비되면 `FileName`을 기반으로 enum을 자동 생성합니다.
+Sound 테이블 SO가 준비되면 `FileName`을 기반으로 enum을 자동 생성합니다.
 
 Unity Editor에서 아래 버튼을 누릅니다.
 
-`Framework/Audio/Generate/ESound From SoundTable`
+`Game Framework/Sound/Generate ESound From Sound Table`
 
 * 동작:
-  * `SoundSO`를 읽어 `FileName` 목록 수집
+  * Sound 테이블 SO를 읽어 `FileName` 목록 수집
   * `ESound.cs`를 자동 생성
 * 생성 위치:
-  * `Assets/Scripts/Audio/ESound.cs`
+  * `Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs`
+
+> `ESound`는 `SoundDatabaseSO`/`SoundPlayer`/`SoundManager`가 직접 참조하는 프로젝트 전용 타입이라 패키지 어셈블리 내부에 함께 있어야 합니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, 프로젝트마다 위 메뉴로 재생성해서 덮어써서 사용합니다.
 
 이제 런타임에서 다음처럼 바로 사용 가능합니다.
 
@@ -349,52 +366,74 @@ Unity Editor에서 아래 버튼을 누릅니다.
 
 ---
 
-#### 4) SoundDatabase 빌드 + Addressables 자동 등록
-SoundDatabaseSO를 갱신하고 AudioClip을 Addressables에 자동 등록합니다.
+#### 4) Sound Manager Settings 만들기 (씬 배치 불필요)
+`Assets/Create/Game Framework/Sound/Sound Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
 
-`Framework/Audio/Build Sound Database From Sheet + Folder`
+`Assets/Resources/GameFramework/SoundManagerSettings.asset`
 
-* 입력:
-  * `SoundSO` (시트 파싱 결과)
-  * `Assets/Audio/` 폴더의 AudioClip들
-* 출력:
-  * `SoundDatabaseSO` entries 자동 갱신
-  * Addressables 그룹에 자동 등록 + address 통일(fileName)
-
->런타임에서 자동 로드되도록 `SoundDatabaseSO`는 아래 위치를 사용합니다.
-
-```text
-Assets/Resources/SoundDatabaseSO.asset
-또는 Assets/Resources/Audio/SoundDatabaseSO.asset
-```
+설정 가능한 항목:
+* Initial/Max Pool Size
+* 채널별 AudioMixerGroup (선택)
+* BGM Crossfade Seconds
+* Duck Bgm On Voice / Ducked Bgm Volume Scale / Duck Fade Seconds
+* Preload Sounds (부팅 시 미리 로드할 `ESound` 목록)
 
 ---
 
-#### 5) 런타임 사용
+#### 5) SoundDatabase 빌드 + Addressables 자동 등록
+`Assets/Create/Game Framework/Sound/Sound Database`로 에셋을 만들고 아래 경로에 저장합니다.
+
+`Assets/Resources/GameFramework/SoundDatabaseSO.asset`
+
+그 다음 SoundDatabaseSO를 갱신하고 AudioClip을 Addressables에 자동 등록합니다.
+
+`Game Framework/Sound/Build Sound Database From Sheet + Folder`
+
+* 입력:
+  * Sound 테이블 SO (시트 파싱 결과)
+  * `Assets/03.Sound/` 폴더의 AudioClip들
+* 출력:
+  * `SoundDatabaseSO` entries 자동 갱신
+  * Addressables `Sound` 그룹에 자동 등록 + address 통일(fileName)
+
+---
+
+#### 6) 런타임 사용
 
 ```cs
-// SFX/UI/Voice
+// SFX/UI/Voice - 원샷 재생
 SoundManager.Instance.PlaySound(ESound.UI_Click);
 SoundManager.Instance.PlaySound(ESound.SFX_Merge);
 
-// BGM
+// Voice 재생 시 SoundManagerSettings.DuckBgmOnVoice가 켜져 있으면 BGM이 자동으로 낮아졌다 복구됩니다.
+SoundManager.Instance.PlaySound(ESound.Voice_Greeting);
+
+// BGM - 자동 크로스페이드 전환
 SoundManager.Instance.PlaySound(ESound.BGM_Main);
 
 // BGM 정지
 SoundManager.Instance.StopBgm();
 
+// 특정 사운드만 정지 (BGM/원샷 불문, 현재 재생 중인 모든 인스턴스)
+SoundManager.Instance.StopSound(ESound.SFX_Merge);
+
 // 모든 원샷 정지
 SoundManager.Instance.StopAllOneShots();
 
-// 마스터 볼륨 설정
+// 마스터 볼륨 설정 (자동 저장)
 SoundManager.Instance.SetMasterVolume(0.0f);
 
-// 채널별 볼륨 설정
-SoundManager.Instance.SetChannelVolume(EAudioChannel.BGM, 0.6f);
-SoundManager.Instance.SetChannelVolume(EAudioChannel.SFX, 1.0f);
-SoundManager.Instance.SetChannelVolume(EAudioChannel.UI, 0.8f);
-SoundManager.Instance.SetChannelVolume(EAudioChannel.Voice, 1.0f);
+// 채널별 볼륨 설정 (자동 저장)
+SoundManager.Instance.SetChannelVolume(ESoundChannel.BGM, 0.6f);
+SoundManager.Instance.SetChannelVolume(ESoundChannel.SFX, 1.0f);
+SoundManager.Instance.SetChannelVolume(ESoundChannel.UI, 0.8f);
+SoundManager.Instance.SetChannelVolume(ESoundChannel.Voice, 1.0f);
 ```
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/SoundTester.cs`를 빈 GameObject에 붙이면 재생/정지/볼륨/더킹 확인용 OnGUI 버튼이 표시됩니다.
 
 </details>
 

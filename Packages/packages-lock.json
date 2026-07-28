@@ -31,13 +31,6 @@
         "com.changbeom.gameframework.core": "0.1.0"
       }
     },
-    "com.cysharp.unitask": {
-      "version": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
-      "depth": 0,
-      "source": "git",
-      "dependencies": {},
-      "hash": "a9e27c03d411d2fca01cc7410c24c97cd77cb539"
-    },
     "com.unity.2d.animation": {
       "version": "10.2.2",
       "depth": 1,
