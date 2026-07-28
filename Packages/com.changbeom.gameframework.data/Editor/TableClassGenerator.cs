@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Text;
@@ -13,6 +14,10 @@ namespace GameFramework.Data.Editor
             public string columnName;
             public string fieldName;
             public EDataTableColumnType type;
+            public bool isArray;
+
+            /// <summary>Fully-qualified enum type name (only set when type == Enum).</summary>
+            public string enumTypeFullName;
         }
 
         public static bool TryExtractColumnsFromTsv(string tsv, out List<ColumnInfo> columns, out string error)
@@ -50,12 +55,32 @@ namespace GameFramework.Data.Editor
                     continue;
                 }
 
-                string typeText = table.GetCell(2, c).Trim().ToLowerInvariant();
-                EDataTableColumnType type;
+                string rawTypeText = table.GetCell(2, c).Trim();
 
-                if (!TryParseType(typeText, out type))
+                bool isArray = rawTypeText.EndsWith("[]");
+                string baseTypeText = isArray ? rawTypeText.Substring(0, rawTypeText.Length - 2) : rawTypeText;
+
+                EDataTableColumnType type;
+                string enumTypeFullName = null;
+
+                if (baseTypeText.StartsWith("enum:", StringComparison.OrdinalIgnoreCase))
                 {
-                    error = "알 수 없는 타입: " + typeText + " (col=" + (c + 1) + ", name=" + name + ")";
+                    // Enum type names are case-sensitive, so this branch must not lowercase them.
+                    string enumTypeName = baseTypeText.Substring("enum:".Length).Trim();
+
+                    Type resolvedType;
+                    if (!TryFindEnumType(enumTypeName, out resolvedType, out error))
+                    {
+                        error += " (col=" + (c + 1) + ", name=" + name + ")";
+                        return false;
+                    }
+
+                    type = EDataTableColumnType.Enum;
+                    enumTypeFullName = resolvedType.FullName.Replace('+', '.');
+                }
+                else if (!TryParseType(baseTypeText.ToLowerInvariant(), out type))
+                {
+                    error = "알 수 없는 타입: " + rawTypeText + " (col=" + (c + 1) + ", name=" + name + ")";
                     return false;
                 }
 
@@ -73,6 +98,8 @@ namespace GameFramework.Data.Editor
                 info.columnName = name;
                 info.fieldName = ToSafeFieldName(name);
                 info.type = type;
+                info.isArray = isArray;
+                info.enumTypeFullName = enumTypeFullName;
 
                 columns.Add(info);
             }
@@ -92,7 +119,6 @@ namespace GameFramework.Data.Editor
 
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Collections.Generic;");
-            sb.AppendLine("using System.Globalization;");
             sb.AppendLine("using UnityEngine;");
             sb.AppendLine("using GameFramework.Data;");
             sb.AppendLine();
@@ -113,7 +139,10 @@ namespace GameFramework.Data.Editor
             for (int i = 0; i < columns.Count; i++)
             {
                 ColumnInfo col = columns[i];
-                sb.AppendLine("        public " + ToCsType(col.type) + " " + col.fieldName + ";");
+                string csType = col.type == EDataTableColumnType.Enum
+                    ? (col.isArray ? col.enumTypeFullName + "[]" : col.enumTypeFullName)
+                    : ToCsType(col.type, col.isArray);
+                sb.AppendLine("        public " + csType + " " + col.fieldName + ";");
             }
 
             sb.AppendLine("    }");
@@ -202,7 +231,7 @@ namespace GameFramework.Data.Editor
                 ColumnInfo col = columns[i];
                 sb.AppendLine("            {");
                 sb.AppendLine("                string raw = table.GetCell(r, " + col.colIndex + ").Trim();");
-                AppendParseAssign(sb, "data", col);
+                AppendParseAssign(sb, "data", col, className);
                 sb.AppendLine("            }");
             }
 
@@ -222,59 +251,101 @@ namespace GameFramework.Data.Editor
             AssetDatabase.ImportAsset(scriptPath);
         }
 
-        private static void AppendParseAssign(StringBuilder sb, string dataVar, ColumnInfo col)
+        private static void AppendParseAssign(StringBuilder sb, string dataVar, ColumnInfo col, string className)
         {
             string field = dataVar + "." + col.fieldName;
 
-            if (col.type == EDataTableColumnType.Int)
+            if (col.type == EDataTableColumnType.Enum)
             {
-                sb.AppendLine("                int v = 0;");
-                sb.AppendLine("                if (!string.IsNullOrEmpty(raw))");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    if (!int.TryParse(raw, out v))");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        v = 0;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                }");
-                sb.AppendLine("                " + field + " = v;");
+                string enumMethod = col.isArray ? "ParseEnumArray" : "ParseEnum";
+                sb.AppendLine("                " + field + " = TableValueParser." + enumMethod + "<" + col.enumTypeFullName + ">(raw, \"" + className + "." + col.fieldName + " row=\" + (r + 1));");
+                return;
             }
-            else if (col.type == EDataTableColumnType.Float)
+
+            if (col.isArray)
             {
-                sb.AppendLine("                float v = 0f;");
-                sb.AppendLine("                if (!string.IsNullOrEmpty(raw))");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    if (!float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out v))");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        v = 0f;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                }");
-                sb.AppendLine("                " + field + " = v;");
+                string arrayMethod = col.type switch
+                {
+                    EDataTableColumnType.Int => "ParseIntArray",
+                    EDataTableColumnType.Long => "ParseLongArray",
+                    EDataTableColumnType.Float => "ParseFloatArray",
+                    EDataTableColumnType.Double => "ParseDoubleArray",
+                    EDataTableColumnType.Bool => "ParseBoolArray",
+                    _ => "ParseStringArray",
+                };
+
+                sb.AppendLine("                " + field + " = TableValueParser." + arrayMethod + "(raw);");
+                return;
             }
-            else if (col.type == EDataTableColumnType.String)
+
+            if (col.type == EDataTableColumnType.String)
             {
                 sb.AppendLine("                " + field + " = raw;");
+                return;
             }
-            else if (col.type == EDataTableColumnType.Bool)
+
+            string scalarMethod = col.type switch
             {
-                sb.AppendLine("                bool v = false;");
-                sb.AppendLine("                if (!string.IsNullOrEmpty(raw))");
-                sb.AppendLine("                {");
-                sb.AppendLine("                    string lower = raw.ToLowerInvariant();");
-                sb.AppendLine("                    if (lower == \"1\" || lower == \"true\")");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        v = true;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                    else if (lower == \"0\" || lower == \"false\")");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        v = false;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                    else");
-                sb.AppendLine("                    {");
-                sb.AppendLine("                        v = false;");
-                sb.AppendLine("                    }");
-                sb.AppendLine("                }");
-                sb.AppendLine("                " + field + " = v;");
+                EDataTableColumnType.Int => "ParseInt",
+                EDataTableColumnType.Long => "ParseLong",
+                EDataTableColumnType.Float => "ParseFloat",
+                EDataTableColumnType.Double => "ParseDouble",
+                EDataTableColumnType.Bool => "ParseBool",
+                _ => null,
+            };
+
+            string defaultLiteral = col.type switch
+            {
+                EDataTableColumnType.Long => "0L",
+                EDataTableColumnType.Float => "0f",
+                EDataTableColumnType.Double => "0.0",
+                EDataTableColumnType.Bool => "false",
+                _ => "0",
+            };
+
+            sb.AppendLine("                " + field + " = TableValueParser." + scalarMethod + "(raw, " + defaultLiteral + ");");
+        }
+
+        /// <summary>
+        /// Finds an existing enum type by its short name across every loaded assembly.
+        /// The enum must already be defined in project code -- this never generates one.
+        /// Fails (with a clear reason) if the type doesn't exist or the name is ambiguous,
+        /// so a typo'd type reference blocks table generation instead of silently
+        /// producing a broken table.
+        /// </summary>
+        private static bool TryFindEnumType(string enumTypeName, out Type foundType, out string error)
+        {
+            foundType = null;
+            error = null;
+
+            TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<Enum>();
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                Type t = candidates[i];
+
+                if (t.Name != enumTypeName)
+                {
+                    continue;
+                }
+
+                if (foundType != null)
+                {
+                    foundType = null;
+                    error = "동일 이름의 enum 타입이 여러 개입니다: " + enumTypeName + " (네임스페이스로 구분되는 타입이 여러 개 있는지 확인하세요)";
+                    return false;
+                }
+
+                foundType = t;
             }
+
+            if (foundType == null)
+            {
+                error = "enum 타입을 찾을 수 없습니다: " + enumTypeName + " (먼저 C# 코드에 이 이름의 enum을 정의해야 합니다)";
+                return false;
+            }
+
+            return true;
         }
 
         private static bool TryParseType(string typeText, out EDataTableColumnType type)
@@ -287,9 +358,21 @@ namespace GameFramework.Data.Editor
                 return true;
             }
 
+            if (typeText == "long")
+            {
+                type = EDataTableColumnType.Long;
+                return true;
+            }
+
             if (typeText == "float")
             {
                 type = EDataTableColumnType.Float;
+                return true;
+            }
+
+            if (typeText == "double")
+            {
+                type = EDataTableColumnType.Double;
                 return true;
             }
 
@@ -308,12 +391,19 @@ namespace GameFramework.Data.Editor
             return false;
         }
 
-        private static string ToCsType(EDataTableColumnType type)
+        private static string ToCsType(EDataTableColumnType type, bool isArray)
         {
-            if (type == EDataTableColumnType.Int) return "int";
-            if (type == EDataTableColumnType.Float) return "float";
-            if (type == EDataTableColumnType.Bool) return "bool";
-            return "string";
+            string baseType = type switch
+            {
+                EDataTableColumnType.Int => "int",
+                EDataTableColumnType.Long => "long",
+                EDataTableColumnType.Float => "float",
+                EDataTableColumnType.Double => "double",
+                EDataTableColumnType.Bool => "bool",
+                _ => "string",
+            };
+
+            return isArray ? baseType + "[]" : baseType;
         }
 
         public static string ToSafeClassName(string tabName)
