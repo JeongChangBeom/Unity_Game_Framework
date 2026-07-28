@@ -1,0 +1,12 @@
+﻿<Solution>
+  <Project Path="GameFramework.TimeSystem.csproj" />
+  <Project Path="GameFramework.SaveLoad.csproj" />
+  <Project Path="GameFramework.UISystem.csproj" />
+  <Project Path="GameFramework.SoundSystem.csproj" />
+  <Project Path="GameFramework.DataParsing.Editor.csproj" />
+  <Project Path="GameFramework.Core.csproj" />
+  <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="GameFramework.Pooling.csproj" />
+  <Project Path="GameFramework.DataParsing.csproj" />
+  <Project Path="GameFramework.SoundSystem.Editor.csproj" />
+</Solution>

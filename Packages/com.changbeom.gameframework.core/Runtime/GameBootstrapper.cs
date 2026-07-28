@@ -67,7 +67,7 @@ namespace GameFramework.Core
 
             foreach ((int _, Type type) in targets)
             {
-                PropertyInfo instanceProperty = type.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static);
+                PropertyInfo instanceProperty = type.GetProperty("Instance", BindingFlags.Public | BindingFlags.Static | BindingFlags.FlattenHierarchy);
 
                 if (instanceProperty == null)
                 {

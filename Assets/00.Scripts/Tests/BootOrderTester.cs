@@ -9,7 +9,7 @@ namespace GameFramework.Tests
     // attribute, so it only initializes lazily when something actually touches .Instance,
     // exactly like every manager before this feature existed.
 
-    [BootPriority(-100)]
+    [BootPriority(1)]
     public sealed class BootTestManagerA : MonoSingleton<BootTestManagerA>
     {
         protected override void OnInitialize()
@@ -18,7 +18,7 @@ namespace GameFramework.Tests
         }
     }
 
-    [BootPriority(-50)]
+    [BootPriority(2)]
     public sealed class BootTestManagerB : MonoSingleton<BootTestManagerB>
     {
         protected override void OnInitialize()

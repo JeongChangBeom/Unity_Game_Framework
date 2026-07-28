@@ -252,6 +252,13 @@ namespace GameFramework.SoundSystem
             _pool.StopAll();
         }
 
+        /// <summary>Stops everything currently playing: BGM and every active one-shot.</summary>
+        public void StopAll()
+        {
+            StopBgm();
+            StopAllOneShots();
+        }
+
         // ---- Volume ----
 
         public void SetMasterVolume(float volume)

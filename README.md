@@ -401,6 +401,7 @@ public class MandatoryConfirmPopup : UIPopupBase
   * 사운드별 MaxConcurrent 설정 지원
 - 개별 사운드 정지
   * `StopSound(ESound id)`로 현재 재생 중인 특정 사운드(BGM/원샷 불문)만 골라서 정지
+  * `StopAll()`로 BGM + 모든 원샷을 한 번에 전부 정지
 - Voice 재생 시 BGM 자동 더킹(Ducking)
   * Voice 채널 사운드가 재생되는 동안 BGM 볼륨을 자동으로 낮추고, 끝나면 원복
 - 사운드 프리로드(Preload)
@@ -512,6 +513,9 @@ SoundManager.Instance.StopSound(ESound.SFX_Merge);
 
 // 모든 원샷 정지
 SoundManager.Instance.StopAllOneShots();
+
+// 지금 나는 소리 전부 정지 (BGM + 모든 원샷)
+SoundManager.Instance.StopAll();
 
 // 마스터 볼륨 설정 (자동 저장)
 SoundManager.Instance.SetMasterVolume(0.0f);

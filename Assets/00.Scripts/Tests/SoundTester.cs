@@ -35,10 +35,10 @@ namespace GameFramework.Tests
                 Log("PlaySound(" + _oneShotSound + ")");
             }
 
-            if (GUILayout.Button("4) Stop This Sound (all instances)"))
+            if (GUILayout.Button("4) Stop This Sound via StopSound(BGM id) -- proves StopSound also stops BGM"))
             {
-                SoundManager.Instance.StopSound(_oneShotSound);
-                Log("StopSound(" + _oneShotSound + ")");
+                SoundManager.Instance.StopSound(_bgmSound);
+                Log("StopSound(" + _bgmSound + ")");
             }
 
             if (GUILayout.Button("5) Stop All One-Shots"))
@@ -47,27 +47,33 @@ namespace GameFramework.Tests
                 Log("StopAllOneShots()");
             }
 
+            if (GUILayout.Button("6) Stop All Sounds (BGM + One-Shots)"))
+            {
+                SoundManager.Instance.StopAll();
+                Log("StopAll()");
+            }
+
             GUILayout.Space(10);
             GUILayout.Label("Volume");
-            if (GUILayout.Button("6) Master 0.5"))
+            if (GUILayout.Button("7) Master 0.5"))
             {
                 SoundManager.Instance.SetMasterVolume(0.5f);
                 Log("MasterVolume=0.5");
             }
 
-            if (GUILayout.Button("7) Master 1.0"))
+            if (GUILayout.Button("8) Master 1.0"))
             {
                 SoundManager.Instance.SetMasterVolume(1f);
                 Log("MasterVolume=1.0");
             }
 
-            if (GUILayout.Button("8) BGM Channel 0.3"))
+            if (GUILayout.Button("9) BGM Channel 0.3"))
             {
                 SoundManager.Instance.SetChannelVolume(ESoundChannel.BGM, 0.3f);
                 Log("BGM Channel Volume=0.3");
             }
 
-            if (GUILayout.Button("9) Print Current Volumes"))
+            if (GUILayout.Button("10) Print Current Volumes"))
             {
                 SoundManager sm = SoundManager.Instance;
                 Log("Master=" + sm.GetMasterVolume()
@@ -79,7 +85,7 @@ namespace GameFramework.Tests
 
             GUILayout.Space(10);
             GUILayout.Label("Ducking (play a Voice-channel sound to test)");
-            if (GUILayout.Button("10) Play BGM then simulate Voice ducking"))
+            if (GUILayout.Button("11) Play BGM then simulate Voice ducking"))
             {
                 SoundManager.Instance.PlaySound(_bgmSound);
                 Log("BGM started. Play a Voice-channel ESound to hear ducking.");
