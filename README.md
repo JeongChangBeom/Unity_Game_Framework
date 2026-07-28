@@ -59,7 +59,7 @@
 |Data Parsing|Google Sheet 데이터 파이프라인|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.data`|
 |UI System|패키지화 예정|-|
 |Audio System|패키지화 예정|-|
-|Time System|패키지화 예정|-|
+|Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
 
 > Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 
@@ -616,160 +616,149 @@ SaveManager.Instance.Save(key, _settings);
 <summary><h2>6️⃣ Time System</h2></summary>
 
 ### 기능
-Time System은 **게임 전반의 시간 흐름을 통합 관리**하는 시스템입니다.
-모든 시간 계산은 **UTC 기준**으로 동작하며, 서버 시간·쿨타임·리셋·오프라인 경과 시간을 안정저긍로 처리합니다.
+게임 전반의 시간 흐름을 UTC 기준으로 통합 관리합니다.
+
+- **서버/로컬 시간 소스 전환** — `Mode`(LocalOnly / ServerOnly / PreferServer)를 설정으로 선택. 게임마다 서버 동기화가 필요한지 다르기 때문에 하나로 고정하지 않음
+- **모노토닉 클럭 기반 서버 신뢰도 판단** — 서버 동기화는 기기 시계가 아니라 `Stopwatch` 기반 모노토닉 클럭에 앵커링되어, 동기화 후 기기 시계를 바꿔도 흔들리지 않음. 신뢰 유효기간(Trust Window) 만료 시 자동으로 로컬로 대체
+- **일/주/월 리셋 키 + 남은 시간 계산**
+- **쿨타임** — 개별 조회 + 전체 목록 조회
+- **오프라인 경과 시간**
+- **시간 역행(치트) 감지** — 마지막 접속 시각보다 뒤로 가면 감지, 허용 오차 내의 사소한 뒤로 감(NTP 보정 등)은 미신뢰 소스에 한해 허용
+- **리셋 크로싱 이벤트** — 게임을 켜놓은 채로 일/주/월 리셋 시각을 넘기면 `OnDailyReset`/`OnWeeklyReset`/`OnMonthlyReset` 발생
+- **서버 재동기화 필요 신호** — `IsServerTrustExpiringSoon(초)`으로 신뢰 만료가 임박했는지 확인 가능 (실제 재동기화 네트워크 호출은 프로젝트마다 다르므로 신호만 제공)
+- **이벤트 기간 유틸(`TimeRangeUtc`)** — 시작~종료 UTC 구간의 진행 여부/남은 시간 계산 (기간 한정 이벤트 등에 사용)
+- **스키마 버전 체크** — 저장된 버전과 현재 버전이 다르면 감지 후 로그
+- **테스트용 Mock 시간** — 시간 점프, 리셋 시점으로 바로 이동
+- **Save / Load 연동** — 모든 시간 데이터 영구 저장
 
 ---
 
-핵심 기능 요약
-
-|기능|설명|
-|-|-|
-|UTC 기준 시간 제공|`TimeManager.Instance.UtcNow`로 현재 시간 제공|
-|서버 시간 동기화|서버 UTC를 받아 로컬 시간 왜곡 없이 보정|
-|시간 신뢰도 판단|서버 시간 유효 기간 관리(`Trust Window`)|
-|일/주/월 리셋 계산|리셋 시각 기준 키 및 남은 시간 계산|
-|쿨타임 시스템|스킬,상점,보상 등에 사용되는 타이머|
-|오프라인 경과 시간|앱 종료 후 경과 시간 계산|
-|시간 역행(치트) 감지|기기 시간 되돌림 탐지|
-|테스트용 Mock 시간|시간 점프 및 리셋 테스트 지원|
-|Save / Load 연동|모든 시간 데이터 영구 저장|
+### 외부 패키지
+없음. `System.Diagnostics.Stopwatch`(모노토닉 클럭)와 Unity API만 사용합니다.
 
 ---
 
-## 씬 배치
-Time System은 `MonoSingleton<TimeManager>` 기반입니다.
+### 사용 방법
 
-```text
-⚠ SaveManager보다 먼저 초기화되면 안 되므로
-Boot 씬에 SaveManager와 함께 배치하는 것을 권장합니다.
+#### 1) 설정 에셋 만들기 (씬 배치 불필요)
+* `Assets/Create/Game Framework/Time System/Time Manager Settings`로 에셋 생성
+* 반드시 `Assets/Resources/GameFramework/TimeManagerSettings.asset` 경로에 저장
+* 에셋이 없으면 기본값(PreferServer 등)으로 동작하며 Console에 경고가 남습니다
+
+---
+
+#### 2) 현재 시간 사용
+```cs
+DateTimeOffset now = TimeManager.Instance.UtcNow;
+bool trusted = TimeManager.Instance.IsTrusted;
 ```
 
 ---
 
-현재 시간 사용
-`DataTimeOffset now = TimeManager.Instance.UtcNow;`
-
----
-
-서버 시간 적용
-`TimeManager.Instance.ApplyServerUtc(serverUtc);`
-서버 시간이 신뢰 가능할 경우 `PreferServer` 모드에서 자동으로 서버 시간이 사용됩니다.
-
----
-
-쿨타임 사용
-
+#### 3) 서버 시간 동기화
 ```cs
-// 쿨타임 시작
+TimeManager.Instance.ApplyServerUtc(serverUtc);
+
+// 신뢰 만료가 임박했으면(60초 이내) 재동기화 트리거
+if (TimeManager.Instance.IsServerTrustExpiringSoon(60))
+{
+    // 프로젝트의 서버 시간 API를 호출해서 다시 ApplyServerUtc(...)
+}
+
+TimeManager.Instance.ClearServerSync();
+```
+`Mode`가 `PreferServer`면 신뢰 가능한 동안 자동으로 서버 시간이 쓰이고, 신뢰가 만료되면 자동으로 로컬 시간으로 대체됩니다. `LocalOnly`/`ServerOnly`로 고정할 수도 있습니다.
+
+> 서버 신뢰는 **앱을 껐다 켜는 것만으로는 풀리지 않습니다** (OS 부팅 이후 누적 시간 기준 클럭 사용). 다만 **기기를 재부팅하면 항상 풀리고** 다음 `ApplyServerUtc` 전까지 로컬 시간으로 대체됩니다 — 재부팅 후에는 경과 시간을 검증할 방법이 없어 안전하게 미신뢰 처리하는 의도된 동작입니다. `ServerOnly`/`PreferServer`를 쓴다면 앱 시작 시점에 항상 서버 동기화를 한 번 시도하는 걸 권장합니다.
+
+---
+
+#### 4) 쿨타임
+```cs
 TimeManager.Instance.StartCooldown("skill_A", TimeSpan.FromSeconds(30));
 
-// 사용 가능 여부
 bool ready = TimeManager.Instance.IsCooldownReady("skill_A");
-
-// 남은 시간
-TimeSpan remain = TimeManager.Instance.GetCooldownremaining("skill_A");
-
-// 강제 초기화
+TimeSpan remain = TimeManager.Instance.GetCooldownRemaining("skill_A");
 TimeManager.Instance.ClearCooldown("skill_A");
+
+// 현재 진행 중인 쿨다운 전체 목록 (UI 표시용)
+IReadOnlyDictionary<string, TimeSpan> all = TimeManager.Instance.GetAllCooldownsRemaining();
 ```
 
 ---
 
-리셋 키 (Daily / Weekly / Monthly)
-
+#### 5) 리셋 키 / 남은 시간 / 리셋 이벤트
 ```cs
 int dailyKey = TimeManager.Instance.GetDailyKey();
 int weeklyKey = TimeManager.Instance.GetWeeklyKey();
 int monthlyKey = TimeManager.Instance.GetMonthlyKey();
-```
 
-이 키는 **보상 중복 지급 방지**에 사용할 수 있습니다.
-
----
-
-리셋까지 남은 시간
-
-```cs
 TimeSpan remain = TimeManager.Instance.GetRemainingToDailyReset();
 string text = TimeManager.Instance.GetDailyResetRemainingText();
+
+TimeManager.Instance.OnDailyReset += () => { /* 게임을 켜놓은 채로 자정을 넘긴 순간 호출됨 */ };
+```
+리셋 키는 **보상 중복 지급 방지**에 사용할 수 있습니다.
+
+---
+
+#### 6) 오프라인 경과 시간 / 치트 감지
+```cs
+TimeSpan offline = TimeManager.Instance.GetOfflineDelta();
+
+bool cheated = TimeManager.Instance.IsCheatDetected;
+TimeManager.Instance.ClearCheatFlag();
 ```
 
 ---
 
-오프라인 경과 시간
-`TimeSpan offline = TimeManager.Instance.GetOfflineDelta();`
-
-스태미나 회복, 생산 정산 등 여러가지 기능을 구현할 때 활용 가능합니다.
-
----
-
-시간 역행 감지
-bool cheated = TimeManager.Instance.IsCheatDetected;
-TimeManager.Instance.ClearCheatFlag();
-
----
-
-테스트용 Mock 시간
-
+#### 7) 테스트용 Mock 시간
 ```cs
 TimeManager.Instance.EnableMockTime();
 TimeManager.Instance.AddMockSeconds(3600); // +1시간
-
 TimeManager.Instance.JumpToNextDailyResetForTest();
-TimeManager.Instnace.DisableMockTime();
+TimeManager.Instance.DisableMockTime();
 ```
 
 ---
 
-저장 구조
+#### 8) 이벤트 기간 (TimeRangeUtc)
+```cs
+TimeRangeUtc eventPeriod = new TimeRangeUtc(eventStartUtc, eventEndUtc);
+
+bool isActive = eventPeriod.IsActive(TimeManager.Instance.UtcNow);
+TimeSpan remain = eventPeriod.Remaining(TimeManager.Instance.UtcNow);
+```
+
+---
+
+### TimeManagerSettings 항목
+`Assets/Resources/GameFramework/TimeManagerSettings.asset`의 Inspector에서 설정합니다.
+
+|항목|설명|
+|-|-|
+|Mode|LocalOnly / ServerOnly / PreferServer|
+|Daily Reset Hour|일일 리셋 기준 UTC 시각|
+|Weekly Reset Day|주간 리셋 시작 요일|
+|Backward Tolerance Seconds|시간 역행 허용 오차(초)|
+|Server Trust Window Seconds|서버 시간 신뢰 유효 기간(초)|
+|Schema Version|Time 저장 데이터 버전|
+
+---
+
+### 저장 구조
 Time System의 모든 데이터는 Save / Load의 Domain을 사용하여 저장됩니다.
 
 ```text
 game/time/...
 ```
 
-저장 항목 예:
-* 서버 동기화 시각
-* 마지막 접속 시간
-* 쿨타임 종료 시각
-* Mock 시간 오프셋
-* 치트 플래그
+저장 항목: 서버 동기화 시각, 마지막 접속 시간, 쿨타임 목록, Mock 시간 오프셋, 치트 플래그, 스키마 버전
 
 ---
 
-## TimeManager Inspector 설정
-
-<img width="539" height="302" alt="image" src="https://github.com/user-attachments/assets/565251e6-2ed5-480e-85f7-f6d55c817576" />
-
-|항목|설명|
-|-|-|
-|Mode|LocalOnly / ServerOnly / PreferServer|
-|Daily reset Hour|일일 리셋 기준 UTC 시각|
-|Weekly Reset Day|주간 리셋 시작 요일|
-|Backward Tolerance Sec|시간 역행 허용 오차|
-|Server Trust Window|서버 시간 신뢰 유효 기간|
-|Schema Version|타임 저장 데이터 버전|
-
----
-
-## 실제 활용 예시
-
-```cs
-// 스킬 쿨타임
-if(TimeManager.Instance.IsCooldownReady("skill_A"))
-{
-    TimeManager.Instance.StartCooldown("skill_A", TimeSpan.FromSeconds(10));
-    UseDash();
-}
-
-// 일일 보상 리셋 판단
-int todayKey = TimeManager.Instance.GetDailykey();
-if(lastRewardKey != todayKey)
-{
-    GiveDailyReward(); // 일일 보상 주는 보상(미구현)
-}
-```
+### 테스트 방법
+`Assets/00.Scripts/Tests/TimeTester.cs`를 아무 GameObject에 붙이고 Play하면 버튼으로 스냅샷/쿨타임/서버 동기화/Mock 시간/리셋 키/오프라인 경과/치트 플래그를 전부 확인할 수 있고, 리셋 이벤트가 발생하면 로그에 자동으로 찍힙니다.
 
 </details>
 

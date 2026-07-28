@@ -1,0 +1,17 @@
+{
+    "name": "GameFramework.TimeSystem",
+    "rootNamespace": "GameFramework.TimeSystem",
+    "references": [
+        "GameFramework.Core",
+        "GameFramework.SaveLoad"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}
