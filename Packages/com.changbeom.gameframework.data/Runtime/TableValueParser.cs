@@ -2,7 +2,7 @@ using System;
 using System.Globalization;
 using UnityEngine;
 
-namespace GameFramework.Data
+namespace GameFramework.DataParsing
 {
     /// <summary>
     /// Shared cell-value parsing used by generated table classes. Centralizing this here

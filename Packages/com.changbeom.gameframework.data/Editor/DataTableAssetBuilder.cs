@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameFramework.Data.Editor
+namespace GameFramework.DataParsing.Editor
 {
     [InitializeOnLoad]
     public static class DataTableAssetBuilder
@@ -69,7 +69,7 @@ namespace GameFramework.Data.Editor
                 Type t = FindScriptableObjectTypeByName(className);
                 if (t == null)
                 {
-                    Debug.LogError("[GameFramework.Data] Type not found: " + className);
+                    Debug.LogError("[GameFramework.DataParsing] Type not found: " + className);
                     continue;
                 }
 
@@ -106,7 +106,7 @@ namespace GameFramework.Data.Editor
 
                 if (found != null)
                 {
-                    Debug.LogError("[GameFramework.Data] 동일 이름 ScriptableObject 타입이 여러 개입니다: " + className);
+                    Debug.LogError("[GameFramework.DataParsing] 동일 이름 ScriptableObject 타입이 여러 개입니다: " + className);
                     return null;
                 }
 

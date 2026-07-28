@@ -252,7 +252,7 @@ PoolManager.Instance.Despawn(obj);
 - 우선순위 처리 (Low / Normal / High / Critical)
 - 선점 / 대기 / 교체 정책
 - Suspend / Resume 흐름
-- 닫힘 연출 대응 (비동기 Close), 열림 연출 훅(`PlayOpenAnimation`)도 대칭 지원
+- Open / Resume / Suspend / Close, Toast Show / Hide 전 구간에 애니메이션 훅 제공 (기본 스케일 연출 포함, 원하는 연출 코드로 교체 가능)
 - Modal 입력 차단
 - Pooling 패키지(`PoolManager`) 연계 (자체 풀 없음)
 - 팝업 결과 콜백 — 확인/취소처럼 "어떻게 닫혔는지" 결과값을 호출한 쪽이 받을 수 있음
@@ -354,6 +354,11 @@ public class MandatoryConfirmPopup : UIPopupBase
     public override bool CloseableByBackButton => false;
 }
 ```
+
+---
+
+#### 애니메이션 커스터마이징
+`UIPopupBase`(Open/Resume/Suspend/Close)와 `UIToastBase`(Show/Hide)는 각 동작마다 `PlayXAnimation()` 훅과 스케일 기반 기본 연출을 제공합니다. 원하는 연출로 바꾸려면 해당 메서드를 override해서 애니메이션 코드(코루틴, 자체 트윈 등 원하는 방식)를 작성하고, 끝났을 때 대응하는 `CompleteX()`(`CompleteOpen`/`CompleteResume`/`CompleteSuspend`/`CompleteClose`/`CompleteShow`/`CompleteHide`)를 반드시 호출하면 됩니다. override하지 않은 동작은 기본 스케일 연출(0↔1)이 그대로 재생되며, 각 클래스의 `_animationDuration`(Inspector에서 조정 가능한 float) 필드로 코드 수정 없이 기본 연출 속도만 바꿀 수도 있습니다.
 
 ---
 

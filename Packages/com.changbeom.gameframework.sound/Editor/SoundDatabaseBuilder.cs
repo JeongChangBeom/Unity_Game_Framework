@@ -6,7 +6,7 @@ using UnityEditor.AddressableAssets.Settings;
 using UnityEditor.AddressableAssets.Settings.GroupSchemas;
 using UnityEngine;
 
-namespace GameFramework.Sound.Editor
+namespace GameFramework.SoundSystem.Editor
 {
     public static class SoundDatabaseBuilder
     {

@@ -1,9 +1,11 @@
 {
-    "name": "GameFramework.UI",
-    "rootNamespace": "GameFramework.UI",
+    "name": "GameFramework.SoundSystem",
+    "rootNamespace": "GameFramework.SoundSystem",
     "references": [
         "GameFramework.Core",
-        "GameFramework.Pooling"
+        "GameFramework.SaveLoad",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

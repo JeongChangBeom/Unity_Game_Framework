@@ -1,8 +1,8 @@
 {
-    "name": "GameFramework.Data.Editor",
-    "rootNamespace": "GameFramework.Data.Editor",
+    "name": "GameFramework.DataParsing.Editor",
+    "rootNamespace": "GameFramework.DataParsing.Editor",
     "references": [
-        "GameFramework.Data",
+        "GameFramework.DataParsing",
         "Unity.EditorCoroutines.Editor"
     ],
     "includePlatforms": [

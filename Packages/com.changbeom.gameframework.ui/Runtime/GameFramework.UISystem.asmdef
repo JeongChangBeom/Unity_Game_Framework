@@ -1,13 +1,11 @@
 {
-    "name": "GameFramework.Sound.Editor",
-    "rootNamespace": "GameFramework.Sound.Editor",
+    "name": "GameFramework.UISystem",
+    "rootNamespace": "GameFramework.UISystem",
     "references": [
-        "GameFramework.Sound",
-        "Unity.Addressables.Editor"
+        "GameFramework.Core",
+        "GameFramework.Pooling"
     ],
-    "includePlatforms": [
-        "Editor"
-    ],
+    "includePlatforms": [],
     "excludePlatforms": [],
     "allowUnsafeCode": false,
     "overrideReferences": false,

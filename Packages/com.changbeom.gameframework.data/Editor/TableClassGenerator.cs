@@ -4,7 +4,7 @@ using System.IO;
 using System.Text;
 using UnityEditor;
 
-namespace GameFramework.Data.Editor
+namespace GameFramework.DataParsing.Editor
 {
     public static class TableClassGenerator
     {
@@ -120,7 +120,7 @@ namespace GameFramework.Data.Editor
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Collections.Generic;");
             sb.AppendLine("using UnityEngine;");
-            sb.AppendLine("using GameFramework.Data;");
+            sb.AppendLine("using GameFramework.DataParsing;");
             sb.AppendLine();
             sb.AppendLine("// AUTO-GENERATED. DO NOT EDIT.");
             sb.AppendLine("public class " + className + " : ScriptableObject");

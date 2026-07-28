@@ -1,11 +1,8 @@
 {
-    "name": "GameFramework.Sound",
-    "rootNamespace": "GameFramework.Sound",
+    "name": "GameFramework.DataParsing",
+    "rootNamespace": "GameFramework.DataParsing",
     "references": [
-        "GameFramework.Core",
-        "GameFramework.SaveLoad",
-        "Unity.Addressables",
-        "Unity.ResourceManager"
+        "GameFramework.Core"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],

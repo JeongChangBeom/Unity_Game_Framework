@@ -5,7 +5,7 @@ using System.Text;
 using UnityEditor;
 using UnityEngine;
 
-namespace GameFramework.Sound.Editor
+namespace GameFramework.SoundSystem.Editor
 {
     // ESound.cs is regenerated directly inside this package's Runtime folder (not Assets/GeneratedTables),
     // because SoundDatabaseSO/SoundPlayer/SoundManager reference ESound concretely and must share its assembly.

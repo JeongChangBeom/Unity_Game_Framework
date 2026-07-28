@@ -1,6 +1,6 @@
 using System.Collections.Generic;
 
-namespace GameFramework.Data
+namespace GameFramework.DataParsing
 {
     public class TsvTable
     {

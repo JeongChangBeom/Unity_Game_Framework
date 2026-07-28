@@ -2,7 +2,7 @@ using System;
 using System.Text.RegularExpressions;
 using UnityEngine.Networking;
 
-namespace GameFramework.Data.Editor
+namespace GameFramework.DataParsing.Editor
 {
     public static class GoogleSheetUtility
     {

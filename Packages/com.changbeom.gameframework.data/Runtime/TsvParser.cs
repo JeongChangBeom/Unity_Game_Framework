@@ -1,4 +1,4 @@
-namespace GameFramework.Data
+namespace GameFramework.DataParsing
 {
     public class TsvParser
     {

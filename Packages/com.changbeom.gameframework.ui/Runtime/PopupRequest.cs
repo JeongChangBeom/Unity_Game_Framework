@@ -1,6 +1,6 @@
 using System;
 
-namespace GameFramework.UI
+namespace GameFramework.UISystem
 {
     [Serializable]
     public class PopupRequest

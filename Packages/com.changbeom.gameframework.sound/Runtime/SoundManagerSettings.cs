@@ -1,7 +1,7 @@
 using UnityEngine;
 using UnityEngine.Audio;
 
-namespace GameFramework.Sound
+namespace GameFramework.SoundSystem
 {
     /// <summary>
     /// Project-specific SoundManager configuration. Create via

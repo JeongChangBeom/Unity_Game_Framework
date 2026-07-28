@@ -1,6 +1,6 @@
 using System;
 using System.Text;
-using GameFramework.Data;
+using GameFramework.DataParsing;
 using UnityEngine;
 
 namespace GameFramework.Tests

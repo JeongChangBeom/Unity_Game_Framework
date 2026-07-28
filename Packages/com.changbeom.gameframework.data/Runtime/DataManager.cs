@@ -3,7 +3,7 @@ using System.Collections.Generic;
 using GameFramework.Core;
 using UnityEngine;
 
-namespace GameFramework.Data
+namespace GameFramework.DataParsing
 {
     public sealed class DataManager : MonoSingleton<DataManager>
     {

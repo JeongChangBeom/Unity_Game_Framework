@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameFramework.UI
+namespace GameFramework.UISystem
 {
     /// <summary>
     /// Project-specific UIManager configuration. Create via

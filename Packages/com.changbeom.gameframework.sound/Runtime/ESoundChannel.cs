@@ -1,4 +1,4 @@
-namespace GameFramework.Sound
+namespace GameFramework.SoundSystem
 {
     public enum ESoundChannel
     {

@@ -1,6 +1,6 @@
 using UnityEngine;
 
-namespace GameFramework.Data
+namespace GameFramework.DataParsing
 {
     public static class TableLoader
     {

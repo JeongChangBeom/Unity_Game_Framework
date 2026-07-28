@@ -1,4 +1,4 @@
-using GameFramework.Sound;
+using GameFramework.SoundSystem;
 using UnityEngine;
 
 namespace GameFramework.Tests

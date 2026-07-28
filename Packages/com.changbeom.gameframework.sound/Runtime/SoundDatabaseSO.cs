@@ -2,7 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
-namespace GameFramework.Sound
+namespace GameFramework.SoundSystem
 {
     [CreateAssetMenu(menuName = "Game Framework/Sound/Sound Database")]
     public class SoundDatabaseSO : ScriptableObject

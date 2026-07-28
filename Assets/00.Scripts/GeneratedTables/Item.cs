@@ -2,7 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
-using GameFramework.Data;
+using GameFramework.DataParsing;
 
 // AUTO-GENERATED. DO NOT EDIT.
 public class Item : ScriptableObject

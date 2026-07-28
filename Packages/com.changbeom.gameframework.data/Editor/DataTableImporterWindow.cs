@@ -7,7 +7,7 @@ using UnityEditor;
 using UnityEngine;
 using UnityEngine.Networking;
 
-namespace GameFramework.Data.Editor
+namespace GameFramework.DataParsing.Editor
 {
     public class DataTableImporterWindow : EditorWindow
     {

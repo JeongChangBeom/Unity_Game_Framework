@@ -1,7 +1,7 @@
 using System;
 using UnityEngine;
 
-namespace GameFramework.Sound
+namespace GameFramework.SoundSystem
 {
     [Serializable]
     public class SoundSettingsData

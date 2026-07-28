@@ -5,7 +5,7 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Audio;
 
-namespace GameFramework.Sound
+namespace GameFramework.SoundSystem
 {
     public sealed class SoundManager : MonoSingleton<SoundManager>
     {
@@ -382,7 +382,7 @@ namespace GameFramework.Sound
             }
 
             var handle = Addressables.LoadAssetAsync<AudioClip>(fileName);
-            AudioClip clip = await handle;
+            AudioClip clip = await handle.Task;
 
             if (clip != null)
             {

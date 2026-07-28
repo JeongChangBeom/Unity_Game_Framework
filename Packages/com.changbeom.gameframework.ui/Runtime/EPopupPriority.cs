@@ -1,4 +1,4 @@
-namespace GameFramework.UI
+namespace GameFramework.UISystem
 {
     public enum EPopupPriority
     {

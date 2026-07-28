@@ -31,6 +31,34 @@
         "com.changbeom.gameframework.core": "0.1.0"
       }
     },
+    "com.changbeom.gameframework.sound": {
+      "version": "file:com.changbeom.gameframework.sound",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.saveload": "0.1.0",
+        "com.unity.addressables": "1.21.21"
+      }
+    },
+    "com.changbeom.gameframework.time": {
+      "version": "file:com.changbeom.gameframework.time",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.saveload": "0.1.0"
+      }
+    },
+    "com.changbeom.gameframework.ui": {
+      "version": "file:com.changbeom.gameframework.ui",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.pooling": "0.1.0"
+      }
+    },
     "com.unity.2d.animation": {
       "version": "10.2.2",
       "depth": 1,
@@ -257,26 +285,6 @@
       },
       "url": "https://packages.unity.com"
     },
-    "com.unity.textmeshpro": {
-      "version": "5.0.0",
-      "depth": 0,
-      "source": "builtin",
-      "dependencies": {
-        "com.unity.ugui": "2.0.0"
-      }
-    },
-    "com.unity.timeline": {
-      "version": "1.7.6",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.modules.audio": "1.0.0",
-        "com.unity.modules.director": "1.0.0",
-        "com.unity.modules.animation": "1.0.0",
-        "com.unity.modules.particlesystem": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
-    },
     "com.unity.ugui": {
       "version": "2.0.0",
       "depth": 0,
@@ -285,16 +293,6 @@
         "com.unity.modules.ui": "1.0.0",
         "com.unity.modules.imgui": "1.0.0"
       }
-    },
-    "com.unity.visualscripting": {
-      "version": "1.9.1",
-      "depth": 0,
-      "source": "registry",
-      "dependencies": {
-        "com.unity.ugui": "1.0.0",
-        "com.unity.modules.jsonserialize": "1.0.0"
-      },
-      "url": "https://packages.unity.com"
     },
     "com.unity.modules.ai": {
       "version": "1.0.0",

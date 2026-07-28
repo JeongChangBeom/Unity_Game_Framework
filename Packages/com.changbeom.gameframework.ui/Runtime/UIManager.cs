@@ -5,7 +5,7 @@ using GameFramework.Pooling;
 using UnityEngine;
 using UnityEngine.UI;
 
-namespace GameFramework.UI
+namespace GameFramework.UISystem
 {
     public class UIManager : MonoSingleton<UIManager>
     {
@@ -354,8 +354,7 @@ namespace GameFramework.UI
                 return;
             }
 
-            toast.Hide();
-            PoolManager.Instance.Despawn(toast.gameObject);
+            toast.RequestHide(() => PoolManager.Instance.Despawn(toast.gameObject));
         }
 
         private async Awaitable AutoHideToastAfterDelay(UIToastBase toast, float delay)
