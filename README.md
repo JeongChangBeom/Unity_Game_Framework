@@ -61,9 +61,9 @@
 |Sound System|Addressables + Sheet 기반 사운드 재생|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sound`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
 
-> Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
-> Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
-> UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
+> * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
+> * Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
+> * UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
 
 ---
 
