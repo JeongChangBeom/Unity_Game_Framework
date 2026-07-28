@@ -1,0 +1,16 @@
+{
+    "name": "GameFramework.Pooling",
+    "rootNamespace": "GameFramework.Pooling",
+    "references": [
+        "GameFramework.Core"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

@@ -6,6 +6,14 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.changbeom.gameframework.pooling": {
+      "version": "file:com.changbeom.gameframework.pooling",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0"
+      }
+    },
     "com.changbeom.gameframework.saveload": {
       "version": "file:com.changbeom.gameframework.saveload",
       "depth": 0,

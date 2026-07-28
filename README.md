@@ -143,54 +143,51 @@ ItemData item = ItemTable.Instance.Get(1001);
 <summary><h2>2️⃣ Pooling</h2></summary>
 
 ### 기능
-- Type 기반 풀링
-- Dictionary + Stack 구조
-- Instantiate / Destroy 최소화
-- 상태 초기화 훅 제공
+- 프리팹(GameObject) 단위 풀링 — 프리팹별로 독립된 Pool 관리
+- Dictionary + Queue 구조로 재사용 인스턴스 관리
+- Instantiate / Destroy 최소화 (Spawn/Despawn만 반복)
+- `IPoolable.OnSpawn/OnDespawn` 상태 초기화 훅 제공 (자식 오브젝트 포함 자동 호출)
+- 씬 배치 불필요 — 처음 사용하는 순간 자동 생성
 
 ---
 
 ### 사용 방법
 
 ```cs
-// 풀에 남아있는 같은 타입 인스턴스를 재사용하거나,
-// 없으면 prefab으로 새로 생성해서 반환한다.
-MyObject obj = Pool.Get<MyObject>(myObjectPrefab);
+// 풀에 남아있는 인스턴스를 재사용하거나, 없으면 prefab으로 새로 생성해서 반환한다.
+GameObject obj = PoolManager.Instance.Spawn(myPrefab, spawnPosition, Quaternion.identity);
 
-// 사용 (위치, 데이터 등은 사용자가 초기화)
-obj.transform.position = spawnPosition;
-obj.gameObject.SetActive(true);
+// 컴포넌트로 바로 받고 싶다면 제네릭 오버로드 사용
+MyComponent comp = PoolManager.Instance.Spawn(myPrefabComponent, spawnPosition, Quaternion.identity);
 
 // 사용이 끝나면 Destroy하지 않고 비활성화 후 풀에 반환한다.
-Pool.Return(obj);
+PoolManager.Instance.Despawn(obj);
 ```
 
-- **`Get<T>(prefab)`**
-  -> 재사용(있으면) / 생성(없으면)  
-- **`Return(obj)`**
+- **`Spawn(prefab, position, rotation, parent = null)`**
+  -> 재사용(있으면) / 생성(없으면)
+- **`Spawn<T>(prefab, position, rotation, parent = null)`**
+  -> 위와 동일하되 컴포넌트 타입으로 바로 반환
+- **`Despawn(instance)`**
   -> 비활성화 후 풀에 보관, 다음 요청 시 재사용
 
 ---
 
-## (Optional) Pool Settings ScriptableObject
-Pooling은 선택적으로
-**ScriptableObject 기반 풀 설정을 사용할 수 있습니다.**
+### Pool Settings (선택, 씬 배치 불필요)
+대량 생성이 예상되는 프리팹은 시작 시 미리 생성(Prewarm)해두는 설정 에셋을 만들 수 있습니다.
 
-|SO|
-|-|
-|<img width="392" height="249" alt="image" src="https://github.com/user-attachments/assets/2b25c199-f671-493f-9a68-f04054997782" />|
+* `Assets/Create/Game Framework/Pooling/Pool Settings`로 에셋 생성
+* 반드시 `Assets/Resources/GameFramework/PoolSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
+* 항목: Prefab / Prewarm Count / Max Count(0 = 무제한) / Auto Expand / Default Parent
+
+> 단순한 풀링이 필요한 경우에는 설정 없이 `Spawn`/`Despawn`만 사용해도 됩니다. 설정은 대량 생성·성능 관리가 필요할 때만 추가하면 됩니다.
 
 ---
 
-### Pool Settings 항목
-- Prefab : 풀링 대상 오브젝트
-- Prewarm Count : 시작 시 미리 생성할 개수
-- Max Count : 풀 최대 개수
-- Auto Expand : 최대 개수 초과 시 자동 생성 여부
-- Default Parent : 풀링 오브젝트의 기본 부모 Transform
-
-> 단순한 풀링이 필요한 경우에는 설정 없이 사용 가능하며,
-> 대량 생성·성능 관리가 필요한 경우에만 PoolingSettings를 사용하면 됩니다.
+### 테스트 방법
+`Assets/00.Scripts/Tests/PoolingTester.cs`를 아무 GameObject에 붙이고 Play하면:
+- Spawn/Despawn 버튼으로 재사용 여부를 인스턴스 ID로 직접 확인할 수 있습니다 (Despawn 후 다시 Spawn하면 같은 ID가 재사용됨).
+- Hierarchy 창에서 `[PoolRoot]` 하위에 풀이 쌓이는 것도 함께 확인 가능합니다.
 
 </details>
 
