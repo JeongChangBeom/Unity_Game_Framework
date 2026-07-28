@@ -57,12 +57,13 @@
 |Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
 |Pooling|프리팹 기반 오브젝트 풀링|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.pooling`|
 |Data Parsing|Google Sheet 데이터 파이프라인|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.data`|
-|UI System|패키지화 예정|-|
+|UI System|우선순위/선점 기반 팝업 + 토스트|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.ui`|
 |Sound System|Addressables + Sheet 기반 사운드 재생|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sound`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
 
 > Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
+> UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
 
 ---
 
@@ -251,9 +252,15 @@ PoolManager.Instance.Despawn(obj);
 - 우선순위 처리 (Low / Normal / High / Critical)
 - 선점 / 대기 / 교체 정책
 - Suspend / Resume 흐름
-- 닫힘 연출 대응 (비동기 Close)
-- Model 입력 차단
-- Pooling 연계
+- 닫힘 연출 대응 (비동기 Close), 열림 연출 훅(`PlayOpenAnimation`)도 대칭 지원
+- Modal 입력 차단
+- Pooling 패키지(`PoolManager`) 연계 (자체 풀 없음)
+- 팝업 결과 콜백 — 확인/취소처럼 "어떻게 닫혔는지" 결과값을 호출한 쪽이 받을 수 있음
+- 전체 닫기(`CloseAll`) — 씬 전환 시 대기열까지 한번에 정리
+- 비모달 토스트(Toast) — 모달 팝업과 별개로 여러 개 동시 표시 가능, 자동 사라짐
+- HUD / Overlay 레이어 — 상시 표시 UI, 전체화면 연출용 레이어를 별도로 제공
+- 뒤로가기 / Escape 키로 최상단 팝업 닫기 (팝업별로 끄기 가능)
+- Settings ScriptableObject 기반 설정 (씬 배치 불필요)
 
 ---
 
@@ -280,10 +287,91 @@ UIManager.Instance.RequestPopup(
 
 ---
 
+#### 결과 콜백 (확인/취소 다이얼로그)
+팝업 쪽에서 `CloseSelf(result)`로 닫으면, 호출한 쪽이 결과를 받을 수 있습니다.
+
+```cs
+// 호출하는 쪽
+UIManager.Instance.RequestPopup<bool>(
+    confirmPopupPrefab,
+    EPopupPriority.High,
+    result => Debug.Log($"확인 결과: {result}")
+);
+
+// 팝업 내부 (예: Yes 버튼)
+CloseSelf(true);
+
+// 팝업 내부 (예: No 버튼)
+CloseSelf(false);
+```
+
+---
+
 #### 팝업 닫기
 ```cs
 UIManager.Instance.CloseTopPopup();
+
+// 특정 팝업을 결과값과 함께 닫기
+UIManager.Instance.ClosePopup(popupInstance, result: true);
+
+// 씬 전환 전: 대기열까지 전부 정리
+UIManager.Instance.CloseAll();
 ```
+
+---
+
+#### 토스트 (비모달 알림)
+```cs
+UIManager.Instance.ShowToast(toastPrefab, "아이템 획득!");
+
+// 기본 노출 시간(UIManagerSettings.DefaultToastDuration) 대신 직접 지정
+UIManager.Instance.ShowToast(toastPrefab, "아이템 획득!", duration: 3f);
+```
+
+---
+
+#### HUD / Overlay 레이어
+상시 표시되는 HUD나 로딩 화면 등 전체화면 연출을 팝업/토스트와 겹치지 않는 별도 레이어에 붙일 수 있습니다.
+
+```cs
+Instantiate(hudPrefab, UIManager.Instance.HudRoot);
+Instantiate(loadingScreenPrefab, UIManager.Instance.OverlayRoot);
+```
+
+---
+
+#### 상태 조회
+```cs
+if (UIManager.Instance.IsAnyPopupOpen) { /* 조작 비활성화 등 */ }
+```
+
+---
+
+#### 뒤로가기 / Escape로 닫히길 원하지 않는 팝업
+```cs
+public class MandatoryConfirmPopup : UIPopupBase
+{
+    public override bool CloseableByBackButton => false;
+}
+```
+
+---
+
+### UI Manager Settings 만들기 (씬 배치 불필요)
+`Assets/Create/Game Framework/UI/UI Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
+
+`Assets/Resources/GameFramework/UIManagerSettings.asset`
+
+설정 가능한 항목:
+* Canvas 참조 해상도 / Match Width-or-Height
+* 모달 블로커 색상
+* 토스트 기본 노출 시간
+* 뒤로가기/Escape로 팝업 닫기 사용 여부
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/UITester.cs`를 빈 GameObject에 붙이고 `_popupA`/`_popupB`에 `UIPopup_TestA`/`UIPopup_TestB` 프리팹을 연결하면 팝업/결과 콜백/토스트/전체 닫기를 확인할 수 있는 OnGUI 버튼이 표시됩니다.
 
 </details>
 

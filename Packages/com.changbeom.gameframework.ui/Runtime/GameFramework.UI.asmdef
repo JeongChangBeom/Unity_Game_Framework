@@ -1,0 +1,17 @@
+{
+    "name": "GameFramework.UI",
+    "rootNamespace": "GameFramework.UI",
+    "references": [
+        "GameFramework.Core",
+        "GameFramework.Pooling"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

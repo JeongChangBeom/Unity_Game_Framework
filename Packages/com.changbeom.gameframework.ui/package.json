@@ -1,0 +1,14 @@
+{
+    "name": "com.changbeom.gameframework.ui",
+    "version": "0.1.0",
+    "displayName": "Game Framework - UI System",
+    "description": "Priority/preemption-based modal popup flow with suspend/resume, result callbacks, non-modal toasts, and HUD/Overlay layers. Depends on Game Framework Core and Pooling.",
+    "unity": "6000.0",
+    "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.pooling": "0.1.0"
+    },
+    "author": {
+        "name": "ChangBeom"
+    }
+}

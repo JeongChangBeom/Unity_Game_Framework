@@ -1,3 +1,4 @@
+using GameFramework.UI;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -5,6 +6,8 @@ public class UIPopup_TestA : UIPopupBase
 {
     [SerializeField] private Button _closeButton;
     [SerializeField] private float _closeDelay = 0.25f;
+
+    private UnityEngine.Events.UnityAction _onCloseButtonClicked;
 
     private void Awake()
     {
@@ -15,7 +18,10 @@ public class UIPopup_TestA : UIPopupBase
 
         if (_closeButton != null)
         {
-            _closeButton.onClick.AddListener(CloseSelf);
+            // Demonstrates the result-callback path: closing via this button reports `true`
+            // back to whatever RequestPopup<TResult> caller opened this popup.
+            _onCloseButtonClicked = () => CloseSelf(true);
+            _closeButton.onClick.AddListener(_onCloseButtonClicked);
         }
     }
 
@@ -45,9 +51,9 @@ public class UIPopup_TestA : UIPopupBase
 
     private void OnDestroy()
     {
-        if (_closeButton != null)
+        if (_closeButton != null && _onCloseButtonClicked != null)
         {
-            _closeButton.onClick.RemoveListener(CloseSelf);
+            _closeButton.onClick.RemoveListener(_onCloseButtonClicked);
         }
 
         CancelInvoke();
