@@ -49,11 +49,11 @@ namespace GameFramework.Pooling
                     continue;
                 }
 
-                CreatePoolIfNeeded(e.prefab, e.prewarmCount, e.maxCount, e.autoExpand, e.defaultParent);
+                CreatePoolIfNeeded(e.prefab, e.prewarmCount, e.maxCount, e.autoExpand);
             }
         }
 
-        public void CreatePoolIfNeeded(GameObject prefab, int prewarmCount, int maxCount, bool autoExpand, Transform defaultParent)
+        public void CreatePoolIfNeeded(GameObject prefab, int prewarmCount, int maxCount, bool autoExpand)
         {
             if (prefab == null)
             {
@@ -68,7 +68,7 @@ namespace GameFramework.Pooling
             Transform root = new GameObject("[Pool] " + prefab.name).transform;
             root.SetParent(_poolRoot, false);
 
-            Pool pool = new Pool(prefab, root, defaultParent, prewarmCount, maxCount, autoExpand, this);
+            Pool pool = new Pool(prefab, root, prewarmCount, maxCount, autoExpand, this);
             _pools.Add(prefab, pool);
         }
 
@@ -82,7 +82,7 @@ namespace GameFramework.Pooling
             Pool pool;
             if (_pools.TryGetValue(prefab, out pool) == false)
             {
-                CreatePoolIfNeeded(prefab, 0, 0, true, null);
+                CreatePoolIfNeeded(prefab, 0, 0, true);
 
                 if (_pools.TryGetValue(prefab, out pool) == false)
                 {

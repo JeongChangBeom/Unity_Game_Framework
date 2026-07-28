@@ -178,9 +178,10 @@ PoolManager.Instance.Despawn(obj);
 
 * `Assets/Create/Game Framework/Pooling/Pool Settings`로 에셋 생성
 * 반드시 `Assets/Resources/GameFramework/PoolSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
-* 항목: Prefab / Prewarm Count / Max Count(0 = 무제한) / Auto Expand / Default Parent
+* 항목: Prefab / Prewarm Count / Max Count(0 = 무제한) / Auto Expand
+* 재사용 대기 중인(비활성) 인스턴스는 `PoolManager` 하위 `[PoolRoot]/[Pool] <프리팹 이름>`에 자동으로 정리됩니다. Spawn 시 부모를 직접 넘기지 않으면 씬 루트로 배치됩니다.
 
-> 단순한 풀링이 필요한 경우에는 설정 없이 `Spawn`/`Despawn`만 사용해도 됩니다. 설정은 대량 생성·성능 관리가 필요할 때만 추가하면 됩니다.
+> 단순한 풀링이 필요한 경우에는 설정 없이 `Spawn`/`Despawn`만 사용해도 됩니다. 설정은 대량 생성·성능 관리가 필요할 때만 추가하면 됩니다. 스폰 시 부모가 필요하면 `Spawn(prefab, position, rotation, parent)`처럼 그때그때 넘겨주세요.
 
 ---
 

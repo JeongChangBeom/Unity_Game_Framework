@@ -17,4 +17,3 @@ MonoBehaviour:
     prewarmCount: 10
     maxCount: 30
     autoExpand: 1
-    defaultParent: {fileID: 0}

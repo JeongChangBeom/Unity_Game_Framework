@@ -7,7 +7,6 @@ namespace GameFramework.Pooling
     {
         private readonly GameObject _prefab;
         private readonly Transform _root;
-        private readonly Transform _defaultParent;
 
         private readonly int _maxCount;
         private readonly bool _autoExpand;
@@ -17,11 +16,10 @@ namespace GameFramework.Pooling
 
         public GameObject Prefab => _prefab;
 
-        public Pool(GameObject prefab, Transform root, Transform defaultParent, int prewarmCount, int maxCount, bool autoExpand, PoolManager owner)
+        public Pool(GameObject prefab, Transform root, int prewarmCount, int maxCount, bool autoExpand, PoolManager owner)
         {
             _prefab = prefab;
             _root = root;
-            _defaultParent = defaultParent;
             _maxCount = maxCount;
             _autoExpand = autoExpand;
 
@@ -74,20 +72,9 @@ namespace GameFramework.Pooling
 
             Transform t = go.transform;
 
-            Transform finalParent = parent;
-            if (finalParent == null)
-            {
-                finalParent = _defaultParent;
-            }
-
-            if (finalParent != null)
-            {
-                t.SetParent(finalParent, false);
-            }
-            else
-            {
-                t.SetParent(null, false);
-            }
+            // No parent given -> unparent to scene root. Pooled (inactive) instances
+            // always live under _root regardless; this only affects the active instance.
+            t.SetParent(parent, false);
 
             t.position = position;
             t.rotation = rotation;
