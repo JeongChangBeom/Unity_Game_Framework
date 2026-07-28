@@ -41,7 +41,8 @@
 
 ### 기능
 - 공용 싱글톤 베이스 `MonoSingleton<T>` 제공
-- 씬에 인스턴스가 있으면 재사용, 없으면 자동 생성
+- **씬 배치 불필요** — 처음 `.Instance`에 접근하는 순간 자동 생성
+- `[BootPriority(int)]`로 매니저 간 초기화 순서를 코드로 직접 선언 가능
 - Domain Reload 비활성화(Enter Play Mode Settings) 환경에서도 안전하게 동작
 - 초기화(`OnInitialize`)는 정확히 1회만 보장
 
@@ -64,8 +65,8 @@ public class MyManager : MonoSingleton<MyManager>
 {
     protected override void OnInitialize()
     {
-        // 씬에 인스턴스가 없어 자동 생성되었거나,
-        // 씬에 배치된 인스턴스의 Awake 시점에 정확히 1회 호출됩니다.
+        // 씬에 아무것도 배치하지 않아도, 처음 MyManager.Instance에 접근하는
+        // 순간 자동 생성되며 정확히 1회 호출됩니다.
     }
 }
 ```
@@ -74,9 +75,21 @@ public class MyManager : MonoSingleton<MyManager>
 MyManager.Instance.DoSomething();
 ```
 
-- Inspector의 `Dont Destroy On Load` 체크박스로 씬 전환 시 유지 여부 제어 (기본값 true)
-- 초기화 순서가 중요한 매니저(SaveManager, TimeManager 등)는 자동 생성에 의존하지 말고 Boot 씬에 직접 배치 권장
-- 자동 생성이 발생하면 Console에 경고 로그가 남습니다 (배치를 깜빡했는지 확인 가능)
+- 씬에 배치할 필요가 없습니다. 배치하지 않으면 자동 생성되고, Console에 안내 로그가 남습니다.
+- 다른 매니저보다 먼저/나중에 초기화돼야 하는 매니저는 클래스에 `[BootPriority(int)]`를 붙이면, 씬이 로드되기도 전에 숫자가 작은 것부터 순서대로 초기화됩니다.
+  ```cs
+  [BootPriority(-100)]
+  public class SaveManager : MonoSingleton<SaveManager> { ... }
+  ```
+  `[BootPriority]`가 없는 매니저는 기존처럼 누군가 처음 `.Instance`를 호출하는 시점에 초기화됩니다.
+- 씬 전환 시 파괴되지 않아야 하면 기본적으로 유지됩니다. 유지되지 않아야 하는 매니저는 `protected override bool ShouldPersistAcrossScenes => false;`로 오버라이드하세요.
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/BootOrderTester.cs`를 아무 GameObject에 붙이고 Play하면:
+- `[BootPriority(-100)]`, `[BootPriority(-50)]`가 붙은 더미 매니저 2개가 씬 로드 전에 이미 자동 초기화되어 순서대로 로그에 기록되어 있는 걸 확인할 수 있습니다.
+- attribute가 없는 매니저는 버튼을 눌러 `.Instance`를 직접 건드리기 전까지는 기록되지 않는 것도 함께 확인할 수 있습니다.
 
 ---
 
@@ -311,8 +324,9 @@ SoundManager.Instance.SetChannelVolume(EAudioChannel.Voice, 1.0f);
 - **Provider 기반 저장 시스템**
   - `ISaveProvider` 인터페이스로 저장 방식 교체 가능
   - 기본 제공 Provider
-    - `PlayerPrefsSaveProvider` (default)
-    - `ES3SaveProvider` (optional)
+    - `JsonFileSaveProvider` (default, 원자적 쓰기 + 자동 백업)
+    - `PlayerPrefsSaveProvider` (가장 단순, 백업 미지원)
+    - `ES3SaveProvider` (optional, `USE_ES3` 필요)
     - `MemorySaveProvider` (테스트용 런타임 임시 저장)
    
 - **Domain + Key 기반 저장 구조**
@@ -362,14 +376,17 @@ game/meta/saveVersion
 
 ### 사용 방법
 
-#### 1) SaveManager 씬 배치
-`SaveManager`는 `MonoSingleton<SaveManager>` 기반이라 런타임 자동 생성도 가능하지만,  
-초기화 순서 보장 및 Inspector 설정 관리를 위해 Boot 씬에 1회 배치를 권장합니다.  
+#### 1) 설정 에셋 만들기 (씬 배치 불필요)
+`SaveManager`는 씬에 배치할 필요가 없습니다. 대신 프로젝트에 설정 에셋을 하나 만듭니다.
+
+* `Assets/Create/Game Framework/Save Load/Save Manager Settings`로 에셋 생성
+* 반드시 `Assets/Resources/GameFramework/SaveManagerSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
+* 에셋이 없으면 기본값으로 동작하며 Console에 경고가 남습니다
 
 ---
 
-#### 2) Storage Mode 선택 (Inspector, default : JsonFile)
-코드 수정 없이 SaveManager Inspector의 `Storage Mode` 드롭다운으로 저장 방식을 교체합니다.
+#### 2) Storage Mode 선택 (SaveManagerSettings 에셋, default : JsonFile)
+코드 수정 없이 `SaveManagerSettings` 에셋의 `Storage Mode` 드롭다운으로 저장 방식을 교체합니다.
 
 |Storage Mode|설명|
 |-|-|
@@ -448,9 +465,8 @@ SaveManager.Instance.RestoreFromBackup();
 
 ---
 
-### SaveManager Inspector 설정
-
-<img width="366" height="519" alt="image" src="https://github.com/user-attachments/assets/f3ebaaf4-4998-47be-94d2-ae0f82e81b4a" />
+### SaveManagerSettings 항목
+`Assets/Resources/GameFramework/SaveManagerSettings.asset`의 Inspector에서 아래 항목을 설정합니다.
 
 |항목|설명|
 |-|-|
@@ -500,6 +516,16 @@ _settings = SaveManager.Instance.LoadOrCreate(key, () => new AudioSettingsData()
 SaveManager.Instance.Save(key, _settings);
 
 ```
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/SaveLoadTester.cs`를 아무 GameObject에 붙이고 Play하면 버튼으로 아래 기능을 전부 확인할 수 있습니다.
+- Save / TryLoad / LoadOrCreate / HasKey / Delete
+- Flush (강제 즉시 저장)
+- HasBackup / BackupNow / RestoreFromBackup (JsonFile, Es3 모드에서만 동작 확인 가능)
+
+> `SaveManagerSettings` 에셋을 아직 안 만들었다면 기본값(JsonFile)으로 동작하며 Console에 경고가 남습니다.
 
 ---
 

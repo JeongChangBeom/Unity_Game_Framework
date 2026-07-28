@@ -4,35 +4,37 @@ using UnityEngine;
 
 namespace GameFramework.SaveLoad
 {
+    [BootPriority(-100)]
     public class SaveManager : MonoSingleton<SaveManager>
     {
-        [Header("Storage")]
-        [SerializeField] private ESaveStorageMode _storageMode = ESaveStorageMode.JsonFile;
-        [SerializeField] private string _saveFileName = "save.json";
-        [SerializeField] private string _rootKey = "game";
-        [SerializeField] private int _currentVersion = 1;
-
-        [Header("Auto Flush")]
-        [SerializeField] private bool _autoFlushEnabled = true;
-        [SerializeField] private float _autoFlushIntervalSeconds = 5f;
-
-        [Header("Backup")]
-        [SerializeField] private bool _backupOnPause = true;
-        [SerializeField] private bool _backupOnQuit = true;
-        [SerializeField] private bool _autoRestoreOnInit = true;
-
+        private SaveManagerSettings _settings;
         private SaveCore _core;
         private float _dirtyElapsed;
 
         protected override void OnInitialize()
         {
-            _core = new SaveCore(CreateProvider(), _rootKey);
-            _core.EnsureMeta(_currentVersion);
+            _settings = LoadSettings();
+
+            _core = new SaveCore(CreateProvider(_settings), _settings.RootKey);
+            _core.EnsureMeta(_settings.CurrentVersion);
         }
 
-        private ISaveProvider CreateProvider()
+        private static SaveManagerSettings LoadSettings()
         {
-            switch (_storageMode)
+            SaveManagerSettings settings = Resources.Load<SaveManagerSettings>(SaveManagerSettings.ResourcePath);
+
+            if (settings != null)
+            {
+                return settings;
+            }
+
+            Debug.LogWarning($"[SaveManager] No SaveManagerSettings asset found at Resources/{SaveManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/Save Load/Save Manager Settings.");
+            return ScriptableObject.CreateInstance<SaveManagerSettings>();
+        }
+
+        private static ISaveProvider CreateProvider(SaveManagerSettings settings)
+        {
+            switch (settings.StorageMode)
             {
                 case ESaveStorageMode.PlayerPrefs:
                     return new PlayerPrefsSaveProvider();
@@ -42,20 +44,20 @@ namespace GameFramework.SaveLoad
 
                 case ESaveStorageMode.Es3:
 #if USE_ES3
-                    return new ES3SaveProvider(_saveFileName);
+                    return new ES3SaveProvider(settings.SaveFileName);
 #else
                     Debug.LogWarning("[SaveManager] Es3 storage mode selected but USE_ES3 is not defined. Falling back to JsonFile. Install Easy Save 3 and add USE_ES3 to Scripting Define Symbols to use it.");
-                    return new JsonFileSaveProvider(_saveFileName, _autoRestoreOnInit);
+                    return new JsonFileSaveProvider(settings.SaveFileName, settings.AutoRestoreOnInit);
 #endif
 
                 default:
-                    return new JsonFileSaveProvider(_saveFileName, _autoRestoreOnInit);
+                    return new JsonFileSaveProvider(settings.SaveFileName, settings.AutoRestoreOnInit);
             }
         }
 
         private void Update()
         {
-            if (!_autoFlushEnabled || _core.IsDirty == false)
+            if (!_settings.AutoFlushEnabled || _core.IsDirty == false)
             {
                 _dirtyElapsed = 0f;
                 return;
@@ -63,7 +65,7 @@ namespace GameFramework.SaveLoad
 
             _dirtyElapsed += Time.unscaledDeltaTime;
 
-            if (_dirtyElapsed >= _autoFlushIntervalSeconds)
+            if (_dirtyElapsed >= _settings.AutoFlushIntervalSeconds)
             {
                 Flush();
                 _dirtyElapsed = 0f;
@@ -129,7 +131,7 @@ namespace GameFramework.SaveLoad
 
             Flush();
 
-            if (_backupOnPause)
+            if (_settings.BackupOnPause)
             {
                 BackupNow();
             }
@@ -141,7 +143,7 @@ namespace GameFramework.SaveLoad
 
             Flush();
 
-            if (_backupOnQuit)
+            if (_settings.BackupOnQuit)
             {
                 BackupNow();
             }

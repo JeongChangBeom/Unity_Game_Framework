@@ -29,9 +29,13 @@ namespace GameFramework.Core
         private static bool _isQuitting;
         private static bool _resetHookRegistered;
 
-        [SerializeField] private bool _dontDestroyOnLoad = true;
-
         private bool _initialized;
+
+        /// <summary>
+        /// Override to return false if this singleton should NOT survive scene loads.
+        /// Defaults to true, matching typical manager behavior.
+        /// </summary>
+        protected virtual bool ShouldPersistAcrossScenes => true;
 
         public static T Instance
         {
@@ -55,7 +59,7 @@ namespace GameFramework.Core
                     return _instance;
                 }
 
-                Debug.LogWarning($"[MonoSingleton] No instance of {typeof(T).Name} found in the scene. Auto-creating one. If initialization order matters, place it explicitly in a boot scene instead.");
+                Debug.Log($"[MonoSingleton] Auto-creating {typeof(T).Name} (no instance was placed in the scene). Add [BootPriority] to the class if it needs to initialize before/after other managers.");
 
                 GameObject go = new GameObject(typeof(T).Name);
                 _instance = go.AddComponent<T>();
@@ -87,7 +91,7 @@ namespace GameFramework.Core
 
             RegisterResetHook();
 
-            if (_dontDestroyOnLoad)
+            if (ShouldPersistAcrossScenes)
             {
                 DontDestroyOnLoad(gameObject);
             }
