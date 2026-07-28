@@ -1,0 +1,14 @@
+{
+    "name": "com.changbeom.gameframework.data",
+    "version": "0.1.0",
+    "displayName": "Game Framework - Data",
+    "description": "Google Sheet -> ScriptableObject data table pipeline (runtime loader + Editor import tool). Depends on Game Framework Core and Unity's official Editor Coroutines package.",
+    "unity": "6000.0",
+    "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.unity.editorcoroutines": "1.0.0"
+    },
+    "author": {
+        "name": "ChangBeom"
+    }
+}

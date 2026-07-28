@@ -2,9 +2,10 @@
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using GameFramework.Data;
 
 // AUTO-GENERATED. DO NOT EDIT.
-public class Monster : ScriptableObject
+public class Item : ScriptableObject
 {
     [SerializeField] private List<Data> _table = new List<Data>();
     public IReadOnlyList<Data> Table => _table;

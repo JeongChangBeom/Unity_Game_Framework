@@ -2,9 +2,10 @@
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using GameFramework.Data;
 
 // AUTO-GENERATED. DO NOT EDIT.
-public class Sound : ScriptableObject
+public class Monster : ScriptableObject
 {
     [SerializeField] private List<Data> _table = new List<Data>();
     public IReadOnlyList<Data> Table => _table;
@@ -16,11 +17,8 @@ public class Sound : ScriptableObject
     public class Data
     {
         public int RowKey;
-        public string fileName;
-        public string channel;
-        public float defaultVolume;
-        public int maxConcurrent;
-        public bool loop;
+        public string name;
+        public string description;
     }
 
     public Data Get(int rowKey)
@@ -103,56 +101,11 @@ public class Sound : ScriptableObject
             data.RowKey = rowKey;
             {
                 string raw = table.GetCell(r, 1).Trim();
-                data.fileName = raw;
+                data.name = raw;
             }
             {
                 string raw = table.GetCell(r, 2).Trim();
-                data.channel = raw;
-            }
-            {
-                string raw = table.GetCell(r, 3).Trim();
-                float v = 0f;
-                if (!string.IsNullOrEmpty(raw))
-                {
-                    if (!float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out v))
-                    {
-                        v = 0f;
-                    }
-                }
-                data.defaultVolume = v;
-            }
-            {
-                string raw = table.GetCell(r, 4).Trim();
-                int v = 0;
-                if (!string.IsNullOrEmpty(raw))
-                {
-                    if (!int.TryParse(raw, out v))
-                    {
-                        v = 0;
-                    }
-                }
-                data.maxConcurrent = v;
-            }
-            {
-                string raw = table.GetCell(r, 5).Trim();
-                bool v = false;
-                if (!string.IsNullOrEmpty(raw))
-                {
-                    string lower = raw.ToLowerInvariant();
-                    if (lower == "1" || lower == "true")
-                    {
-                        v = true;
-                    }
-                    else if (lower == "0" || lower == "false")
-                    {
-                        v = false;
-                    }
-                    else
-                    {
-                        v = false;
-                    }
-                }
-                data.loop = v;
+                data.description = raw;
             }
 
             _table.Add(data);

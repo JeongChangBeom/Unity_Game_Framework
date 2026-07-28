@@ -2,6 +2,7 @@
 using System.Collections.Generic;
 using System.Globalization;
 using UnityEngine;
+using GameFramework.Data;
 
 // AUTO-GENERATED. DO NOT EDIT.
 public class Quest : ScriptableObject

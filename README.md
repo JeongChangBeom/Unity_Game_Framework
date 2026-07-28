@@ -55,8 +55,8 @@
 |-|-|-|
 |Core|공용 싱글톤 베이스|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.core`|
 |Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
-|Pooling|패키지화 예정|-|
-|Data Parsing|패키지화 예정|-|
+|Pooling|프리팹 기반 오브젝트 풀링|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.pooling`|
+|Data Parsing|Google Sheet 데이터 파이프라인|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.data`|
 |UI System|패키지화 예정|-|
 |Audio System|패키지화 예정|-|
 |Time System|패키지화 예정|-|
@@ -121,19 +121,44 @@ MyManager.Instance.DoSomething();
 <summary><h2>1️⃣ Data Parsing</h2></summary>
 
 ### 기능
-- Google Sheet → ScriptableObject 자동 변환
-- Sheet Tab 선택 후 SO 생성
-- SO 갱신(Update) 지원
-- 런타임 Dictionary 캐싱
+- Google Sheet → ScriptableObject 자동 변환 (TSV 다운로드 후 파싱)
+- Sheet Tab 선택 후 C# 테이블 스크립트 + .asset 자동 생성
+- 기존 테이블 갱신(Update)/삭제 지원
+- `DataManager`가 타입별로 로드 결과를 캐싱
+
+---
+
+### 외부 패키지
+Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패키지**(`com.unity.editorcoroutines`)를 사용합니다. 그 외 런타임 코드는 전부 Unity API(`UnityEngine.Networking.UnityWebRequest`, `Resources`)만 사용합니다.
 
 ---
 
 ### 사용 방법
 
-#### 런타임 데이터 접근
+#### 1) 시트 임포트 (Editor 전용)
+`Tools/DataTable/DataTable Importer` 메뉴에서:
+1. Sheet URL, API Key 입력 후 **시트 불러오기**
+2. 원하는 탭 선택 후 **선택 시트 생성** — `{ScriptFolder}/{TabName}.cs`와 `Resources/GeneratedTables/{TabName}.asset`이 만들어집니다
+3. 시트 내용이 바뀌면 **선택 시트 갱신**, 탭을 지우려면 **선택 시트 삭제**
+
+> 시트 형식: 1행=컬럼명, 3행=타입(`int`/`float`/`string`/`bool`), 4행부터 데이터. 1열은 항상 `RowKey`(int)로 취급됩니다. 컬럼명이 `~`로 시작하면 무시됩니다.
+
+---
+
+#### 2) 런타임 데이터 접근
 ```cs
-ItemData item = ItemTable.Instance.Get(1001);
+Item.Data item = DataManager.Instance.GetTable<Item>().Get(1001);
 ```
+
+- **`DataManager.Instance.GetTable<T>()`**
+  -> 처음 호출 시 `Resources/GeneratedTables/{T의 타입명}`에서 로드 후 캐싱, 이후 호출은 캐시 반환
+- **`table.Get(rowKey)`**
+  -> 해당 rowKey 행이 없으면 `null` 반환
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/DataTester.cs`를 아무 GameObject에 붙이고 Play하면, RowKey를 입력하고 Item/Monster/Quest/Sound 각 테이블에서 조회한 결과를 버튼으로 확인할 수 있습니다.
 
 </details>
 
