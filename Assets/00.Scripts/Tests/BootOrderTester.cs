@@ -38,6 +38,11 @@ namespace GameFramework.Tests
     public static class BootOrderLog
     {
         public static readonly List<string> Entries = new List<string>();
+
+        public static void Record(string name)
+        {
+            Entries.Add(name);
+        }
     }
 
     public sealed class BootOrderTester : MonoBehaviour
