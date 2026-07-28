@@ -1,10 +1,10 @@
-using Newtonsoft.Json;
 using UnityEngine;
 
 namespace GameFramework.SaveLoad
 {
     /// <summary>
-    /// Stores each key as a JSON string inside PlayerPrefs. Simplest option, no file I/O of our own.
+    /// Stores each key as a JsonUtility-encoded string inside PlayerPrefs. Simplest option,
+    /// no file I/O of our own, no external JSON library.
     /// </summary>
     public sealed class PlayerPrefsSaveProvider : ISaveProvider
     {
@@ -20,8 +20,7 @@ namespace GameFramework.SaveLoad
 
         public void Set<T>(string key, T value)
         {
-            string json = JsonConvert.SerializeObject(value);
-            PlayerPrefs.SetString(key, json);
+            PlayerPrefs.SetString(key, JsonUtilityCodec.ToJson(value));
         }
 
         public bool TryGet<T>(string key, out T value)
@@ -33,15 +32,7 @@ namespace GameFramework.SaveLoad
                 return false;
             }
 
-            try
-            {
-                value = JsonConvert.DeserializeObject<T>(PlayerPrefs.GetString(key));
-                return true;
-            }
-            catch
-            {
-                return false;
-            }
+            return JsonUtilityCodec.TryFromJson(PlayerPrefs.GetString(key), out value);
         }
 
         public void Flush()

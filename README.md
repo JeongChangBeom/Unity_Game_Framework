@@ -15,29 +15,59 @@
 - **Core**  
   모든 매니저가 상속하는 공용 베이스(MonoSingleton)
 
-- **Data Parsing Framework**  
+- **Data Parsing**  
   Google Sheet 기반 게임 데이터 파이프라인
 
-- **Pooling Framework**  
+- **Pooling**  
   Type 기반 공용 오브젝트 풀링 시스템
 
-- **UI System Framework**  
+- **UI System**  
   우선순위 / 선점 기반 UI 흐름 관리 시스템
 
-- **Audio System Framework**  
+- **Audio System**  
   Addressables + Sheet 기반 사운드 재생/관리 시스템
 
-- **Save / Load Framework**  
+- **Save / Load**  
   Provider 기반 저장/로드 시스템 (AutoFlush / Backup / Restore 지원)
 
-- **Time Framework**  
+- **Time System**  
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
 
-## 0️⃣ Core
+## 🔗 목차
+- [0️⃣ Core](#core)
+- [1️⃣ Data Parsing](#data)
+- [2️⃣ Pooling](#pooling)
+- [3️⃣ UI System](#ui)
+- [4️⃣ Audio System](#audio)
+- [5️⃣ Save / Load](#saveload)
+- [6️⃣ Time System](#time)
+
+---
+
+## 📥 패키지 다운로드
+필요한 패키지만 골라서 설치할 수 있습니다. Unity Package Manager → `+` → `Add package from git URL...`에 아래 주소를 붙여넣으세요.
+
+|패키지|설명|설치 주소|
+|-|-|-|
+|Core|공용 싱글톤 베이스|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.core`|
+|Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
+|Pooling|패키지화 예정|-|
+|Data Parsing|패키지화 예정|-|
+|UI System|패키지화 예정|-|
+|Audio System|패키지화 예정|-|
+|Time System|패키지화 예정|-|
+
+> Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
+
+---
+
+<details id="core">
+<summary><h2>0️⃣ Core</h2></summary>
+
 
 ### 기능
 - 공용 싱글톤 베이스 `MonoSingleton<T>` 제공
@@ -45,14 +75,6 @@
 - `[BootPriority(int)]`로 매니저 간 초기화 순서를 코드로 직접 선언 가능
 - Domain Reload 비활성화(Enter Play Mode Settings) 환경에서도 안전하게 동작
 - 초기화(`OnInitialize`)는 정확히 1회만 보장
-
----
-
-### 패키지 위치
-```text
-Packages/com.changbeom.gameframework.core
-```
-다른 프레임워크 패키지에 의존하지 않는 최소 공용 패키지입니다.
 
 ---
 
@@ -91,9 +113,12 @@ MyManager.Instance.DoSomething();
 - `[BootPriority(-100)]`, `[BootPriority(-50)]`가 붙은 더미 매니저 2개가 씬 로드 전에 이미 자동 초기화되어 순서대로 로그에 기록되어 있는 걸 확인할 수 있습니다.
 - attribute가 없는 매니저는 버튼을 눌러 `.Instance`를 직접 건드리기 전까지는 기록되지 않는 것도 함께 확인할 수 있습니다.
 
+</details>
+
 ---
 
-## 1️⃣ Data Parsing Framework
+<details id="data">
+<summary><h2>1️⃣ Data Parsing</h2></summary>
 
 ### 기능
 - Google Sheet → ScriptableObject 자동 변환
@@ -110,9 +135,12 @@ MyManager.Instance.DoSomething();
 ItemData item = ItemTable.Instance.Get(1001);
 ```
 
+</details>
+
 ---
 
-## 2️⃣ Pooling Framework
+<details id="pooling">
+<summary><h2>2️⃣ Pooling</h2></summary>
 
 ### 기능
 - Type 기반 풀링
@@ -145,7 +173,7 @@ Pool.Return(obj);
 ---
 
 ## (Optional) Pool Settings ScriptableObject
-Pooling Framework는 선택적으로
+Pooling은 선택적으로
 **ScriptableObject 기반 풀 설정을 사용할 수 있습니다.**
 
 |SO|
@@ -164,9 +192,12 @@ Pooling Framework는 선택적으로
 > 단순한 풀링이 필요한 경우에는 설정 없이 사용 가능하며,
 > 대량 생성·성능 관리가 필요한 경우에만 PoolingSettings를 사용하면 됩니다.
 
+</details>
+
 ---
 
-## 3️⃣ UI System Framework
+<details id="ui">
+<summary><h2>3️⃣ UI System</h2></summary>
 
 ### 기능
 - 단일 팝업 표시 (Single Active Popup)
@@ -207,9 +238,12 @@ UIManager.Instance.RequestPopup(
 UIManager.Instance.CloseTopPopup();
 ```
 
+</details>
+
 ---
 
-## 4️⃣ Audio System Framework
+<details id="audio">
+<summary><h2>4️⃣ Audio System</h2></summary>
 
 ### 기능
 - Sound Sheet 기반 사운드 관리
@@ -316,9 +350,12 @@ SoundManager.Instance.SetChannelVolume(EAudioChannel.UI, 0.8f);
 SoundManager.Instance.SetChannelVolume(EAudioChannel.Voice, 1.0f);
 ```
 
+</details>
+
 ---
 
-## 5️⃣ Save / Load Framework
+<details id="saveload">
+<summary><h2>5️⃣ Save / Load</h2></summary>
 
 ### 기능
 - **Provider 기반 저장 시스템**
@@ -343,19 +380,17 @@ SoundManager.Instance.SetChannelVolume(EAudioChannel.Voice, 1.0f);
   - `BackupNow()`, `RestoreFromBackup()` 제공
 - **Save Meta 자동 관리**
   - `saveVersion`, `createdAtUtc`, `lastSavedAtUtc` 자동 저장/갱신
- 
+
 ---
 
-### 패키지 위치
-```text
-Packages/com.changbeom.gameframework.saveload
-```
-`com.changbeom.gameframework.core`에만 의존하는 패키지입니다.
+### 외부 패키지
+- `JsonFileSaveProvider`, `PlayerPrefsSaveProvider`, `MemorySaveProvider`는 **`UnityEngine.JsonUtility`만 사용합니다. 외부 패키지 불필요.**
+- `ES3SaveProvider`만 예외적으로 **Easy Save 3** (Unity Asset Store 유료 에셋) 설치가 필요합니다. 설치 안 하면 자동으로 JsonFile로 대체됩니다.
 
 ---
 
 ### 저장 키 구조
-Save Framework는 모든 키를 아래 규칙으로 통합합니다.
+Save / Load는 모든 키를 아래 규칙으로 통합합니다.
 
 ```text
 {RootKey}/{Domain}/{Key}
@@ -502,7 +537,7 @@ game/meta/lastSavedAtUtc
 ---
 
 ### 실제 사용 예시
-Audio System Framework에서 적용 중인 저장 패턴 예시입니다.
+Audio System에서 적용 중인 저장 패턴 예시입니다.
 
 ```cs
 private const string SettingsDomain = "settings";
@@ -527,12 +562,15 @@ SaveManager.Instance.Save(key, _settings);
 
 > `SaveManagerSettings` 에셋을 아직 안 만들었다면 기본값(JsonFile)으로 동작하며 Console에 경고가 남습니다.
 
+</details>
+
 ---
 
-## 6️⃣ Time Framework
+<details id="time">
+<summary><h2>6️⃣ Time System</h2></summary>
 
 ### 기능
-Time Framework는 **게임 전반의 시간 흐름을 통합 관리**하는 시스템입니다.
+Time System은 **게임 전반의 시간 흐름을 통합 관리**하는 시스템입니다.
 모든 시간 계산은 **UTC 기준**으로 동작하며, 서버 시간·쿨타임·리셋·오프라인 경과 시간을 안정저긍로 처리합니다.
 
 ---
@@ -549,12 +587,12 @@ Time Framework는 **게임 전반의 시간 흐름을 통합 관리**하는 시�
 |오프라인 경과 시간|앱 종료 후 경과 시간 계산|
 |시간 역행(치트) 감지|기기 시간 되돌림 탐지|
 |테스트용 Mock 시간|시간 점프 및 리셋 테스트 지원|
-|Save Framework 연동|모든 시간 데이터 영구 저장|
+|Save / Load 연동|모든 시간 데이터 영구 저장|
 
 ---
 
 ## 씬 배치
-Time Framework는 `MonoSingleton<TimeManager>` 기반입니다.
+Time System은 `MonoSingleton<TimeManager>` 기반입니다.
 
 ```text
 ⚠ SaveManager보다 먼저 초기화되면 안 되므로
@@ -639,7 +677,7 @@ TimeManager.Instnace.DisableMockTime();
 ---
 
 저장 구조
-Time Framework의 모든 데이터는 Save Framework의 Domain을 사용하여 저장됩니다.
+Time System의 모든 데이터는 Save / Load의 Domain을 사용하여 저장됩니다.
 
 ```text
 game/time/...
@@ -686,6 +724,8 @@ if(lastRewardKey != todayKey)
     GiveDailyReward(); // 일일 보상 주는 보상(미구현)
 }
 ```
+
+</details>
 
 ---
 

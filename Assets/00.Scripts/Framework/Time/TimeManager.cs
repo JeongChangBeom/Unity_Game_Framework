@@ -6,6 +6,21 @@ using GameFramework.SaveLoad;
 
 public class TimeManager : MonoSingleton<TimeManager>
 {
+    // JsonUtility can't serialize Dictionary directly, so cooldowns are converted
+    // to/from this list-shaped form only at the save/load boundary.
+    [Serializable]
+    private class CooldownEntry
+    {
+        public string Id;
+        public long EndTicks;
+    }
+
+    [Serializable]
+    private class CooldownList
+    {
+        public List<CooldownEntry> Items = new List<CooldownEntry>();
+    }
+
     private const string KEY_LAST_TIME = "time/last_time";
     private const string KEY_COOLDOWN = "time/cooldown";
     private const string KEY_SERVER_TIME = "time/server";
@@ -56,13 +71,25 @@ public class TimeManager : MonoSingleton<TimeManager>
 
         _utcNow = DateTime.UtcNow;
 
-        _cooldowns = _save.LoadOrCreate(KEY_COOLDOWN, () => new Dictionary<string, long>(), saveIfMissing: true);
+        CooldownList list = _save.LoadOrCreate(KEY_COOLDOWN, () => new CooldownList(), saveIfMissing: true);
+
+        _cooldowns = new Dictionary<string, long>();
+        foreach (CooldownEntry entry in list.Items)
+        {
+            _cooldowns[entry.Id] = entry.EndTicks;
+        }
     }
 
     private void Save()
     {
+        CooldownList list = new CooldownList();
+        foreach (KeyValuePair<string, long> kvp in _cooldowns)
+        {
+            list.Items.Add(new CooldownEntry { Id = kvp.Key, EndTicks = kvp.Value });
+        }
+
         _save.Save(KEY_LAST_TIME, UtcNow.Ticks);
-        _save.Save(KEY_COOLDOWN, _cooldowns);
+        _save.Save(KEY_COOLDOWN, list);
         _save.Save(KEY_CHEAT, _isCheat);
         _save.Flush();
     }

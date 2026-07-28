@@ -6,6 +6,7 @@ namespace GameFramework.Tests
 {
     public sealed class SaveLoadTester : MonoBehaviour
     {
+        [Serializable]
         private sealed class TestData
         {
             public int Score;
