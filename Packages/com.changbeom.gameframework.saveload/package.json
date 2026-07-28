@@ -1,0 +1,13 @@
+{
+    "name": "com.changbeom.gameframework.saveload",
+    "version": "0.1.0",
+    "displayName": "Game Framework - SaveLoad",
+    "description": "Provider-based save/load system (PlayerPrefs / JSON file / ES3 / in-memory) with dirty-based auto flush, crash-safe atomic writes, and backup/restore. Depends only on Game Framework Core.",
+    "unity": "6000.0",
+    "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0"
+    },
+    "author": {
+        "name": "ChangBeom"
+    }
+}

@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using GameFramework.Core;
+using GameFramework.SaveLoad;
 
 public class TimeManager : MonoSingleton<TimeManager>
 {
@@ -42,7 +43,7 @@ public class TimeManager : MonoSingleton<TimeManager>
 
     private void Load()
     {
-        long lastTicks = _save.GetOrDefault(KEY_LAST_TIME, 0L);
+        long lastTicks = _save.LoadOrCreate(KEY_LAST_TIME, () => 0L, saveIfMissing: true);
 
         if (lastTicks == 0)
         {
@@ -55,15 +56,15 @@ public class TimeManager : MonoSingleton<TimeManager>
 
         _utcNow = DateTime.UtcNow;
 
-        _cooldowns = _save.GetOrDefault(KEY_COOLDOWN, new Dictionary<string, long>());
+        _cooldowns = _save.LoadOrCreate(KEY_COOLDOWN, () => new Dictionary<string, long>(), saveIfMissing: true);
     }
 
     private void Save()
     {
-        _save.Set(KEY_LAST_TIME, UtcNow.Ticks);
-        _save.Set(KEY_COOLDOWN, _cooldowns);
-        _save.Set(KEY_CHEAT, _isCheat);
-        _save.Save();
+        _save.Save(KEY_LAST_TIME, UtcNow.Ticks);
+        _save.Save(KEY_COOLDOWN, _cooldowns);
+        _save.Save(KEY_CHEAT, _isCheat);
+        _save.Flush();
     }
     private DateTime GetNow()
     {

@@ -1,5 +1,19 @@
 {
   "dependencies": {
+    "com.changbeom.gameframework.core": {
+      "version": "file:com.changbeom.gameframework.core",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
+    "com.changbeom.gameframework.saveload": {
+      "version": "file:com.changbeom.gameframework.saveload",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0"
+      }
+    },
     "com.cysharp.unitask": {
       "version": "https://github.com/Cysharp/UniTask.git?path=src/UniTask/Assets/Plugins/UniTask",
       "depth": 0,

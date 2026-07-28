@@ -321,12 +321,23 @@ SoundManager.Instance.SetChannelVolume(EAudioChannel.Voice, 1.0f);
   - 변경 발생 시 Dirty 처리 -> 일정 시간 후 자동 Flush
 - **Pause/Quit 저장**
   - `OnApplicationPause`, `OnApplicationQuit`에서 Flush 처리
+- **크래시/강제종료 대응**
+  - 파일 저장 시 임시 파일 교체 방식의 원자적 쓰기 (쓰는 도중 종료돼도 기존 파일 보존)
+  - 저장 성공 시마다 이전 버전을 `.bak`으로 자동 보관
 - **백업/복구 지원**
-  - `ISaveBackupProvider` 기반
+  - `ISaveBackupProvider` 기반 (파일 기반 Provider만 지원)
   - `BackupNow()`, `RestoreFromBackup()` 제공
 - **Save Meta 자동 관리**
   - `saveVersion`, `createdAtUtc`, `lastSavedAtUtc` 자동 저장/갱신
  
+---
+
+### 패키지 위치
+```text
+Packages/com.changbeom.gameframework.saveload
+```
+`com.changbeom.gameframework.core`에만 의존하는 패키지입니다.
+
 ---
 
 ### 저장 키 구조
@@ -357,21 +368,22 @@ game/meta/saveVersion
 
 ---
 
-#### 2) Provider 선택 (default : PlayerPrefs)
-기본은 PlayerPrefs 저장이며, ES3로 교체 가능합니다.
+#### 2) Storage Mode 선택 (Inspector, default : JsonFile)
+코드 수정 없이 SaveManager Inspector의 `Storage Mode` 드롭다운으로 저장 방식을 교체합니다.
 
-```cs
-#if USE_ES3
-    _provider = new ES3SaveProvider(settings);
-#else
-    _provider = new PlayerPrefsSaveProvider();
-#endif
-```
+|Storage Mode|설명|
+|-|-|
+|**JsonFile (default)**|`Application.persistentDataPath`에 JSON 파일 1개로 저장. 원자적 쓰기 + 자동 백업(.bak) 지원|
+|PlayerPrefs|가장 단순한 저장 (키마다 JSON 문자열로 저장). 백업/복구는 지원하지 않음|
+|Es3|Easy Save 3 사용. `USE_ES3` 미정의 시 자동으로 JsonFile로 대체되고 경고 로그 출력|
+|Memory|디스크에 저장하지 않음 (테스트/에디터 전용)|
 
 #### ✅ ES3 활성화 방법 (Unity 버튼)
+* Easy Save 3 asset 설치
 * `Project Settings -> Player -> Other Settings -> Scripting Define Symbol`에 **`USE_ES3`** 추가
+* Storage Mode를 `Es3`로 변경
 
-> ES3 Provider는 대용량/복잡 데이터에 유리하며 파일 기반 백업/복구까지 지원합니다.
+> JsonFile이 기본값인 이유: 강제 종료/크래시 상황에서도 원자적 쓰기와 자동 백업으로 데이터 손상을 막아주기 때문입니다. PlayerPrefs는 가장 간단하지만 이 안전장치가 없어, 설정값처럼 손실돼도 괜찮은 가벼운 데이터에 적합합니다.
 
 ---
 
@@ -442,6 +454,8 @@ SaveManager.Instance.RestoreFromBackup();
 
 |항목|설명|
 |-|-|
+|Storage Mode|JsonFile / PlayerPrefs / Es3 / Memory 중 저장 방식 선택 (기본: JsonFile)|
+|Save File Name|JsonFile/Es3 모드에서 사용할 파일명 (기본: `save.json`)|
 |Current Version|세이브 버전. 버전 변경 시 `meta/saveVersion` 갱신|
 |Root Key|모든 저장 키의 root prefix (기본: `game`)|
 |Auto Flush Enabled|Dirty 상태에서 자동 저장 사용 여부|

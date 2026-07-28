@@ -1,4 +1,5 @@
 using System;
+using GameFramework.SaveLoad;
 
 public sealed class TimeStore
 {
@@ -27,7 +28,7 @@ public sealed class TimeStore
 
     public bool Has(string localKey)
     {
-        return _save.Has(MakeKey(localKey));
+        return _save.HasKey(MakeKey(localKey));
     }
 
     public void Delete(string localKey)
@@ -37,27 +38,27 @@ public sealed class TimeStore
 
     public int GetInt(string localKey, int defaultValue)
     {
-        return _save.GetOrDefault(MakeKey(localKey), defaultValue);
+        return _save.LoadOrCreate(MakeKey(localKey), () => defaultValue, saveIfMissing: true);
     }
 
     public void SetInt(string localKey, int value)
     {
-        _save.Set(MakeKey(localKey), value);
+        _save.Save(MakeKey(localKey), value);
     }
 
     public long GetLong(string localKey, long defaultValue)
     {
-        return _save.GetOrDefault(MakeKey(localKey), defaultValue);
+        return _save.LoadOrCreate(MakeKey(localKey), () => defaultValue, saveIfMissing: true);
     }
 
     public void SetLong(string localKey, long value)
     {
-        _save.Set(MakeKey(localKey), value);
+        _save.Save(MakeKey(localKey), value);
     }
 
     public string GetString(string localKey, string defaultValue)
     {
-        return _save.GetOrDefault(MakeKey(localKey), defaultValue);
+        return _save.LoadOrCreate(MakeKey(localKey), () => defaultValue, saveIfMissing: true);
     }
 
     public void SetString(string localKey, string value)
@@ -67,11 +68,11 @@ public sealed class TimeStore
             value = string.Empty;
         }
 
-        _save.Set(MakeKey(localKey), value);
+        _save.Save(MakeKey(localKey), value);
     }
 
     public void Flush()
     {
-        _save.Save();
+        _save.Flush();
     }
 }

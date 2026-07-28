@@ -4,6 +4,7 @@ using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Audio;
 using GameFramework.Core;
+using GameFramework.SaveLoad;
 
 public class SoundManager : MonoSingleton<SoundManager>
 {
@@ -68,15 +69,15 @@ public class SoundManager : MonoSingleton<SoundManager>
 
     private void LoadVolume()
     {
-        _bgmVolume = _save.GetOrDefault(KEY_BGM_VOLUME, 1f);
-        _sfxVolume = _save.GetOrDefault(KEY_SFX_VOLUME, 1f);
+        _bgmVolume = _save.LoadOrCreate(KEY_BGM_VOLUME, () => 1f, saveIfMissing: true);
+        _sfxVolume = _save.LoadOrCreate(KEY_SFX_VOLUME, () => 1f, saveIfMissing: true);
     }
 
     private void SaveVolume()
     {
-        _save.Set(KEY_BGM_VOLUME, _bgmVolume);
-        _save.Set(KEY_SFX_VOLUME, _sfxVolume);
-        _save.Save();
+        _save.Save(KEY_BGM_VOLUME, _bgmVolume);
+        _save.Save(KEY_SFX_VOLUME, _sfxVolume);
+        _save.Flush();
     }
 
     private void ApplyVolume()
