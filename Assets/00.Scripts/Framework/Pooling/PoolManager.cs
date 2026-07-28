@@ -1,5 +1,6 @@
 using System.Collections.Generic;
 using UnityEngine;
+using GameFramework.Core;
 
 public sealed class PoolManager : MonoSingleton<PoolManager>
 {

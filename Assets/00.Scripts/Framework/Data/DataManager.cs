@@ -1,4 +1,6 @@
-public class DataManager : MonoSingleton<DataManager>    
+using GameFramework.Core;
+
+public class DataManager : MonoSingleton<DataManager>
 {
     public DataTables Tables { get; private set; }
 

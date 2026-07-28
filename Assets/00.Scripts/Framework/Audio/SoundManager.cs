@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Audio;
+using GameFramework.Core;
 
 public class SoundManager : MonoSingleton<SoundManager>
 {

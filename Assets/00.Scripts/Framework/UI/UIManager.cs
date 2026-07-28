@@ -2,6 +2,7 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 using UnityEngine.UI;
+using GameFramework.Core;
 
 public class UIManager : MonoSingleton<UIManager>
 {

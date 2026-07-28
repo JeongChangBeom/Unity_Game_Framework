@@ -1,3 +1,5 @@
+using GameFramework.Core;
+
 public class SaveManager : MonoSingleton<SaveManager>
 {
     private SaveCore _core;

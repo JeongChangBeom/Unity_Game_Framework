@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using UnityEngine;
+using GameFramework.Core;
 
 public class TimeManager : MonoSingleton<TimeManager>
 {

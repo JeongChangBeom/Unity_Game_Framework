@@ -12,6 +12,9 @@
 
 현재 포함된 프레임워크는 다음과 같습니다.
 
+- **Core**  
+  모든 매니저가 상속하는 공용 베이스(MonoSingleton)
+
 - **Data Parsing Framework**  
   Google Sheet 기반 게임 데이터 파이프라인
 
@@ -31,6 +34,49 @@
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
 > 프레임워크는 지속적으로 추가될 예정입니다.
+
+---
+
+## 0️⃣ Core
+
+### 기능
+- 공용 싱글톤 베이스 `MonoSingleton<T>` 제공
+- 씬에 인스턴스가 있으면 재사용, 없으면 자동 생성
+- Domain Reload 비활성화(Enter Play Mode Settings) 환경에서도 안전하게 동작
+- 초기화(`OnInitialize`)는 정확히 1회만 보장
+
+---
+
+### 패키지 위치
+```text
+Packages/com.changbeom.gameframework.core
+```
+다른 프레임워크 패키지에 의존하지 않는 최소 공용 패키지입니다.
+
+---
+
+### 사용 방법
+
+```cs
+using GameFramework.Core;
+
+public class MyManager : MonoSingleton<MyManager>
+{
+    protected override void OnInitialize()
+    {
+        // 씬에 인스턴스가 없어 자동 생성되었거나,
+        // 씬에 배치된 인스턴스의 Awake 시점에 정확히 1회 호출됩니다.
+    }
+}
+```
+
+```cs
+MyManager.Instance.DoSomething();
+```
+
+- Inspector의 `Dont Destroy On Load` 체크박스로 씬 전환 시 유지 여부 제어 (기본값 true)
+- 초기화 순서가 중요한 매니저(SaveManager, TimeManager 등)는 자동 생성에 의존하지 말고 Boot 씬에 직접 배치 권장
+- 자동 생성이 발생하면 Console에 경고 로그가 남습니다 (배치를 깜빡했는지 확인 가능)
 
 ---
 
