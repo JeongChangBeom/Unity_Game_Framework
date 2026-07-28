@@ -5,13 +5,13 @@ namespace GameFramework.SoundSystem
 {
     /// <summary>
     /// Project-specific SoundManager configuration. Create via
-    /// Assets/Create/Game Framework/Sound/Sound Manager Settings and place it at
+    /// Assets/Create/Game Framework/Sound System/Sound Manager Settings and place it at
     /// Assets/Resources/GameFramework/SoundManagerSettings.asset so SoundManager can find
     /// it with no scene placement required.
     /// </summary>
     [CreateAssetMenu(
         fileName = "SoundManagerSettings",
-        menuName = "Game Framework/Sound/Sound Manager Settings")]
+        menuName = "Game Framework/Sound System/Sound Manager Settings")]
     public sealed class SoundManagerSettings : ScriptableObject
     {
         public const string ResourcePath = "GameFramework/SoundManagerSettings";

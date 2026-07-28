@@ -51,7 +51,7 @@ namespace GameFramework.SoundSystem
                 return settings;
             }
 
-            Debug.LogWarning($"[SoundManager] No SoundManagerSettings asset found at Resources/{SoundManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/Sound/Sound Manager Settings.");
+            Debug.LogWarning($"[SoundManager] No SoundManagerSettings asset found at Resources/{SoundManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/Sound System/Sound Manager Settings.");
             return ScriptableObject.CreateInstance<SoundManagerSettings>();
         }
 
@@ -61,7 +61,7 @@ namespace GameFramework.SoundSystem
 
             if (database == null)
             {
-                Debug.LogError($"[SoundManager] No SoundDatabaseSO found at Resources/{SoundDatabaseSO.ResourcePath}. Build it via Game Framework/Sound/Build Sound Database From Sheet + Folder. PlaySound will do nothing until then.");
+                Debug.LogError($"[SoundManager] No SoundDatabaseSO found at Resources/{SoundDatabaseSO.ResourcePath}. Build it via Game Framework/Sound System/Build Sound Database From Sheet + Folder. PlaySound will do nothing until then.");
             }
 
             return database;

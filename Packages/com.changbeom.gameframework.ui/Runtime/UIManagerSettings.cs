@@ -4,13 +4,13 @@ namespace GameFramework.UISystem
 {
     /// <summary>
     /// Project-specific UIManager configuration. Create via
-    /// Assets/Create/Game Framework/UI/UI Manager Settings and place it at
+    /// Assets/Create/Game Framework/UI System/UI Manager Settings and place it at
     /// Assets/Resources/GameFramework/UIManagerSettings.asset so UIManager can find
     /// it with no scene placement required.
     /// </summary>
     [CreateAssetMenu(
         fileName = "UIManagerSettings",
-        menuName = "Game Framework/UI/UI Manager Settings")]
+        menuName = "Game Framework/UI System/UI Manager Settings")]
     public sealed class UIManagerSettings : ScriptableObject
     {
         public const string ResourcePath = "GameFramework/UIManagerSettings";

@@ -14,7 +14,7 @@ namespace GameFramework.SoundSystem.Editor
     {
         private const string OutputPath = "Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs";
 
-        [MenuItem("Game Framework/Sound/Generate ESound From Sound Table")]
+        [MenuItem("Game Framework/Sound System/Generate ESound From Sound Table")]
         public static void Generate()
         {
             ScriptableObject soundTable = FindSoundTableSo();

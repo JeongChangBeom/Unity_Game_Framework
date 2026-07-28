@@ -13,13 +13,13 @@ namespace GameFramework.SoundSystem.Editor
         private const string DefaultSoundFolder = "Assets/03.Sound";
         private const string DefaultAddressablesGroup = "Sound";
 
-        [MenuItem("Game Framework/Sound/Build Sound Database From Sheet + Folder")]
+        [MenuItem("Game Framework/Sound System/Build Sound Database From Sheet + Folder")]
         public static void Build()
         {
             SoundDatabaseSO database = FindSingleAsset<SoundDatabaseSO>();
             if (database == null)
             {
-                Debug.LogError("SoundDatabaseSO not found. Create one: Assets/Create/Game Framework/Sound/Sound Database, saved under Assets/Resources/GameFramework/.");
+                Debug.LogError("SoundDatabaseSO not found. Create one: Assets/Create/Game Framework/Sound System/Sound Database, saved under Assets/Resources/GameFramework/.");
                 return;
             }
 

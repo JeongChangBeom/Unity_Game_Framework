@@ -363,7 +363,7 @@ public class MandatoryConfirmPopup : UIPopupBase
 ---
 
 ### UI Manager Settings 만들기 (씬 배치 불필요)
-`Assets/Create/Game Framework/UI/UI Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
+`Assets/Create/Game Framework/UI System/UI Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
 
 `Assets/Resources/GameFramework/UIManagerSettings.asset`
 
@@ -443,7 +443,7 @@ Sound 테이블 SO가 준비되면 `FileName`을 기반으로 enum을 자동 생
 
 Unity Editor에서 아래 버튼을 누릅니다.
 
-`Game Framework/Sound/Generate ESound From Sound Table`
+`Game Framework/Sound System/Generate ESound From Sound Table`
 
 * 동작:
   * Sound 테이블 SO를 읽어 `FileName` 목록 수집
@@ -460,7 +460,7 @@ Unity Editor에서 아래 버튼을 누릅니다.
 ---
 
 #### 4) Sound Manager Settings 만들기 (씬 배치 불필요)
-`Assets/Create/Game Framework/Sound/Sound Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
+`Assets/Create/Game Framework/Sound System/Sound Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
 
 `Assets/Resources/GameFramework/SoundManagerSettings.asset`
 
@@ -474,13 +474,13 @@ Unity Editor에서 아래 버튼을 누릅니다.
 ---
 
 #### 5) SoundDatabase 빌드 + Addressables 자동 등록
-`Assets/Create/Game Framework/Sound/Sound Database`로 에셋을 만들고 아래 경로에 저장합니다.
+`Assets/Create/Game Framework/Sound System/Sound Database`로 에셋을 만들고 아래 경로에 저장합니다.
 
 `Assets/Resources/GameFramework/SoundDatabaseSO.asset`
 
 그 다음 SoundDatabaseSO를 갱신하고 AudioClip을 Addressables에 자동 등록합니다.
 
-`Game Framework/Sound/Build Sound Database From Sheet + Folder`
+`Game Framework/Sound System/Build Sound Database From Sheet + Folder`
 
 * 입력:
   * Sound 테이블 SO (시트 파싱 결과)

@@ -4,7 +4,7 @@ using UnityEngine;
 
 namespace GameFramework.SoundSystem
 {
-    [CreateAssetMenu(menuName = "Game Framework/Sound/Sound Database")]
+    [CreateAssetMenu(menuName = "Game Framework/Sound System/Sound Database")]
     public class SoundDatabaseSO : ScriptableObject
     {
         public const string ResourcePath = "GameFramework/SoundDatabaseSO";

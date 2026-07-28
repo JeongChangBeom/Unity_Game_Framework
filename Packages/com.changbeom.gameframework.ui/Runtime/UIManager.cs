@@ -57,7 +57,7 @@ namespace GameFramework.UISystem
                 return settings;
             }
 
-            Debug.LogWarning($"[UIManager] No UIManagerSettings asset found at Resources/{UIManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/UI/UI Manager Settings.");
+            Debug.LogWarning($"[UIManager] No UIManagerSettings asset found at Resources/{UIManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/UI System/UI Manager Settings.");
             return ScriptableObject.CreateInstance<UIManagerSettings>();
         }
 
