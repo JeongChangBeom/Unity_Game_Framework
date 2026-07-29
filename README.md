@@ -61,6 +61,7 @@
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
 > * UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
+> * Sound System은 Data Parsing에 패키지 의존성을 갖지 않습니다(리플렉션으로만 접근하며, 이름/구조만 맞으면 다른 방식으로 만든 SO도 그대로 동작). 다만 사운드 데이터(`SoundTable`)를 직접 만드는 건 번거로우니, Data Parsing으로 시트에서 생성하는 걸 권장합니다.
 
 ---
 
