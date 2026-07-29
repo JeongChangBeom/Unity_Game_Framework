@@ -8,6 +8,7 @@ namespace GameFramework.Pooling
     {
         private readonly Dictionary<GameObject, Pool> _pools = new Dictionary<GameObject, Pool>();
         private readonly Dictionary<GameObject, GameObject> _instanceToPrefab = new Dictionary<GameObject, GameObject>();
+        private readonly Dictionary<string, GameObject> _keyToPrefab = new Dictionary<string, GameObject>();
 
         private Transform _poolRoot;
 
@@ -50,7 +51,29 @@ namespace GameFramework.Pooling
                 }
 
                 CreatePoolIfNeeded(e.prefab, e.prewarmCount, e.maxCount, e.autoExpand);
+                RegisterKey(e.key, e.prefab);
             }
+        }
+
+        private void RegisterKey(string key, GameObject prefab)
+        {
+            if (string.IsNullOrEmpty(key))
+            {
+                return;
+            }
+
+            if (_keyToPrefab.TryGetValue(key, out GameObject existing) && existing != prefab)
+            {
+                Debug.LogError($"[PoolManager] PoolSettings에 중복된 key가 있습니다: {key}");
+                return;
+            }
+
+            _keyToPrefab[key] = prefab;
+        }
+
+        public bool TryGetPrefab(string key, out GameObject prefab)
+        {
+            return _keyToPrefab.TryGetValue(key, out prefab);
         }
 
         public void CreatePoolIfNeeded(GameObject prefab, int prewarmCount, int maxCount, bool autoExpand)
@@ -118,6 +141,55 @@ namespace GameFramework.Pooling
             }
 
             return instance.GetComponent<T>();
+        }
+
+        /// <summary>PoolSettings의 Entry.key로 등록된 프리팹을 바로 스폰합니다. 프리팹 참조를 두 번 연결할 필요가 없습니다.</summary>
+        public GameObject Spawn(string key, Vector3 position, Quaternion rotation, Transform parent = null)
+        {
+            if (!TryGetPrefab(key, out GameObject prefab))
+            {
+                Debug.LogError($"[PoolManager] PoolSettings에 등록되지 않은 key입니다: {key}");
+                return null;
+            }
+
+            return Spawn(prefab, position, rotation, parent);
+        }
+
+        /// <summary>PoolSettings의 Entry.key로 등록된 프리팹을 컴포넌트 타입으로 바로 스폰합니다.</summary>
+        public T Spawn<T>(string key, Vector3 position, Quaternion rotation, Transform parent = null) where T : Component
+        {
+            GameObject instance = Spawn(key, position, rotation, parent);
+            if (instance == null)
+            {
+                return null;
+            }
+
+            return instance.GetComponent<T>();
+        }
+
+        /// <summary>
+        /// Game Framework/Pooling/Generate EPoolKey From Pool Settings로 생성한 EPoolKey를 사용합니다.
+        /// 오타가 나면 컴파일 에러가 나므로, 문자열 오버로드보다 이쪽을 우선 사용하세요.
+        /// </summary>
+        public GameObject Spawn(EPoolKey key, Vector3 position, Quaternion rotation, Transform parent = null)
+        {
+            if (key == EPoolKey.None)
+            {
+                return null;
+            }
+
+            return Spawn(key.ToString(), position, rotation, parent);
+        }
+
+        /// <summary>위와 동일하되 컴포넌트 타입으로 바로 반환합니다.</summary>
+        public T Spawn<T>(EPoolKey key, Vector3 position, Quaternion rotation, Transform parent = null) where T : Component
+        {
+            if (key == EPoolKey.None)
+            {
+                return null;
+            }
+
+            return Spawn<T>(key.ToString(), position, rotation, parent);
         }
 
         public void Despawn(GameObject instance)

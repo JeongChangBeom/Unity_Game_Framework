@@ -14,6 +14,9 @@ namespace GameFramework.Pooling
         [Serializable]
         public sealed class Entry
         {
+            [Tooltip("비워두면 이름 기반 조회(Spawn(string key, ...))를 사용할 수 없습니다.")]
+            public string key;
+
             public GameObject prefab;
 
             [Min(0)] public int prewarmCount = 10;

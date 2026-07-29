@@ -7,21 +7,10 @@ namespace GameFramework.Tests
 {
     public sealed class PoolingTester : MonoBehaviour
     {
-        private GameObject _testPrefab;
         private readonly List<GameObject> _spawned = new List<GameObject>();
 
         private string _log = "";
         private Vector2 _scroll;
-
-        private void Awake()
-        {
-            // Instantiate() works on any GameObject reference, not just a Prefab asset,
-            // so this tester needs zero manual setup (no dragging a prefab in).
-            _testPrefab = GameObject.CreatePrimitive(PrimitiveType.Cube);
-            _testPrefab.name = "PoolingTestCube";
-            _testPrefab.transform.SetParent(transform, false);
-            _testPrefab.SetActive(false);
-        }
 
         private void OnGUI()
         {
@@ -30,15 +19,15 @@ namespace GameFramework.Tests
 
             GUILayout.Label($"Active spawned: {_spawned.Count}");
 
-            if (GUILayout.Button("1) Spawn"))
+            if (GUILayout.Button("1) Spawn (EPoolKey.Test)"))
             {
                 Vector3 pos = UnityEngine.Random.insideUnitSphere * 3f;
-                GameObject go = PoolManager.Instance.Spawn(_testPrefab, pos, Quaternion.identity);
+                GameObject go = PoolManager.Instance.Spawn(EPoolKey.Test, pos, Quaternion.identity);
 
                 if (go != null)
                 {
                     _spawned.Add(go);
-                    Log($"Spawned id={go.GetInstanceID()} at {pos}");
+                    Log($"스폰됨 id={go.GetInstanceID()} at {pos}");
                 }
             }
 
@@ -46,14 +35,14 @@ namespace GameFramework.Tests
             {
                 if (_spawned.Count == 0)
                 {
-                    Log("Nothing to despawn");
+                    Log("디스폰할 대상이 없습니다");
                 }
                 else
                 {
                     GameObject go = _spawned[_spawned.Count - 1];
                     _spawned.RemoveAt(_spawned.Count - 1);
                     PoolManager.Instance.Despawn(go);
-                    Log($"Despawned id={go.GetInstanceID()}");
+                    Log($"디스폰됨 id={go.GetInstanceID()}");
                 }
             }
 
@@ -67,7 +56,7 @@ namespace GameFramework.Tests
                 }
 
                 _spawned.Clear();
-                Log($"Despawned all ({count})");
+                Log($"전체 디스폰됨 ({count}개)");
             }
 
             GUILayout.Space(10);

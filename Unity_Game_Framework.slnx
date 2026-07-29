@@ -6,6 +6,7 @@
   <Project Path="GameFramework.DataParsing.Editor.csproj" />
   <Project Path="GameFramework.Core.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
+  <Project Path="GameFramework.Pooling.Editor.csproj" />
   <Project Path="GameFramework.Pooling.csproj" />
   <Project Path="GameFramework.DataParsing.csproj" />
   <Project Path="GameFramework.SoundSystem.Editor.csproj" />

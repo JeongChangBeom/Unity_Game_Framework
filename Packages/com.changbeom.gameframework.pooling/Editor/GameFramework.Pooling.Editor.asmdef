@@ -1,0 +1,18 @@
+{
+    "name": "GameFramework.Pooling.Editor",
+    "rootNamespace": "GameFramework.Pooling.Editor",
+    "references": [
+        "GameFramework.Pooling"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

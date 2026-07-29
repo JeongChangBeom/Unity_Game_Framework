@@ -88,7 +88,7 @@ namespace GameFramework.Tests
             if (GUILayout.Button("11) Play BGM then simulate Voice ducking"))
             {
                 SoundManager.Instance.PlaySound(_bgmSound);
-                Log("BGM started. Play a Voice-channel ESound to hear ducking.");
+                Log("BGM 시작됨. 덕킹을 확인하려면 Voice 채널 ESound를 재생하세요.");
             }
 
             GUILayout.Space(10);

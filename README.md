@@ -135,7 +135,7 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 ### 사용 방법
 
 #### 1) 시트 임포트 (Editor 전용)
-`Tools/DataTable/DataTable Importer` 메뉴에서:
+`Game Framework/Data Parsing/DataTable Importer` 메뉴에서:
 1. Sheet URL, API Key 입력 후 **시트 불러오기**
 2. 원하는 탭 선택 후 **선택 시트 생성** - `{ScriptFolder}/{TabName}.cs`와 `Resources/GeneratedTables/{TabName}.asset`이 만들어집니다
 3. 시트 내용이 바뀌면 **선택 시트 갱신**, 탭을 지우려면 **선택 시트 삭제**
@@ -195,6 +195,8 @@ Item.Data item = DataManager.Instance.GetTable<Item>().Get(1001);
 - Instantiate / Destroy 최소화 (Spawn/Despawn만 반복)
 - `IPoolable.OnSpawn/OnDespawn` 상태 초기화 훅 제공 (자식 오브젝트 포함 자동 호출)
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
+- Pool Settings에 등록한 Key로 프리팹 참조 없이 바로 Spawn 가능
+- `EPoolKey` 자동 생성 - Key 오타를 컴파일 타임 에러로 잡음 (Sound System의 `ESound`와 동일한 방식)
 
 ---
 
@@ -225,15 +227,51 @@ PoolManager.Instance.Despawn(obj);
 
 * `Assets/Create/Game Framework/Pooling/Pool Settings`로 에셋 생성
 * 반드시 `Assets/Resources/GameFramework/PoolSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
-* 항목: Prefab / Prewarm Count / Max Count(0 = 무제한) / Auto Expand
+* 항목: Key(선택) / Prefab / Prewarm Count / Max Count(0 = 무제한) / Auto Expand
 * 재사용 대기 중인(비활성) 인스턴스는 `PoolManager` 하위 `[PoolRoot]/[Pool] <프리팹 이름>`에 자동으로 정리됩니다. Spawn 시 부모를 직접 넘기지 않으면 씬 루트로 배치됩니다.
 
 > 단순한 풀링이 필요한 경우에는 설정 없이 `Spawn`/`Despawn`만 사용해도 됩니다. 설정은 대량 생성·성능 관리가 필요할 때만 추가하면 됩니다. 스폰 시 부모가 필요하면 `Spawn(prefab, position, rotation, parent)`처럼 그때그때 넘겨주세요.
 
+#### Key로 바로 스폰하기
+Pool Settings의 Entry마다 `Key`를 적어두면, 프리팹 참조를 스포너 스크립트에 다시 연결하지 않고도 Key만으로 스폰할 수 있습니다. `Key`는 영문/숫자/밑줄만 가능하고 숫자로 시작할 수 없습니다 (아래 `EPoolKey` enum의 멤버 이름으로 그대로 쓰이기 때문).
+
+**1) `EPoolKey` 생성 (오타 방지, 권장)**
+
+Pool Settings에 Key들을 다 적은 뒤, Unity Editor에서 아래 메뉴를 누릅니다.
+
+`Game Framework/Pooling/Generate EPoolKey From Pool Settings`
+
+* 동작: Pool Settings의 모든 `Key`를 모아 `EPoolKey.cs`를 자동 생성 (유효하지 않은 Key/중복 Key는 Console에 에러·경고를 남기고 건너뜀)
+* 생성 위치: `Packages/com.changbeom.gameframework.pooling/Runtime/EPoolKey.cs`
+* Key를 추가/변경/삭제할 때마다 이 메뉴를 다시 눌러야 `EPoolKey`가 최신 상태로 반영됩니다.
+
+```cs
+// PoolSettings에 Key="Orc"로 등록해둔 프리팹을 스폰. 오타는 컴파일 에러로 즉시 드러남
+GameObject orc = PoolManager.Instance.Spawn(EPoolKey.Orc, spawnPosition, Quaternion.identity);
+
+// 컴포넌트 타입으로 바로 받고 싶으면 명시적으로 타입 인자를 지정
+Orc orcComp = PoolManager.Instance.Spawn<Orc>(EPoolKey.Orc, spawnPosition, Quaternion.identity);
+```
+
+**2) 문자열로 바로 스폰하기 (EPoolKey 생성 전이거나, 동적으로 Key를 다뤄야 할 때)**
+
+```cs
+GameObject orc = PoolManager.Instance.Spawn("Orc", spawnPosition, Quaternion.identity);
+Orc orcComp = PoolManager.Instance.Spawn<Orc>("Orc", spawnPosition, Quaternion.identity);
+```
+
+- **`Spawn(key, position, rotation, parent = null)`** (`EPoolKey` 또는 `string` 오버로드)
+  -> Pool Settings에 등록된 Key로 프리팹을 찾아 스폰. 등록 안 된 Key(또는 `EPoolKey.None`)면 Console에 에러를 남기고 `null` 반환
+- **`TryGetPrefab(key, out prefab)`**
+  -> Key에 연결된 프리팹만 필요할 때 (Spawn 없이 참조만 얻고 싶을 때) 사용
+- Despawn은 스폰된 인스턴스 하나하나를 반환하는 동작이라 Key가 필요 없습니다. Spawn이 돌려준 인스턴스를 그대로 `Despawn(instance)`에 넘기면 됩니다.
+
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/PoolingTester.cs`를 아무 GameObject에 붙이고 Play하면:
+`Assets/00.Scripts/Tests/PoolingTester.cs`는 `EPoolKey.Test` 키로 바로 스폰하는 예시입니다. 미리 `PoolSettings.asset`에 프리팹을 Key=`Test`로 등록하고 `Generate EPoolKey From Pool Settings` 메뉴로 `EPoolKey`를 생성해둬야 동작합니다.
+
+아무 GameObject에 붙이고 Play하면:
 - Spawn/Despawn 버튼으로 재사용 여부를 인스턴스 ID로 직접 확인할 수 있습니다 (Despawn 후 다시 Spawn하면 같은 ID가 재사용됨).
 - Hierarchy 창에서 `[PoolRoot]` 하위에 풀이 쌓이는 것도 함께 확인 가능합니다.
 

@@ -11,9 +11,10 @@ MonoBehaviour:
   m_EditorHideFlags: 0
   m_Script: {fileID: 11500000, guid: 11e7e781d5f7d794db6142eb44162823, type: 3}
   m_Name: PoolSettings
-  m_EditorClassIdentifier:
+  m_EditorClassIdentifier: 
   entries:
-  - prefab: {fileID: 2297028266651648793, guid: e28efaa041dfdf84b949bae9b2a1e8dd, type: 3}
+  - key: Test
+    prefab: {fileID: 2297028266651648793, guid: e28efaa041dfdf84b949bae9b2a1e8dd, type: 3}
     prewarmCount: 10
     maxCount: 30
     autoExpand: 1

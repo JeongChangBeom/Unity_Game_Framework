@@ -31,9 +31,9 @@ namespace GameFramework.Tests
             TimeManager.Instance.OnMonthlyReset -= HandleMonthlyReset;
         }
 
-        private void HandleDailyReset() => Log("EVENT: OnDailyReset fired");
-        private void HandleWeeklyReset() => Log("EVENT: OnWeeklyReset fired");
-        private void HandleMonthlyReset() => Log("EVENT: OnMonthlyReset fired");
+        private void HandleDailyReset() => Log("이벤트: OnDailyReset 발생");
+        private void HandleWeeklyReset() => Log("이벤트: OnWeeklyReset 발생");
+        private void HandleMonthlyReset() => Log("이벤트: OnMonthlyReset 발생");
 
         private void OnGUI()
         {
@@ -55,18 +55,18 @@ namespace GameFramework.Tests
                 if (tm.IsCooldownReady(_cooldownId))
                 {
                     tm.StartCooldown(_cooldownId, TimeSpan.FromSeconds(_cooldownSeconds));
-                    Log("USED");
+                    Log("사용됨");
                 }
                 else
                 {
-                    Log("NOT READY: " + tm.GetCooldownRemaining(_cooldownId).TotalSeconds.ToString("0.00"));
+                    Log("아직 준비 안 됨: " + tm.GetCooldownRemaining(_cooldownId).TotalSeconds.ToString("0.00"));
                 }
             }
 
             if (GUILayout.Button("3) Clear Cooldown"))
             {
                 TimeManager.Instance.ClearCooldown(_cooldownId);
-                Log("Cooldown cleared");
+                Log("쿨타임 초기화됨");
             }
 
             if (GUILayout.Button("4) List All Active Cooldowns"))
@@ -74,13 +74,13 @@ namespace GameFramework.Tests
                 var all = TimeManager.Instance.GetAllCooldownsRemaining();
                 if (all.Count == 0)
                 {
-                    Log("No active cooldowns");
+                    Log("활성 쿨타임 없음");
                 }
                 else
                 {
                     foreach (var kvp in all)
                     {
-                        Log($"  {kvp.Key}: {kvp.Value.TotalSeconds:0.00}s left");
+                        Log($"  {kvp.Key}: {kvp.Value.TotalSeconds:0.00}초 남음");
                     }
                 }
             }
@@ -90,18 +90,18 @@ namespace GameFramework.Tests
             if (GUILayout.Button("5) Apply Server +120s"))
             {
                 TimeManager.Instance.ApplyServerUtc(DateTimeOffset.UtcNow.AddSeconds(120));
-                Log("Server applied +120s");
+                Log("서버 시간 +120초 적용됨");
             }
 
             if (GUILayout.Button("6) Clear Server Sync"))
             {
                 TimeManager.Instance.ClearServerSync();
-                Log("Server sync cleared");
+                Log("서버 동기화 해제됨");
             }
 
             if (GUILayout.Button("7) Is Trust Expiring Soon (within 60s)?"))
             {
-                Log("ExpiringSoon: " + TimeManager.Instance.IsServerTrustExpiringSoon(60));
+                Log("만료 임박: " + TimeManager.Instance.IsServerTrustExpiringSoon(60));
             }
 
             GUILayout.Space(10);
@@ -109,25 +109,25 @@ namespace GameFramework.Tests
             if (GUILayout.Button("8) Enable Mock"))
             {
                 TimeManager.Instance.EnableMockTime();
-                Log("Mock ON");
+                Log("Mock 켜짐");
             }
 
             if (GUILayout.Button("9) Disable Mock"))
             {
                 TimeManager.Instance.DisableMockTime();
-                Log("Mock OFF");
+                Log("Mock 꺼짐");
             }
 
             if (GUILayout.Button("10) Add +60s"))
             {
                 TimeManager.Instance.AddMockSeconds(60);
-                Log("Mock += 60s");
+                Log("Mock +60초");
             }
 
             if (GUILayout.Button("11) Jump To Next Daily Reset"))
             {
                 TimeManager.Instance.JumpToNextDailyResetForTest();
-                Log("Jumped past next daily reset (watch for OnDailyReset above)");
+                Log("다음 일일 리셋 시점을 넘겼습니다 (위에서 OnDailyReset 발생 확인)");
             }
 
             GUILayout.Space(10);
@@ -135,18 +135,18 @@ namespace GameFramework.Tests
             if (GUILayout.Button("12) Print Reset Keys + Remaining"))
             {
                 TimeManager tm = TimeManager.Instance;
-                Log($"Daily={tm.GetDailyKey()} ({tm.GetDailyResetRemainingText()} left), Weekly={tm.GetWeeklyKey()}, Monthly={tm.GetMonthlyKey()}");
+                Log($"Daily={tm.GetDailyKey()} ({tm.GetDailyResetRemainingText()} 남음), Weekly={tm.GetWeeklyKey()}, Monthly={tm.GetMonthlyKey()}");
             }
 
             if (GUILayout.Button("13) Offline Delta"))
             {
-                Log("Offline: " + TimeManager.Instance.GetOfflineDelta().TotalSeconds.ToString("0.00") + "s");
+                Log("오프라인 경과: " + TimeManager.Instance.GetOfflineDelta().TotalSeconds.ToString("0.00") + "초");
             }
 
             if (GUILayout.Button("14) Clear Cheat Flag"))
             {
                 TimeManager.Instance.ClearCheatFlag();
-                Log("Cheat flag cleared");
+                Log("치트 플래그 초기화됨");
             }
 
             GUILayout.Space(10);

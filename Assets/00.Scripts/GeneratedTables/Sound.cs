@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using UnityEngine;
 using GameFramework.DataParsing;
 
-// AUTO-GENERATED. DO NOT EDIT.
+// 자동 생성됨. 직접 편집하지 마세요.
 public class Sound : ScriptableObject
 {
     [SerializeField] private List<Data> _table = new List<Data>();
@@ -112,48 +111,15 @@ public class Sound : ScriptableObject
             }
             {
                 string raw = table.GetCell(r, 3).Trim();
-                float v = 0f;
-                if (!string.IsNullOrEmpty(raw))
-                {
-                    if (!float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out v))
-                    {
-                        v = 0f;
-                    }
-                }
-                data.defaultVolume = v;
+                data.defaultVolume = TableValueParser.ParseFloat(raw, 0f);
             }
             {
                 string raw = table.GetCell(r, 4).Trim();
-                int v = 0;
-                if (!string.IsNullOrEmpty(raw))
-                {
-                    if (!int.TryParse(raw, out v))
-                    {
-                        v = 0;
-                    }
-                }
-                data.maxConcurrent = v;
+                data.maxConcurrent = TableValueParser.ParseInt(raw, 0);
             }
             {
                 string raw = table.GetCell(r, 5).Trim();
-                bool v = false;
-                if (!string.IsNullOrEmpty(raw))
-                {
-                    string lower = raw.ToLowerInvariant();
-                    if (lower == "1" || lower == "true")
-                    {
-                        v = true;
-                    }
-                    else if (lower == "0" || lower == "false")
-                    {
-                        v = false;
-                    }
-                    else
-                    {
-                        v = false;
-                    }
-                }
-                data.loop = v;
+                data.loop = TableValueParser.ParseBool(raw, false);
             }
 
             _table.Add(data);

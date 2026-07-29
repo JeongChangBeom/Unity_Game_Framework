@@ -4,10 +4,9 @@ using UnityEngine;
 
 namespace GameFramework.Tests
 {
-    // Two dummy managers with [BootPriority] to prove they auto-initialize, in order,
-    // before the scene even loads -- with zero scene placement. A third manager has no
-    // attribute, so it only initializes lazily when something actually touches .Instance,
-    // exactly like every manager before this feature existed.
+    // [BootPriority]가 붙은 더미 매니저 2개는 씬 배치 없이도 씬이 로드되기 전에
+    // 순서대로 자동 초기화됨을 보여줍니다. 세 번째 매니저는 attribute가 없어서,
+    // 이 기능이 없던 때와 마찬가지로 누군가 실제로 .Instance를 건드릴 때만 지연 초기화됩니다.
 
     [BootPriority(1)]
     public sealed class BootTestManagerA : MonoSingleton<BootTestManagerA>

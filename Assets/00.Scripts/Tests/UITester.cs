@@ -16,8 +16,8 @@ namespace GameFramework.Tests
 
         private void Awake()
         {
-            // Built at runtime (like PoolingTester's test cube) so this tester needs no
-            // manually-authored toast prefab to demonstrate ShowToast/HideToast.
+            // 런타임에 직접 만들어서, 토스트 프리팹을 미리 준비하지 않아도
+            // ShowToast/HideToast 동작을 확인할 수 있습니다.
             _toastTemplate = CreateToastTemplate();
         }
 
@@ -39,14 +39,14 @@ namespace GameFramework.Tests
             if (GUILayout.Button("2) Request Popup B (High, PreemptIfHigher)"))
             {
                 UIManager.Instance.RequestPopup(_popupB, EPopupPriority.High);
-                Log("RequestPopup(B, High) -- preempts A if A is open");
+                Log("RequestPopup(B, High) -- A가 열려 있으면 선점합니다");
             }
 
             if (GUILayout.Button("3) Request Popup A with Result Callback"))
             {
                 UIManager.Instance.RequestPopup<bool>(_popupA, EPopupPriority.Normal,
-                    result => Log($"Popup A result = {result} (true = closed via its own close button)"));
-                Log("RequestPopup<bool>(A) -- close it with A's own close button to see the result");
+                    result => Log($"Popup A 결과 = {result} (true = 팝업 자체 닫기 버튼으로 닫힘)"));
+                Log("RequestPopup<bool>(A) -- 결과를 보려면 A 자체의 닫기 버튼으로 닫으세요");
             }
 
             if (GUILayout.Button("4) Close Top Popup"))

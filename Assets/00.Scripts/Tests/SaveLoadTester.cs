@@ -37,13 +37,13 @@ namespace GameFramework.Tests
                 };
 
                 SaveManager.Instance.Save(TestKey, data);
-                Log($"Saved: score={data.Score}, name={data.PlayerName}");
+                Log($"저장됨: score={data.Score}, name={data.PlayerName}");
             }
 
             if (GUILayout.Button("2) TryLoad"))
             {
                 bool ok = SaveManager.Instance.TryLoad(TestKey, out TestData data);
-                Log(ok ? $"Loaded: score={data.Score}, name={data.PlayerName}" : "No data found for key");
+                Log(ok ? $"불러옴: score={data.Score}, name={data.PlayerName}" : "해당 key에 대한 데이터가 없습니다");
             }
 
             if (GUILayout.Button("3) LoadOrCreate (creates default if missing)"))
@@ -64,7 +64,7 @@ namespace GameFramework.Tests
             if (GUILayout.Button("5) Delete"))
             {
                 SaveManager.Instance.Delete(TestKey);
-                Log("Deleted key");
+                Log("key 삭제됨");
             }
 
             GUILayout.Space(10);
@@ -73,7 +73,7 @@ namespace GameFramework.Tests
             if (GUILayout.Button("6) Flush (force write to disk now)"))
             {
                 SaveManager.Instance.Flush();
-                Log("Flushed");
+                Log("Flush 완료");
             }
 
             GUILayout.Space(10);
@@ -87,7 +87,7 @@ namespace GameFramework.Tests
             if (GUILayout.Button("8) BackupNow"))
             {
                 SaveManager.Instance.BackupNow();
-                Log("BackupNow called");
+                Log("BackupNow 호출됨");
             }
 
             if (GUILayout.Button("9) RestoreFromBackup"))

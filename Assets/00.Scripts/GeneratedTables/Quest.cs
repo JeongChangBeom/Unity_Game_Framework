@@ -1,10 +1,9 @@
 ﻿using System;
 using System.Collections.Generic;
-using System.Globalization;
 using UnityEngine;
 using GameFramework.DataParsing;
 
-// AUTO-GENERATED. DO NOT EDIT.
+// 자동 생성됨. 직접 편집하지 마세요.
 public class Quest : ScriptableObject
 {
     [SerializeField] private List<Data> _table = new List<Data>();

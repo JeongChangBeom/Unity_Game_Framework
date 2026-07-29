@@ -50,7 +50,7 @@ namespace GameFramework.DataParsing.Editor
 
         private List<SheetTabInfo> _tabs = new List<SheetTabInfo>();
 
-        [MenuItem("Tools/DataTable/DataTable Importer")]
+        [MenuItem("Game Framework/Data Parsing/DataTable Importer")]
         public static void Open()
         {
             GetWindow<DataTableImporterWindow>("DataTable Importer");

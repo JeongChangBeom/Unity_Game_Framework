@@ -47,13 +47,13 @@ namespace GameFramework.Tests
 
                 if (table == null)
                 {
-                    Log("Sound table not found");
+                    Log("Sound 테이블을 찾을 수 없습니다");
                 }
                 else
                 {
                     Sound.Data d = table.Get(ParseRowKey());
                     Log(d == null
-                        ? $"Sound: no row for key={ParseRowKey()} (table has {table.Table.Count} rows)"
+                        ? $"Sound: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
                         : $"Sound: fileName={d.fileName}, channel={d.channel}, volume={d.defaultVolume}, maxConcurrent={d.maxConcurrent}, loop={d.loop}");
                 }
             }
@@ -82,12 +82,12 @@ namespace GameFramework.Tests
         {
             if (table == null)
             {
-                Log("Item table not found");
+                Log("Item 테이블을 찾을 수 없습니다");
                 return;
             }
 
             Log(d == null
-                ? $"Item: no row for key={ParseRowKey()} (table has {table.Table.Count} rows)"
+                ? $"Item: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
                 : $"Item: name={d.name}, description={d.description}");
         }
 
@@ -95,12 +95,12 @@ namespace GameFramework.Tests
         {
             if (table == null)
             {
-                Log("Monster table not found");
+                Log("Monster 테이블을 찾을 수 없습니다");
                 return;
             }
 
             Log(d == null
-                ? $"Monster: no row for key={ParseRowKey()} (table has {table.Table.Count} rows)"
+                ? $"Monster: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
                 : $"Monster: name={d.name}, description={d.description}");
         }
 
@@ -108,12 +108,12 @@ namespace GameFramework.Tests
         {
             if (table == null)
             {
-                Log("Quest table not found");
+                Log("Quest 테이블을 찾을 수 없습니다");
                 return;
             }
 
             Log(d == null
-                ? $"Quest: no row for key={ParseRowKey()} (table has {table.Table.Count} rows)"
+                ? $"Quest: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
                 : $"Quest: name={d.name}, description={d.description}");
         }
 
