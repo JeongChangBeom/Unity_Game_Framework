@@ -8,43 +8,40 @@
 
 ---
 
+## 🛠 개발 환경
+- **Unity**: 6000.0.68f1 (Unity 6 LTS)
+- **에디터 / 도구**: Visual Studio Code, Claude Code
+- **버전 관리**: Git / GitHub
+- **패키지 배포**: UPM(Unity Package Manager), Git URL 기반 패키지별 개별 설치
+
+---
+
 ## 📦 Frameworks
 
 현재 포함된 프레임워크는 다음과 같습니다.
 
-- **Core**  
-  모든 매니저가 상속하는 공용 베이스(MonoSingleton)
+- **[Core](#core)**  
+  모든 매니저가 상속하는 공용 베이스(MonoSingleton) + `BootPriority` 기반 초기화 순서 보장
 
-- **Data Parsing**  
+- **[Data Parsing](#data)**  
   Google Sheet 기반 게임 데이터 파이프라인
 
-- **Pooling**  
-  Type 기반 공용 오브젝트 풀링 시스템
+- **[Pooling](#pooling)**  
+  프리팹 기반 공용 오브젝트 풀링 시스템
 
-- **UI System**  
-  우선순위 / 선점 기반 UI 흐름 관리 시스템
+- **[UI System](#ui)**  
+  우선순위 / 선점 기반 팝업 흐름 관리 + 토스트 / HUD·Overlay 레이어
 
-- **Sound System**  
+- **[Sound System](#sound)**  
   Addressables + Sheet 기반 사운드 재생/관리 시스템
 
-- **Save / Load**  
+- **[Save / Load](#saveload)**  
   Provider 기반 저장/로드 시스템 (AutoFlush / Backup / Restore 지원)
 
-- **Time System**  
+- **[Time System](#time)**  
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
 > 프레임워크는 지속적으로 추가될 예정입니다.
-
----
-
-## 🔗 목차
-- [0️⃣ Core](#core)
-- [1️⃣ Data Parsing](#data)
-- [2️⃣ Pooling](#pooling)
-- [3️⃣ UI System](#ui)
-- [4️⃣ Sound System](#sound)
-- [5️⃣ Save / Load](#saveload)
-- [6️⃣ Time System](#time)
 
 ---
 
@@ -68,12 +65,12 @@
 ---
 
 <details id="core">
-<summary><h2>0️⃣ Core</h2></summary>
+<summary><h2>0. Core</h2></summary>
 
 
 ### 기능
 - 공용 싱글톤 베이스 `MonoSingleton<T>` 제공
-- **씬 배치 불필요** — 처음 `.Instance`에 접근하는 순간 자동 생성
+- **씬 배치 불필요** - 처음 `.Instance`에 접근하는 순간 자동 생성
 - `[BootPriority(int)]`로 매니저 간 초기화 순서를 코드로 직접 선언 가능
 - Domain Reload 비활성화(Enter Play Mode Settings) 환경에서도 안전하게 동작
 - 초기화(`OnInitialize`)는 정확히 1회만 보장
@@ -120,7 +117,7 @@ MyManager.Instance.DoSomething();
 ---
 
 <details id="data">
-<summary><h2>1️⃣ Data Parsing</h2></summary>
+<summary><h2>1. Data Parsing</h2></summary>
 
 ### 기능
 - Google Sheet → ScriptableObject 자동 변환 (TSV 다운로드 후 파싱)
@@ -140,7 +137,7 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 #### 1) 시트 임포트 (Editor 전용)
 `Tools/DataTable/DataTable Importer` 메뉴에서:
 1. Sheet URL, API Key 입력 후 **시트 불러오기**
-2. 원하는 탭 선택 후 **선택 시트 생성** — `{ScriptFolder}/{TabName}.cs`와 `Resources/GeneratedTables/{TabName}.asset`이 만들어집니다
+2. 원하는 탭 선택 후 **선택 시트 생성** - `{ScriptFolder}/{TabName}.cs`와 `Resources/GeneratedTables/{TabName}.asset`이 만들어집니다
 3. 시트 내용이 바뀌면 **선택 시트 갱신**, 탭을 지우려면 **선택 시트 삭제**
 
 > 시트 형식: 1행=컬럼명, 3행=타입, 4행부터 데이터. 1열은 항상 `RowKey`(int)로 취급됩니다. 컬럼명이 `~`로 시작하면 무시됩니다.
@@ -163,10 +160,10 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 ### enum 컬럼과 시트 작성 실수 방지
 enum은 시트에 문자열로 적은 값(`"Fire"` 등)을 실제 C# enum으로 변환하는데, 실수를 두 단계에서 확실하게 잡습니다.
 
-1. **타입 이름 오타** — `enum:ElementTyp`처럼 존재하지 않는 타입을 적으면, "선택 시트 생성" 시점에 **에러로 즉시 차단**되고 해당 탭 전체가 생성되지 않습니다. 같은 이름의 enum이 여러 개(다른 네임스페이스) 있어도 모호하다고 차단됩니다.
-2. **셀 값 오타** — 타입은 맞는데 셀 값이 `"Fier"`처럼 실제 enum 멤버와 안 맞으면, 조용히 기본값으로 넘어가지 않고 **Console에 에러 로그**(테이블명·행 번호·잘못된 값·enum 타입명 포함)를 남기고 해당 필드만 기본값으로 처리합니다. 다른 컬럼 값은 그대로 유지됩니다.
+1. **타입 이름 오타** - `enum:ElementTyp`처럼 존재하지 않는 타입을 적으면, "선택 시트 생성" 시점에 **에러로 즉시 차단**되고 해당 탭 전체가 생성되지 않습니다. 같은 이름의 enum이 여러 개(다른 네임스페이스) 있어도 모호하다고 차단됩니다.
+2. **셀 값 오타** - 타입은 맞는데 셀 값이 `"Fier"`처럼 실제 enum 멤버와 안 맞으면, 조용히 기본값으로 넘어가지 않고 **Console에 에러 로그**(테이블명·행 번호·잘못된 값·enum 타입명 포함)를 남기고 해당 필드만 기본값으로 처리합니다. 다른 컬럼 값은 그대로 유지됩니다.
 
-> 즉 오타가 있으면 "선택 시트 생성/갱신" 직후 Console에서 반드시 확인할 수 있습니다 — 조용히 잘못된 데이터가 들어가는 경우는 없습니다.
+> 즉 오타가 있으면 "선택 시트 생성/갱신" 직후 Console에서 반드시 확인할 수 있습니다 - 조용히 잘못된 데이터가 들어가는 경우는 없습니다.
 
 ---
 
@@ -190,14 +187,14 @@ Item.Data item = DataManager.Instance.GetTable<Item>().Get(1001);
 ---
 
 <details id="pooling">
-<summary><h2>2️⃣ Pooling</h2></summary>
+<summary><h2>2. Pooling</h2></summary>
 
 ### 기능
-- 프리팹(GameObject) 단위 풀링 — 프리팹별로 독립된 Pool 관리
+- 프리팹(GameObject) 단위 풀링 - 프리팹별로 독립된 Pool 관리
 - Dictionary + Queue 구조로 재사용 인스턴스 관리
 - Instantiate / Destroy 최소화 (Spawn/Despawn만 반복)
 - `IPoolable.OnSpawn/OnDespawn` 상태 초기화 훅 제공 (자식 오브젝트 포함 자동 호출)
-- 씬 배치 불필요 — 처음 사용하는 순간 자동 생성
+- 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 
 ---
 
@@ -245,7 +242,7 @@ PoolManager.Instance.Despawn(obj);
 ---
 
 <details id="ui">
-<summary><h2>3️⃣ UI System</h2></summary>
+<summary><h2>3. UI System</h2></summary>
 
 ### 기능
 - 단일 팝업 표시 (Single Active Popup)
@@ -255,10 +252,10 @@ PoolManager.Instance.Despawn(obj);
 - Open / Resume / Suspend / Close, Toast Show / Hide 전 구간에 애니메이션 훅 제공 (기본 스케일 연출 포함, 원하는 연출 코드로 교체 가능)
 - Modal 입력 차단
 - Pooling 패키지(`PoolManager`) 연계 (자체 풀 없음)
-- 팝업 결과 콜백 — 확인/취소처럼 "어떻게 닫혔는지" 결과값을 호출한 쪽이 받을 수 있음
-- 전체 닫기(`CloseAll`) — 씬 전환 시 대기열까지 한번에 정리
-- 비모달 토스트(Toast) — 모달 팝업과 별개로 여러 개 동시 표시 가능, 자동 사라짐
-- HUD / Overlay 레이어 — 상시 표시 UI, 전체화면 연출용 레이어를 별도로 제공
+- 팝업 결과 콜백 - 확인/취소처럼 "어떻게 닫혔는지" 결과값을 호출한 쪽이 받을 수 있음
+- 전체 닫기(`CloseAll`) - 씬 전환 시 대기열까지 한번에 정리
+- 비모달 토스트(Toast) - 모달 팝업과 별개로 여러 개 동시 표시 가능, 자동 사라짐
+- HUD / Overlay 레이어 - 상시 표시 UI, 전체화면 연출용 레이어를 별도로 제공
 - 뒤로가기 / Escape 키로 최상단 팝업 닫기 (팝업별로 끄기 가능)
 - Settings ScriptableObject 기반 설정 (씬 배치 불필요)
 
@@ -383,7 +380,7 @@ public class MandatoryConfirmPopup : UIPopupBase
 ---
 
 <details id="sound">
-<summary><h2>4️⃣ Sound System</h2></summary>
+<summary><h2>4. Sound System</h2></summary>
 
 ### 기능
 - Sound Sheet 기반 사운드 관리
@@ -537,7 +534,7 @@ SoundManager.Instance.SetChannelVolume(ESoundChannel.Voice, 1.0f);
 ---
 
 <details id="saveload">
-<summary><h2>5️⃣ Save / Load</h2></summary>
+<summary><h2>5. Save / Load</h2></summary>
 
 ### 기능
 - **Provider 기반 저장 시스템**
@@ -749,23 +746,23 @@ SaveManager.Instance.Save(key, _settings);
 ---
 
 <details id="time">
-<summary><h2>6️⃣ Time System</h2></summary>
+<summary><h2>6. Time System</h2></summary>
 
 ### 기능
 게임 전반의 시간 흐름을 UTC 기준으로 통합 관리합니다.
 
-- **서버/로컬 시간 소스 전환** — `Mode`(LocalOnly / ServerOnly / PreferServer)를 설정으로 선택. 게임마다 서버 동기화가 필요한지 다르기 때문에 하나로 고정하지 않음
-- **모노토닉 클럭 기반 서버 신뢰도 판단** — 서버 동기화는 기기 시계가 아니라 `Stopwatch` 기반 모노토닉 클럭에 앵커링되어, 동기화 후 기기 시계를 바꿔도 흔들리지 않음. 신뢰 유효기간(Trust Window) 만료 시 자동으로 로컬로 대체
+- **서버/로컬 시간 소스 전환** - `Mode`(LocalOnly / ServerOnly / PreferServer)를 설정으로 선택. 게임마다 서버 동기화가 필요한지 다르기 때문에 하나로 고정하지 않음
+- **모노토닉 클럭 기반 서버 신뢰도 판단** - 서버 동기화는 기기 시계가 아니라 `Stopwatch` 기반 모노토닉 클럭에 앵커링되어, 동기화 후 기기 시계를 바꿔도 흔들리지 않음. 신뢰 유효기간(Trust Window) 만료 시 자동으로 로컬로 대체
 - **일/주/월 리셋 키 + 남은 시간 계산**
-- **쿨타임** — 개별 조회 + 전체 목록 조회
+- **쿨타임** - 개별 조회 + 전체 목록 조회
 - **오프라인 경과 시간**
-- **시간 역행(치트) 감지** — 마지막 접속 시각보다 뒤로 가면 감지, 허용 오차 내의 사소한 뒤로 감(NTP 보정 등)은 미신뢰 소스에 한해 허용
-- **리셋 크로싱 이벤트** — 게임을 켜놓은 채로 일/주/월 리셋 시각을 넘기면 `OnDailyReset`/`OnWeeklyReset`/`OnMonthlyReset` 발생
-- **서버 재동기화 필요 신호** — `IsServerTrustExpiringSoon(초)`으로 신뢰 만료가 임박했는지 확인 가능 (실제 재동기화 네트워크 호출은 프로젝트마다 다르므로 신호만 제공)
-- **이벤트 기간 유틸(`TimeRangeUtc`)** — 시작~종료 UTC 구간의 진행 여부/남은 시간 계산 (기간 한정 이벤트 등에 사용)
-- **스키마 버전 체크** — 저장된 버전과 현재 버전이 다르면 감지 후 로그
-- **테스트용 Mock 시간** — 시간 점프, 리셋 시점으로 바로 이동
-- **Save / Load 연동** — 모든 시간 데이터 영구 저장
+- **시간 역행(치트) 감지** - 마지막 접속 시각보다 뒤로 가면 감지, 허용 오차 내의 사소한 뒤로 감(NTP 보정 등)은 미신뢰 소스에 한해 허용
+- **리셋 크로싱 이벤트** - 게임을 켜놓은 채로 일/주/월 리셋 시각을 넘기면 `OnDailyReset`/`OnWeeklyReset`/`OnMonthlyReset` 발생
+- **서버 재동기화 필요 신호** - `IsServerTrustExpiringSoon(초)`으로 신뢰 만료가 임박했는지 확인 가능 (실제 재동기화 네트워크 호출은 프로젝트마다 다르므로 신호만 제공)
+- **이벤트 기간 유틸(`TimeRangeUtc`)** - 시작~종료 UTC 구간의 진행 여부/남은 시간 계산 (기간 한정 이벤트 등에 사용)
+- **스키마 버전 체크** - 저장된 버전과 현재 버전이 다르면 감지 후 로그
+- **테스트용 Mock 시간** - 시간 점프, 리셋 시점으로 바로 이동
+- **Save / Load 연동** - 모든 시간 데이터 영구 저장
 
 ---
 
@@ -805,7 +802,7 @@ TimeManager.Instance.ClearServerSync();
 ```
 `Mode`가 `PreferServer`면 신뢰 가능한 동안 자동으로 서버 시간이 쓰이고, 신뢰가 만료되면 자동으로 로컬 시간으로 대체됩니다. `LocalOnly`/`ServerOnly`로 고정할 수도 있습니다.
 
-> 서버 신뢰는 **앱을 껐다 켜는 것만으로는 풀리지 않습니다** (OS 부팅 이후 누적 시간 기준 클럭 사용). 다만 **기기를 재부팅하면 항상 풀리고** 다음 `ApplyServerUtc` 전까지 로컬 시간으로 대체됩니다 — 재부팅 후에는 경과 시간을 검증할 방법이 없어 안전하게 미신뢰 처리하는 의도된 동작입니다. `ServerOnly`/`PreferServer`를 쓴다면 앱 시작 시점에 항상 서버 동기화를 한 번 시도하는 걸 권장합니다.
+> 서버 신뢰는 **앱을 껐다 켜는 것만으로는 풀리지 않습니다** (OS 부팅 이후 누적 시간 기준 클럭 사용). 다만 **기기를 재부팅하면 항상 풀리고** 다음 `ApplyServerUtc` 전까지 로컬 시간으로 대체됩니다 - 재부팅 후에는 경과 시간을 검증할 방법이 없어 안전하게 미신뢰 처리하는 의도된 동작입니다. `ServerOnly`/`PreferServer`를 쓴다면 앱 시작 시점에 항상 서버 동기화를 한 번 시도하는 걸 권장합니다.
 
 ---
 
