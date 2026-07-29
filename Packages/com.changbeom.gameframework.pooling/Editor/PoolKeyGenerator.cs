@@ -9,7 +9,9 @@ namespace GameFramework.Pooling.Editor
 {
     // EPoolKey.cs는 이 패키지의 Runtime 폴더 안에서 직접 재생성됩니다. PoolManager가
     // EPoolKey를 구체 타입으로 참조하기 때문에 같은 어셈블리를 공유해야 하기 때문입니다.
-    // 재생성하면 이전 enum 멤버들이 이번에 등록된 Key 목록으로 덮어써집니다.
+    // 기존 멤버의 선언 순서(=정수 값)는 그대로 보존되고, 새로 등록된 Key만 맨 뒤에 추가됩니다
+    // (BuildOrderedNames 참고 -- 순서가 바뀌면 기존에 저장된 EPoolKey 값이 다른 프리팹을
+    // 가리키게 되는 사고가 생기기 때문입니다).
     public static class PoolKeyGenerator
     {
         private const string OutputPath = "Packages/com.changbeom.gameframework.pooling/Runtime/EPoolKey.cs";
@@ -53,15 +55,48 @@ namespace GameFramework.Pooling.Editor
                 names.Add(key);
             }
 
-            names.Sort(StringComparer.Ordinal);
+            List<string> ordered = BuildOrderedNames(names);
 
-            string code = BuildCode(names);
+            string code = BuildCode(ordered);
             WriteFile(OutputPath, code);
 
             AssetDatabase.ImportAsset(OutputPath);
             AssetDatabase.Refresh();
 
-            Debug.Log("[PoolKeyGenerator] 생성됨: " + OutputPath + " (개수: " + names.Count + ")");
+            Debug.Log("[PoolKeyGenerator] 생성됨: " + OutputPath + " (개수: " + ordered.Count + ")");
+        }
+
+        // 새로 생성할 때 이름을 알파벳순으로 정렬하면, enum은 값을 안 주면 선언 순서대로
+        // 0,1,2...가 매겨지기 때문에 기존 멤버의 정수 값이 조용히 바뀌어버립니다 (코드에
+        // 박아둔 EPoolKey 값이 다른 프리팹을 가리키게 됨). 그래서 기존 멤버는 Pool Settings에서
+        // 지워졌더라도 순서/값을 그대로 보존하고, 새로 추가된 Key만 맨 뒤에 붙입니다.
+        private static List<string> BuildOrderedNames(List<string> currentKeys)
+        {
+            List<string> result = new List<string>();
+            HashSet<string> seen = new HashSet<string>();
+
+            string[] existingNames = Enum.GetNames(typeof(EPoolKey));
+            for (int i = 0; i < existingNames.Length; i++)
+            {
+                string name = existingNames[i];
+                if (name == "None" || !seen.Add(name))
+                {
+                    continue;
+                }
+
+                result.Add(name);
+            }
+
+            for (int i = 0; i < currentKeys.Count; i++)
+            {
+                string name = currentKeys[i];
+                if (seen.Add(name))
+                {
+                    result.Add(name);
+                }
+            }
+
+            return result;
         }
 
         private static bool IsValidIdentifier(string s)
