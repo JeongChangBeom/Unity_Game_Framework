@@ -128,7 +128,7 @@ MyManager.Instance.DoSomething();
 ---
 
 ### 외부 패키지
-Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패키지**(`com.unity.editorcoroutines`)를 사용합니다. 그 외 런타임 코드는 전부 Unity API(`UnityEngine.Networking.UnityWebRequest`, `Resources`)만 사용합니다.
+Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패키지**(`com.unity.editorcoroutines`)를 사용합니다.
 
 ---
 
@@ -409,7 +409,7 @@ public class MandatoryConfirmPopup : UIPopupBase
 ---
 
 ### 외부 패키지
-사운드 클립 스트리밍/로딩에 **Unity 공식 Addressables 패키지**(`com.unity.addressables`)를 사용합니다. 비동기 처리는 전부 Unity 6 네이티브 `Awaitable`을 사용하며, 별도의 async 라이브러리(UniTask 등)는 사용하지 않습니다.
+사운드 클립 스트리밍/로딩에 **Unity 공식 Addressables 패키지**(`com.unity.addressables`)를 사용합니다. 비동기 처리는 Unity 6 네이티브 `Awaitable`을 사용합니다.
 
 ---
 
@@ -563,8 +563,7 @@ SoundManager.Instance.SetChannelVolume(ESoundChannel.Voice, 1.0f);
 ---
 
 ### 외부 패키지
-- `JsonFileSaveProvider`, `PlayerPrefsSaveProvider`, `MemorySaveProvider`는 **`UnityEngine.JsonUtility`만 사용합니다. 외부 패키지 불필요.**
-- `ES3SaveProvider`만 예외적으로 **Easy Save 3** (Unity Asset Store 유료 에셋) 설치가 필요합니다. 설치 안 하면 자동으로 JsonFile로 대체됩니다.
+`ES3SaveProvider`를 사용하려면 **Easy Save 3** (Unity Asset Store 유료 에셋) 설치가 필요합니다. 설치 안 하면 자동으로 JsonFile로 대체됩니다.
 
 ---
 
@@ -763,11 +762,6 @@ SaveManager.Instance.Save(key, _settings);
 - **스키마 버전 체크** - 저장된 버전과 현재 버전이 다르면 감지 후 로그
 - **테스트용 Mock 시간** - 시간 점프, 리셋 시점으로 바로 이동
 - **Save / Load 연동** - 모든 시간 데이터 영구 저장
-
----
-
-### 외부 패키지
-없음. `System.Diagnostics.Stopwatch`(모노토닉 클럭)와 Unity API만 사용합니다.
 
 ---
 
