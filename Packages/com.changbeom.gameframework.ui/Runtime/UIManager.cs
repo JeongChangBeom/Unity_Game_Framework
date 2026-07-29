@@ -27,10 +27,10 @@ namespace GameFramework.UISystem
         private int _sequenceCounter;
         private bool _processScheduled;
 
-        /// <summary>Persistent layer for always-visible HUD elements, below popups. Parent your own HUD prefabs here.</summary>
+        /// <summary>팝업보다 아래에 있는, 상시 표시되는 HUD 요소용 지속 레이어입니다. 여기에 자신의 HUD 프리팹을 부모로 연결하세요.</summary>
         public Transform HudRoot => _hudRoot;
 
-        /// <summary>Topmost layer, above popups and toasts. For full-screen loading/transition content.</summary>
+        /// <summary>팝업과 토스트보다 위에 있는 최상단 레이어입니다. 전체화면 로딩/전환 연출용입니다.</summary>
         public Transform OverlayRoot => _overlayRoot;
 
         public bool IsAnyPopupOpen => _current != null;
@@ -57,7 +57,7 @@ namespace GameFramework.UISystem
                 return settings;
             }
 
-            Debug.LogWarning($"[UIManager] No UIManagerSettings asset found at Resources/{UIManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/UI System/UI Manager Settings.");
+            Debug.LogWarning($"[UIManager] Resources/{UIManagerSettings.ResourcePath}에서 UIManagerSettings 에셋을 찾지 못했습니다. 기본값을 사용합니다. Assets/Create/Game Framework/UI System/UI Manager Settings로 에셋을 만드세요.");
             return ScriptableObject.CreateInstance<UIManagerSettings>();
         }
 
@@ -90,7 +90,7 @@ namespace GameFramework.UISystem
             ProcessPending();
         }
 
-        // ---- Popup ----
+        // ---- 팝업 ----
 
         public void RequestPopup(
             UIPopupBase prefab,
@@ -152,7 +152,7 @@ namespace GameFramework.UISystem
             _processScheduled = true;
         }
 
-        /// <summary>Typed convenience wrapper for popups that report a result (e.g. a confirm/cancel dialog).</summary>
+        /// <summary>결과를 반환하는 팝업(예: 확인/취소 다이얼로그)을 위한 타입 지정 편의 래퍼입니다.</summary>
         public void RequestPopup<TResult>(
             UIPopupBase prefab,
             EPopupPriority priority,
@@ -180,7 +180,7 @@ namespace GameFramework.UISystem
             ClosePopup(target, null);
         }
 
-        /// <summary><paramref name="result"/> is delivered to whatever onResult callback was passed to RequestPopup for this popup.</summary>
+        /// <summary><paramref name="result"/>은 이 팝업의 RequestPopup 호출 시 전달된 onResult 콜백으로 전달됩니다.</summary>
         public void ClosePopup(UIPopupBase target, object result)
         {
             if (_current != target)
@@ -202,7 +202,7 @@ namespace GameFramework.UISystem
             });
         }
 
-        /// <summary>Immediately clears the pending queue and closes the current popup (no result delivered). For scene-transition cleanup.</summary>
+        /// <summary>대기열을 즉시 비우고 현재 팝업을 닫습니다 (결과값 전달 없음). 씬 전환 시 정리용입니다.</summary>
         public void CloseAll()
         {
             _pending.Clear();
@@ -309,9 +309,9 @@ namespace GameFramework.UISystem
             _current = instance;
         }
 
-        // ---- Toast ----
+        // ---- 토스트 ----
 
-        /// <summary>Shows a non-modal, auto-dismissing toast. Multiple toasts can be visible at once and they never block input.</summary>
+        /// <summary>비모달이며 자동으로 사라지는 토스트를 표시합니다. 여러 토스트가 동시에 표시될 수 있고 입력을 절대 막지 않습니다.</summary>
         public void ShowToast(UIToastBase prefab, object payload = null, float duration = -1f)
         {
             if (prefab == null)
@@ -341,7 +341,7 @@ namespace GameFramework.UISystem
             _ = AutoHideToastAfterDelay(instance, d);
         }
 
-        /// <summary>Dismisses a toast early. Safe to call even if it already auto-hid.</summary>
+        /// <summary>토스트를 조기에 닫습니다. 이미 자동으로 사라진 뒤에 호출해도 안전합니다.</summary>
         public void HideToast(UIToastBase toast)
         {
             if (toast == null)
@@ -363,7 +363,7 @@ namespace GameFramework.UISystem
             HideToast(toast);
         }
 
-        // ---- Layout ----
+        // ---- 레이아웃 ----
 
         private void EnsureCanvasRoot()
         {

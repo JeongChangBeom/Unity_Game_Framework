@@ -347,7 +347,7 @@ namespace GameFramework.DataParsing.Editor
 
                 EditorUtility.DisplayProgressBar(
                     "DataTable Importer",
-                    "Downloading TSV: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
+                    "TSV 다운로드 중: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
                     (float)(i + 1) / targets.Count);
 
                 UnityWebRequest req = GoogleSheetUtility.BuildTsvRequest(_spreadsheetId, tab.gid);
@@ -436,7 +436,7 @@ namespace GameFramework.DataParsing.Editor
 
                 EditorUtility.DisplayProgressBar(
                     "DataTable Importer",
-                    "Refreshing: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
+                    "갱신 중: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
                     (float)(i + 1) / targets.Count);
 
                 UnityWebRequest req = GoogleSheetUtility.BuildTsvRequest(_spreadsheetId, tab.gid);

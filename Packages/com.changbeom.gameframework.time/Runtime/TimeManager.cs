@@ -9,8 +9,8 @@ namespace GameFramework.TimeSystem
     [BootPriority(-50)]
     public sealed class TimeManager : MonoSingleton<TimeManager>
     {
-        // JsonUtility can't serialize Dictionary directly, so cooldowns are converted
-        // to/from this list-shaped form only at the save/load boundary.
+        // JsonUtility는 Dictionary를 직접 직렬화할 수 없어서, 쿨타임은 저장/로드 시점에만
+        // 이 리스트 형태로 변환합니다.
         [Serializable]
         private class CooldownEntry
         {
@@ -74,8 +74,8 @@ namespace GameFramework.TimeSystem
             _lastWeeklyKey = ResetKey.GetWeeklyKey(now, _settings.DailyResetHour, _settings.WeeklyResetDay);
             _lastMonthlyKey = ResetKey.GetMonthlyKey(now, _settings.DailyResetHour);
 
-            // Make sure schema/cooldown state from this Init is actually on disk even if the
-            // app crashes before the next AutoFlush tick or cooldown mutation.
+            // 다음 AutoFlush 시점이나 쿨타임 변경 전에 앱이 크래시하더라도, 이번 Init에서의
+            // 스키마/쿨타임 상태가 확실히 디스크에 기록되도록 합니다.
             _store.Flush();
         }
 
@@ -88,7 +88,7 @@ namespace GameFramework.TimeSystem
                 return settings;
             }
 
-            Debug.LogWarning($"[TimeManager] No TimeManagerSettings asset found at Resources/{TimeManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/Time System/Time Manager Settings.");
+            Debug.LogWarning($"[TimeManager] Resources/{TimeManagerSettings.ResourcePath}에서 TimeManagerSettings 에셋을 찾지 못했습니다. 기본값을 사용합니다. Assets/Create/Game Framework/Time System/Time Manager Settings로 에셋을 만드세요.");
             return ScriptableObject.CreateInstance<TimeManagerSettings>();
         }
 
@@ -130,14 +130,14 @@ namespace GameFramework.TimeSystem
             }
         }
 
-        // ---- Mode ----
+        // ---- 모드 ----
 
         public void SetMode(TimeMode mode)
         {
             _service.Mode = mode;
         }
 
-        // ---- Offline / Cheat ----
+        // ---- 오프라인 / 치트 ----
 
         public TimeSpan GetOfflineDelta()
         {
@@ -149,7 +149,7 @@ namespace GameFramework.TimeSystem
             _cheatGuard.ClearCheatFlag();
         }
 
-        // ---- Reset keys ----
+        // ---- 리셋 키 ----
 
         public int GetDailyKey()
         {
@@ -189,7 +189,7 @@ namespace GameFramework.TimeSystem
             return TimeUtil.FormatHhMmSs(GetRemainingToDailyReset());
         }
 
-        // ---- Server sync ----
+        // ---- 서버 동기화 ----
 
         public void ApplyServerUtc(DateTimeOffset serverUtc)
         {
@@ -201,7 +201,7 @@ namespace GameFramework.TimeSystem
             _service.Server.Clear();
         }
 
-        /// <summary>True once the server sync is untrusted or will be within withinSeconds -- use this to decide when to re-sync.</summary>
+        /// <summary>서버 동기화가 이미 미신뢰 상태이거나 withinSeconds 이내에 만료될 예정이면 true입니다 -- 재동기화 시점 판단에 사용하세요.</summary>
         public bool IsServerTrustExpiringSoon(int withinSeconds)
         {
             if (!_service.Server.IsTrusted)
@@ -212,7 +212,7 @@ namespace GameFramework.TimeSystem
             return _service.Server.GetTrustRemaining().TotalSeconds <= withinSeconds;
         }
 
-        // ---- Mock (testing) ----
+        // ---- Mock (테스트용) ----
 
         public void EnableMockTime()
         {
@@ -239,7 +239,7 @@ namespace GameFramework.TimeSystem
             AddMockSeconds((long)remain.TotalSeconds + 1);
         }
 
-        // ---- Cooldown ----
+        // ---- 쿨타임 ----
 
         public bool IsCooldownReady(string id)
         {
@@ -277,7 +277,7 @@ namespace GameFramework.TimeSystem
             }
         }
 
-        /// <summary>All cooldowns that haven't finished yet, keyed by id -- handy for a UI list.</summary>
+        /// <summary>아직 끝나지 않은 모든 쿨타임을 id 기준으로 반환합니다 -- UI 목록 표시에 유용합니다.</summary>
         public IReadOnlyDictionary<string, TimeSpan> GetAllCooldownsRemaining()
         {
             Dictionary<string, TimeSpan> result = new Dictionary<string, TimeSpan>();
@@ -318,7 +318,7 @@ namespace GameFramework.TimeSystem
             _store.Flush();
         }
 
-        // ---- Lifecycle ----
+        // ---- 라이프사이클 ----
 
         private void OnApplicationPause(bool pause)
         {

@@ -2,7 +2,7 @@ using System;
 
 namespace GameFramework.TimeSystem
 {
-    /// <summary>Test-only time source: device time plus a persisted offset the caller controls.</summary>
+    /// <summary>테스트 전용 시간 소스: 기기 시간에 호출하는 쪽이 제어하는, 영구 저장되는 오프셋을 더한 값입니다.</summary>
     public sealed class MockTimeSource : ITimeSource
     {
         private readonly TimeStore _store;

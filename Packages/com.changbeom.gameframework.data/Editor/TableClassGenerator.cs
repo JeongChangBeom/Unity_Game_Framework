@@ -16,7 +16,7 @@ namespace GameFramework.DataParsing.Editor
             public EDataTableColumnType type;
             public bool isArray;
 
-            /// <summary>Fully-qualified enum type name (only set when type == Enum).</summary>
+            /// <summary>정규화된(fully-qualified) enum 타입 이름입니다 (type == Enum일 때만 설정됨).</summary>
             public string enumTypeFullName;
         }
 
@@ -65,7 +65,7 @@ namespace GameFramework.DataParsing.Editor
 
                 if (baseTypeText.StartsWith("enum:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // Enum type names are case-sensitive, so this branch must not lowercase them.
+                    // enum 타입 이름은 대소문자를 구분하므로, 이 분기에서는 소문자로 바꾸면 안 됩니다.
                     string enumTypeName = baseTypeText.Substring("enum:".Length).Trim();
 
                     Type resolvedType;
@@ -122,7 +122,7 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine("using UnityEngine;");
             sb.AppendLine("using GameFramework.DataParsing;");
             sb.AppendLine();
-            sb.AppendLine("// AUTO-GENERATED. DO NOT EDIT.");
+            sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
             sb.AppendLine("public class " + className + " : ScriptableObject");
             sb.AppendLine("{");
             sb.AppendLine("    [SerializeField] private List<Data> _table = new List<Data>();");
@@ -307,11 +307,11 @@ namespace GameFramework.DataParsing.Editor
         }
 
         /// <summary>
-        /// Finds an existing enum type by its short name across every loaded assembly.
-        /// The enum must already be defined in project code -- this never generates one.
-        /// Fails (with a clear reason) if the type doesn't exist or the name is ambiguous,
-        /// so a typo'd type reference blocks table generation instead of silently
-        /// producing a broken table.
+        /// 로드된 모든 어셈블리에서 짧은 이름으로 기존 enum 타입을 찾습니다.
+        /// enum은 반드시 프로젝트 코드에 이미 정의되어 있어야 하며, 이 메서드는 절대
+        /// enum을 생성하지 않습니다. 타입이 없거나 이름이 모호하면 (명확한 이유와 함께)
+        /// 실패하여, 오타난 타입 참조가 조용히 깨진 테이블을 만드는 대신 테이블 생성
+        /// 자체를 막습니다.
         /// </summary>
         private static bool TryFindEnumType(string enumTypeName, out Type foundType, out string error)
         {

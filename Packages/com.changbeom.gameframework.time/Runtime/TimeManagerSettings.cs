@@ -4,10 +4,9 @@ using UnityEngine;
 namespace GameFramework.TimeSystem
 {
     /// <summary>
-    /// Project-specific TimeManager configuration. Create via
-    /// Assets/Create/Game Framework/Time System/Time Manager Settings and place it at
-    /// Assets/Resources/GameFramework/TimeManagerSettings.asset so TimeManager can find it
-    /// with no scene placement required.
+    /// 프로젝트별 TimeManager 설정입니다. Assets/Create/Game Framework/Time System/Time
+    /// Manager Settings로 생성한 뒤 Assets/Resources/GameFramework/TimeManagerSettings.asset
+    /// 경로에 두면, 씬 배치 없이도 TimeManager가 찾을 수 있습니다.
     /// </summary>
     [CreateAssetMenu(
         fileName = "TimeManagerSettings",

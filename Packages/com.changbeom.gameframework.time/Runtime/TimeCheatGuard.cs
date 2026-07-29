@@ -3,9 +3,9 @@ using System;
 namespace GameFramework.TimeSystem
 {
     /// <summary>
-    /// Detects the device clock being turned backward. Small backward jumps on an untrusted
-    /// (local) source are tolerated (NTP drift etc.); anything larger, or any backward jump
-    /// while the active source is supposed to be trusted, flags cheat.
+    /// 기기 시계가 뒤로 감을 감지합니다. 미신뢰(로컬) 소스에서의 사소한 뒤로 감은
+    /// 허용되며(NTP 오차 등), 그보다 크거나 신뢰돼야 할 소스가 활성 상태일 때의
+    /// 뒤로 감은 모두 치트로 표시합니다.
     /// </summary>
     public sealed class TimeCheatGuard
     {

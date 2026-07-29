@@ -4,10 +4,9 @@ using UnityEngine.Audio;
 namespace GameFramework.SoundSystem
 {
     /// <summary>
-    /// Project-specific SoundManager configuration. Create via
-    /// Assets/Create/Game Framework/Sound System/Sound Manager Settings and place it at
-    /// Assets/Resources/GameFramework/SoundManagerSettings.asset so SoundManager can find
-    /// it with no scene placement required.
+    /// 프로젝트별 SoundManager 설정입니다. Assets/Create/Game Framework/Sound System/Sound
+    /// Manager Settings로 생성한 뒤 Assets/Resources/GameFramework/SoundManagerSettings.asset
+    /// 경로에 두면, 씬 배치 없이도 SoundManager가 찾을 수 있습니다.
     /// </summary>
     [CreateAssetMenu(
         fileName = "SoundManagerSettings",
@@ -20,7 +19,7 @@ namespace GameFramework.SoundSystem
         public int InitialPoolSize = 10;
         public int MaxPoolSize = 30;
 
-        [Header("Mixer Routing (optional -- leave empty to skip mixer routing)")]
+        [Header("Mixer Routing (선택 -- 비워두면 믹서 라우팅을 사용하지 않음)")]
         public AudioMixerGroup BgmMixerGroup;
         public AudioMixerGroup SfxMixerGroup;
         public AudioMixerGroup UiMixerGroup;

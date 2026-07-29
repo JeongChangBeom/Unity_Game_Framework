@@ -2,7 +2,7 @@ using System;
 
 namespace GameFramework.TimeSystem
 {
-    /// <summary>Start/end UTC window, e.g. for a time-limited in-game event.</summary>
+    /// <summary>시작/종료 UTC 구간입니다. 예: 기간 한정 인게임 이벤트.</summary>
     public readonly struct TimeRangeUtc
     {
         public readonly DateTimeOffset StartUtc;

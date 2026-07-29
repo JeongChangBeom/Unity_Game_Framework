@@ -72,8 +72,8 @@ namespace GameFramework.Pooling
 
             Transform t = go.transform;
 
-            // No parent given -> unparent to scene root. Pooled (inactive) instances
-            // always live under _root regardless; this only affects the active instance.
+            // parent가 없으면 -> 씬 루트로 배치합니다. 풀링된(비활성) 인스턴스는 어차피
+            // 항상 _root 아래에 있으므로, 이건 활성 인스턴스에만 영향을 줍니다.
             t.SetParent(parent, false);
 
             t.position = position;

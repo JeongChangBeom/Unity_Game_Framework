@@ -28,7 +28,7 @@ namespace GameFramework.SaveLoad
                 return settings;
             }
 
-            Debug.LogWarning($"[SaveManager] No SaveManagerSettings asset found at Resources/{SaveManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/Save Load/Save Manager Settings.");
+            Debug.LogWarning($"[SaveManager] Resources/{SaveManagerSettings.ResourcePath}에서 SaveManagerSettings 에셋을 찾지 못했습니다. 기본값을 사용합니다. Assets/Create/Game Framework/Save Load/Save Manager Settings로 에셋을 만드세요.");
             return ScriptableObject.CreateInstance<SaveManagerSettings>();
         }
 
@@ -46,7 +46,7 @@ namespace GameFramework.SaveLoad
 #if USE_ES3
                     return new ES3SaveProvider(settings.SaveFileName);
 #else
-                    Debug.LogWarning("[SaveManager] Es3 storage mode selected but USE_ES3 is not defined. Falling back to JsonFile. Install Easy Save 3 and add USE_ES3 to Scripting Define Symbols to use it.");
+                    Debug.LogWarning("[SaveManager] Es3 저장 방식이 선택되었지만 USE_ES3가 정의되어 있지 않습니다. JsonFile로 대체합니다. 사용하려면 Easy Save 3를 설치하고 Scripting Define Symbols에 USE_ES3를 추가하세요.");
                     return new JsonFileSaveProvider(settings.SaveFileName, settings.AutoRestoreOnInit);
 #endif
 

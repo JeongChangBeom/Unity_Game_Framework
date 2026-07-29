@@ -20,10 +20,10 @@ namespace GameFramework.DataParsing.Editor
         {
             string joined = string.Join("\n", payloadLines);
 
-            // SessionState (not EditorPrefs) because this is throwaway data that only
-            // needs to survive the domain reload triggered by newly-generated scripts
-            // recompiling -- EditorPrefs would persist it globally across every project
-            // on the machine, which is the wrong scope for this.
+            // EditorPrefs가 아니라 SessionState를 쓰는 이유: 이 데이터는 새로 생성된
+            // 스크립트가 재컴파일되면서 발생하는 domain reload만 버티면 되는 일회성
+            // 데이터이기 때문입니다 -- EditorPrefs는 이 머신의 모든 프로젝트에 걸쳐
+            // 전역으로 유지되므로, 여기에는 범위가 맞지 않습니다.
             SessionState.SetString(PendingKey, joined);
 
             if (!_scheduled)
@@ -69,7 +69,7 @@ namespace GameFramework.DataParsing.Editor
                 Type t = FindScriptableObjectTypeByName(className);
                 if (t == null)
                 {
-                    Debug.LogError("[GameFramework.DataParsing] Type not found: " + className);
+                    Debug.LogError("[GameFramework.DataParsing] 타입을 찾지 못했습니다: " + className);
                     continue;
                 }
 

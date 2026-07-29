@@ -73,7 +73,7 @@ namespace GameFramework.TimeSystem
             _save.Save(MakeKey(localKey), value);
         }
 
-        /// <summary>Generic passthrough for complex (JsonUtility-serializable) values, e.g. the cooldown list.</summary>
+        /// <summary>복잡한(JsonUtility로 직렬화 가능한) 값을 위한 범용 통로입니다. 예: 쿨타임 목록.</summary>
         public T LoadOrCreate<T>(string localKey, Func<T> factory, bool saveIfMissing = true)
         {
             return _save.LoadOrCreate(MakeKey(localKey), factory, saveIfMissing);

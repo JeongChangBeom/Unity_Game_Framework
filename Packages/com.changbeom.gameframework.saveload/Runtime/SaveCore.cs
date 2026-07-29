@@ -3,9 +3,9 @@ using System;
 namespace GameFramework.SaveLoad
 {
     /// <summary>
-    /// Pure C# orchestration layer: applies RootKey namespacing, dirty tracking,
-    /// SaveMeta bookkeeping, and optional backup/restore on top of whichever
-    /// ISaveProvider is active. Testable outside of Unity's MonoBehaviour lifecycle.
+    /// 순수 C# 오케스트레이션 계층입니다: 현재 활성화된 ISaveProvider 위에서 RootKey
+    /// 네임스페이싱, dirty 추적, SaveMeta 관리, 선택적 백업/복구를 처리합니다.
+    /// Unity의 MonoBehaviour 생명주기와 무관하게 테스트할 수 있습니다.
     /// </summary>
     public sealed class SaveCore
     {

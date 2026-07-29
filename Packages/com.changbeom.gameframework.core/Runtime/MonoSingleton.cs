@@ -32,8 +32,8 @@ namespace GameFramework.Core
         private bool _initialized;
 
         /// <summary>
-        /// Override to return false if this singleton should NOT survive scene loads.
-        /// Defaults to true, matching typical manager behavior.
+        /// 씬 전환 시 이 싱글톤이 파괴되어야 한다면 false를 반환하도록 오버라이드하세요.
+        /// 기본값은 true이며, 일반적인 매니저 동작 방식과 동일합니다.
         /// </summary>
         protected virtual bool ShouldPersistAcrossScenes => true;
 
@@ -59,7 +59,7 @@ namespace GameFramework.Core
                     return _instance;
                 }
 
-                Debug.Log($"[MonoSingleton] Auto-creating {typeof(T).Name} (no instance was placed in the scene). Add [BootPriority] to the class if it needs to initialize before/after other managers.");
+                Debug.Log($"[MonoSingleton] {typeof(T).Name}을(를) 자동 생성합니다 (씬에 배치된 인스턴스가 없음). 다른 매니저보다 먼저/나중에 초기화돼야 한다면 클래스에 [BootPriority]를 추가하세요.");
 
                 GameObject go = new GameObject(typeof(T).Name);
                 _instance = go.AddComponent<T>();

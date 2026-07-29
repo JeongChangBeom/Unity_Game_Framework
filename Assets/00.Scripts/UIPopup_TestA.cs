@@ -18,8 +18,6 @@ public class UIPopup_TestA : UIPopupBase
 
         if (_closeButton != null)
         {
-            // Demonstrates the result-callback path: closing via this button reports `true`
-            // back to whatever RequestPopup<TResult> caller opened this popup.
             _onCloseButtonClicked = () => CloseSelf(true);
             _closeButton.onClick.AddListener(_onCloseButtonClicked);
         }

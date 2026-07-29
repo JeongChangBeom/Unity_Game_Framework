@@ -17,7 +17,7 @@ namespace GameFramework.UISystem
 
         public object CachedPayload { get; private set; }
 
-        /// <summary>False to ignore the back button / Escape key (e.g. a mandatory confirmation popup).</summary>
+        /// <summary>뒤로가기 / Escape 키를 무시하려면 false로 설정하세요 (예: 반드시 확인해야 하는 팝업).</summary>
         public virtual bool CloseableByBackButton => true;
 
         private Action _onClosed;
@@ -126,13 +126,13 @@ namespace GameFramework.UISystem
         void IPoolable.OnSpawn() => OnAfterGetFromPool();
         void IPoolable.OnDespawn() => OnBeforeReturnToPool();
 
-        /// <summary>Closes this popup with no result. Kept parameterless so it can be wired directly to a UnityEvent (e.g. Button.onClick).</summary>
+        /// <summary>결과값 없이 이 팝업을 닫습니다. UnityEvent(예: Button.onClick)에 바로 연결할 수 있도록 매개변수 없이 유지합니다.</summary>
         public void CloseSelf()
         {
             CloseSelf(null);
         }
 
-        /// <summary>Closes this popup. <paramref name="result"/> reaches the RequestPopup caller's onResult callback, if one was given.</summary>
+        /// <summary>이 팝업을 닫습니다. <paramref name="result"/>는 onResult 콜백이 주어졌다면 RequestPopup 호출자에게 전달됩니다.</summary>
         public void CloseSelf(object result)
         {
             if (UIManager.Instance == null)

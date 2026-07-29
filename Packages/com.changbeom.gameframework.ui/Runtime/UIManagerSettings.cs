@@ -3,10 +3,9 @@ using UnityEngine;
 namespace GameFramework.UISystem
 {
     /// <summary>
-    /// Project-specific UIManager configuration. Create via
-    /// Assets/Create/Game Framework/UI System/UI Manager Settings and place it at
-    /// Assets/Resources/GameFramework/UIManagerSettings.asset so UIManager can find
-    /// it with no scene placement required.
+    /// 프로젝트별 UIManager 설정입니다. Assets/Create/Game Framework/UI System/UI Manager
+    /// Settings로 생성한 뒤 Assets/Resources/GameFramework/UIManagerSettings.asset
+    /// 경로에 두면, 씬 배치 없이도 UIManager가 찾을 수 있습니다.
     /// </summary>
     [CreateAssetMenu(
         fileName = "UIManagerSettings",

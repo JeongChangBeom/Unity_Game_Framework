@@ -10,7 +10,7 @@ namespace GameFramework.DataParsing
         private readonly Dictionary<Type, ScriptableObject> _cache = new Dictionary<Type, ScriptableObject>();
 
         /// <summary>
-        /// Loads (and caches) a generated table by convention: Resources/GeneratedTables/{typeof(T).Name}.
+        /// 관례 경로 Resources/GeneratedTables/{typeof(T).Name}에서 생성된 테이블을 로드하고 캐싱합니다.
         /// </summary>
         public T GetTable<T>() where T : ScriptableObject
         {
@@ -23,7 +23,7 @@ namespace GameFramework.DataParsing
 
             if (loaded == null)
             {
-                Debug.LogError($"[DataManager] Table asset not found at Resources/GeneratedTables/{typeof(T).Name}.");
+                Debug.LogError($"[DataManager] Resources/GeneratedTables/{typeof(T).Name}에서 테이블 에셋을 찾지 못했습니다.");
                 return null;
             }
 

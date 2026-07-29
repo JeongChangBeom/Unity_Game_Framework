@@ -3,7 +3,7 @@ using System.Collections.Generic;
 namespace GameFramework.SaveLoad
 {
     /// <summary>
-    /// Non-persistent provider (Editor/PlayMode tests, or short-lived sessions). Data is lost on process exit.
+    /// 영구 저장하지 않는 provider (Editor/PlayMode 테스트나 짧은 세션용). 프로세스가 종료되면 데이터가 사라집니다.
     /// </summary>
     public sealed class MemorySaveProvider : ISaveProvider
     {

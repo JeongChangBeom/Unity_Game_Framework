@@ -6,10 +6,10 @@ using UnityEngine;
 namespace GameFramework.SaveLoad
 {
     /// <summary>
-    /// Stores every key in a single JSON file under Application.persistentDataPath, using
-    /// only UnityEngine.JsonUtility (no external JSON library). Writes are atomic (temp
-    /// file + File.Replace) and automatically keep a ".bak" copy of the previous good
-    /// file, so a crash mid-write cannot corrupt both copies at once.
+    /// 모든 키를 Application.persistentDataPath 아래 JSON 파일 하나에 저장하며,
+    /// 외부 JSON 라이브러리 없이 UnityEngine.JsonUtility만 사용합니다. 쓰기는 원자적으로
+    /// (임시 파일 + File.Replace) 처리되고, 이전 정상 파일을 ".bak"으로 자동 보관하므로
+    /// 쓰는 도중 크래시가 나도 두 사본이 동시에 손상되지 않습니다.
     /// </summary>
     public sealed class JsonFileSaveProvider : ISaveProvider, ISaveBackupProvider
     {
@@ -37,7 +37,7 @@ namespace GameFramework.SaveLoad
         {
             if (string.IsNullOrWhiteSpace(fileName))
             {
-                throw new ArgumentException("fileName is null or empty.", nameof(fileName));
+                throw new ArgumentException("fileName이 null이거나 비어 있습니다.", nameof(fileName));
             }
 
             _filePath = Path.Combine(Application.persistentDataPath, fileName);
@@ -139,22 +139,22 @@ namespace GameFramework.SaveLoad
 
             if (!_autoRestoreOnInit)
             {
-                Debug.LogError($"[JsonFileSaveProvider] Primary save file missing or corrupted ({_filePath}). Auto-restore is disabled, starting with an empty save.");
+                Debug.LogError($"[JsonFileSaveProvider] 저장 파일이 없거나 손상되었습니다 ({_filePath}). 자동 복구가 꺼져 있어 빈 저장 데이터로 시작합니다.");
                 _data = new Dictionary<string, string>();
                 return;
             }
 
-            Debug.LogWarning($"[JsonFileSaveProvider] Primary save file missing or corrupted ({_filePath}). Trying backup ({_backupPath}).");
+            Debug.LogWarning($"[JsonFileSaveProvider] 저장 파일이 없거나 손상되었습니다 ({_filePath}). 백업 파일을 시도합니다 ({_backupPath}).");
             Dictionary<string, string> restored = Deserialize(SafeReadAllText(_backupPath));
 
             if (restored != null)
             {
-                Debug.LogWarning("[JsonFileSaveProvider] Restored from backup file.");
+                Debug.LogWarning("[JsonFileSaveProvider] 백업 파일에서 복구했습니다.");
                 _data = restored;
                 return;
             }
 
-            Debug.LogError("[JsonFileSaveProvider] No usable save data found in primary or backup. Starting with an empty save.");
+            Debug.LogError("[JsonFileSaveProvider] 원본과 백업 모두에서 사용 가능한 저장 데이터를 찾지 못했습니다. 빈 저장 데이터로 시작합니다.");
             _data = new Dictionary<string, string>();
         }
 
@@ -171,7 +171,7 @@ namespace GameFramework.SaveLoad
             }
             catch (Exception e)
             {
-                Debug.LogError($"[JsonFileSaveProvider] Read failed for {path}: {e}");
+                Debug.LogError($"[JsonFileSaveProvider] {path} 읽기 실패: {e}");
                 return null;
             }
         }
@@ -204,7 +204,7 @@ namespace GameFramework.SaveLoad
             }
             catch (Exception e)
             {
-                Debug.LogError($"[JsonFileSaveProvider] Parse failed: {e}");
+                Debug.LogError($"[JsonFileSaveProvider] 파싱 실패: {e}");
                 return null;
             }
         }
@@ -237,8 +237,8 @@ namespace GameFramework.SaveLoad
 
                 if (File.Exists(_filePath))
                 {
-                    // Atomically swaps tempPath in as the new file while moving the previous
-                    // good file to _backupPath in the same operation (self-healing on crash).
+                    // tempPath를 새 파일로 원자적으로 교체하면서, 동시에 이전 정상 파일을
+                    // _backupPath로 옮깁니다 (크래시가 나도 스스로 복구 가능).
                     File.Replace(tempPath, _filePath, _backupPath);
                 }
                 else
@@ -248,7 +248,7 @@ namespace GameFramework.SaveLoad
             }
             catch (Exception e)
             {
-                Debug.LogError($"[JsonFileSaveProvider] Save failed: {e}");
+                Debug.LogError($"[JsonFileSaveProvider] 저장 실패: {e}");
             }
         }
     }

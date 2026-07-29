@@ -5,12 +5,12 @@ using UnityEngine;
 namespace GameFramework.SaveLoad
 {
     /// <summary>
-    /// Wraps Easy Save 3. Requires the ES3 asset installed and USE_ES3 added to
-    /// Project Settings -> Player -> Scripting Define Symbols.
+    /// Easy Save 3를 감싸는 provider. ES3 에셋 설치 + Project Settings -> Player ->
+    /// Scripting Define Symbols에 USE_ES3 추가가 필요합니다.
     ///
-    /// NOTE: written without the ES3 asset installed in this project, so the exact
-    /// API surface (ES3.Save/Load/KeyExists/DeleteKey) is based on ES3's documented
-    /// conventions. Re-check against your installed ES3 version once USE_ES3 is enabled.
+    /// 참고: 이 프로젝트에는 ES3 에셋이 설치되지 않은 상태로 작성되어, 실제 API 형태
+    /// (ES3.Save/Load/KeyExists/DeleteKey)는 ES3 공식 문서상의 관례를 기준으로 했습니다.
+    /// USE_ES3를 활성화하면 실제로 설치한 ES3 버전과 맞는지 다시 확인하세요.
     /// </summary>
     public sealed class ES3SaveProvider : ISaveProvider, ISaveBackupProvider
     {
@@ -60,7 +60,7 @@ namespace GameFramework.SaveLoad
 
         public void Flush()
         {
-            // ES3 writes through on every Save call; nothing to flush explicitly.
+            // ES3는 Save 호출마다 즉시 기록하므로, 별도로 flush할 것이 없습니다.
         }
 
         public bool HasBackup()

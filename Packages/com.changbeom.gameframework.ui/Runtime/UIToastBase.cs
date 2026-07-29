@@ -5,8 +5,8 @@ using UnityEngine;
 namespace GameFramework.UISystem
 {
     /// <summary>
-    /// Non-modal, auto-dismissing notification (e.g. "Item obtained"). Unlike UIPopupBase,
-    /// multiple toasts can be visible at once and they never block input.
+    /// 비모달이며 자동으로 사라지는 알림입니다 (예: "아이템 획득"). UIPopupBase와 달리
+    /// 여러 토스트가 동시에 표시될 수 있고 입력을 절대 막지 않습니다.
     /// </summary>
     public abstract class UIToastBase : MonoBehaviour, IPoolable
     {
@@ -33,7 +33,7 @@ namespace GameFramework.UISystem
             // 표시 연출이 끝난 뒤 추가 처리가 필요하면 override 하세요.
         }
 
-        /// <summary>Called by UIManager. Plays the hide animation, then invokes onHidden (which despawns this toast).</summary>
+        /// <summary>UIManager가 호출합니다. 숨김 연출을 재생한 뒤 onHidden을 호출합니다 (이 토스트를 디스폰합니다).</summary>
         public void RequestHide(Action onHidden)
         {
             _onHidden = onHidden;
@@ -69,7 +69,7 @@ namespace GameFramework.UISystem
         void IPoolable.OnSpawn() => OnAfterGetFromPool();
         void IPoolable.OnDespawn() => OnBeforeReturnToPool();
 
-        /// <summary>Dismisses this toast early (e.g. a tap-to-dismiss button), instead of waiting for its auto-hide timer.</summary>
+        /// <summary>자동 숨김 타이머를 기다리지 않고 이 토스트를 즉시 닫습니다 (예: 탭해서 닫기 버튼).</summary>
         public void HideSelf()
         {
             if (UIManager.Instance == null)

@@ -5,9 +5,9 @@ using UnityEngine;
 namespace GameFramework.UISystem
 {
     /// <summary>
-    /// Placeholder scale animation used as the framework's default open/close/show/hide feedback.
-    /// It exists so every popup/toast has *some* feedback out of the box -- it is meant to be
-    /// replaced with your own animation code at each PlayXAnimation() call site.
+    /// 프레임워크의 기본 open/close/show/hide 연출로 사용되는 임시 스케일 애니메이션입니다.
+    /// 모든 팝업/토스트가 기본으로 *어떤* 연출이라도 갖도록 하기 위한 것이며, 각
+    /// PlayXAnimation() 호출부에서 원하는 애니메이션 코드로 교체하는 것을 전제로 합니다.
     /// </summary>
     internal static class DefaultUIAnimation
     {

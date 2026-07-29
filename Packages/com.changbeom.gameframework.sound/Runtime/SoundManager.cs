@@ -51,7 +51,7 @@ namespace GameFramework.SoundSystem
                 return settings;
             }
 
-            Debug.LogWarning($"[SoundManager] No SoundManagerSettings asset found at Resources/{SoundManagerSettings.ResourcePath}. Using defaults. Create one via Assets/Create/Game Framework/Sound System/Sound Manager Settings.");
+            Debug.LogWarning($"[SoundManager] Resources/{SoundManagerSettings.ResourcePath}에서 SoundManagerSettings 에셋을 찾지 못했습니다. 기본값을 사용합니다. Assets/Create/Game Framework/Sound System/Sound Manager Settings로 에셋을 만드세요.");
             return ScriptableObject.CreateInstance<SoundManagerSettings>();
         }
 
@@ -61,7 +61,7 @@ namespace GameFramework.SoundSystem
 
             if (database == null)
             {
-                Debug.LogError($"[SoundManager] No SoundDatabaseSO found at Resources/{SoundDatabaseSO.ResourcePath}. Build it via Game Framework/Sound System/Build Sound Database From Sheet + Folder. PlaySound will do nothing until then.");
+                Debug.LogError($"[SoundManager] Resources/{SoundDatabaseSO.ResourcePath}에서 SoundDatabaseSO를 찾지 못했습니다. Game Framework/Sound System/Build Sound Database From Sheet + Folder로 빌드하세요. 빌드 전까지 PlaySound는 아무 동작도 하지 않습니다.");
             }
 
             return database;
@@ -118,11 +118,11 @@ namespace GameFramework.SoundSystem
 
         private void OnOneShotReturned(ESound finishedId)
         {
-            // This is the single authoritative place a one-shot is known to have actually
-            // finished (Tick() owns the pool's IsFinished() polling) -- ending a duck here,
-            // instead of a second polling loop inside PlayOneShot, avoids a race where the
-            // pool could recycle the SoundPlayer for a new sound before a second poller
-            // notices the original one finished.
+            // 원샷 사운드가 실제로 끝났다는 것을 확실히 아는 유일한 지점입니다
+            // (Tick()이 풀의 IsFinished() 폴링을 담당합니다) -- PlayOneShot 안에 별도의
+            // 폴링 루프를 두는 대신 여기서 덕킹을 종료하면, 두 번째 폴러가 원래 사운드가
+            // 끝난 걸 알아채기 전에 풀이 SoundPlayer를 새 사운드용으로 재활용해버리는
+            // 경쟁 상태를 피할 수 있습니다.
             if (_settings.DuckBgmOnVoice && _database != null &&
                 _database.TryGet(finishedId, out SoundDatabaseSO.Entry entry) &&
                 entry.channel == ESoundChannel.Voice)
@@ -131,7 +131,7 @@ namespace GameFramework.SoundSystem
             }
         }
 
-        // ---- Playback ----
+        // ---- 재생 ----
 
         public void PlaySound(ESound id)
         {
@@ -142,7 +142,7 @@ namespace GameFramework.SoundSystem
 
             if (!_database.TryGet(id, out SoundDatabaseSO.Entry entry))
             {
-                Debug.LogWarning($"[SoundManager] No SoundDatabaseSO entry for {id}.");
+                Debug.LogWarning($"[SoundManager] {id}에 대한 SoundDatabaseSO 항목이 없습니다.");
                 return;
             }
 
@@ -223,7 +223,7 @@ namespace GameFramework.SoundSystem
             player.Play(id, entry.channel, clip, ComputeVolume(entry.channel, entry.defaultVolume), 1f, entry.loop);
         }
 
-        /// <summary>Stops every currently-playing instance of this sound (BGM or one-shot).</summary>
+        /// <summary>이 사운드가 현재 재생 중인 모든 인스턴스를 정지합니다 (BGM 또는 원샷).</summary>
         public void StopSound(ESound id)
         {
             if (id == ESound.None)
@@ -252,14 +252,14 @@ namespace GameFramework.SoundSystem
             _pool.StopAll();
         }
 
-        /// <summary>Stops everything currently playing: BGM and every active one-shot.</summary>
+        /// <summary>현재 재생 중인 모든 것을 정지합니다: BGM과 활성 중인 모든 원샷.</summary>
         public void StopAll()
         {
             StopBgm();
             StopAllOneShots();
         }
 
-        // ---- Volume ----
+        // ---- 볼륨 ----
 
         public void SetMasterVolume(float volume)
         {
@@ -312,7 +312,7 @@ namespace GameFramework.SoundSystem
             return _volumeSettings.master * _volumeSettings.Get(channel) * entryDefaultVolume;
         }
 
-        // ---- Ducking ----
+        // ---- 덕킹 ----
 
         private void BeginDuck()
         {
@@ -330,7 +330,7 @@ namespace GameFramework.SoundSystem
             }
         }
 
-        // ---- Helpers ----
+        // ---- 헬퍼 ----
 
         private int CountActive(ESound id)
         {

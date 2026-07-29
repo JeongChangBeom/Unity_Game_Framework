@@ -5,12 +5,12 @@ using UnityEngine;
 namespace GameFramework.DataParsing
 {
     /// <summary>
-    /// Shared cell-value parsing used by generated table classes. Centralizing this here
-    /// means a parsing fix applies to every already-generated table without regenerating
-    /// them, and keeps the generated code itself short.
+    /// 생성된 테이블 클래스들이 공용으로 사용하는 셀 값 파싱입니다. 이렇게 한 곳에 모아두면
+    /// 이미 생성된 모든 테이블을 재생성하지 않고도 파싱 수정 사항이 적용되고, 생성되는
+    /// 코드 자체도 짧게 유지됩니다.
     ///
-    /// Arrays use a single comma as the element delimiter (e.g. "1,2,3"). An empty string
-    /// parses to an empty (not null) array.
+    /// 배열은 콤마 하나를 요소 구분자로 사용합니다 (예: "1,2,3"). 빈 문자열은 (null이 아닌)
+    /// 빈 배열로 파싱됩니다.
     /// </summary>
     public static class TableValueParser
     {
@@ -186,11 +186,10 @@ namespace GameFramework.DataParsing
         }
 
         /// <summary>
-        /// Parses a sheet cell into an enum value. Unlike the primitive Parse* methods,
-        /// a value that doesn't match any enum member is treated as a sheet-authoring
-        /// mistake: it's logged as an ERROR (not a warning) with the exact table/row/value
-        /// so it can't be missed, and the field falls back to default(T) rather than
-        /// silently looking like valid data.
+        /// 시트 셀을 enum 값으로 파싱합니다. 기본 Parse* 메서드들과 달리, 어떤 enum
+        /// 멤버와도 일치하지 않는 값은 시트 작성 실수로 간주합니다: 놓치지 않도록
+        /// (warning이 아니라) ERROR로 정확한 테이블/행/값과 함께 로그를 남기고, 필드는
+        /// 조용히 유효한 데이터처럼 보이는 대신 default(T)로 대체됩니다.
         /// </summary>
         public static T ParseEnum<T>(string raw, string context) where T : struct, Enum
         {

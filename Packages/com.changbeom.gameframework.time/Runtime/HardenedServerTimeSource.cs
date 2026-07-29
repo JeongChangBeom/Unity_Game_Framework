@@ -3,16 +3,16 @@ using System;
 namespace GameFramework.TimeSystem
 {
     /// <summary>
-    /// Server time anchored to a monotonic (wall-clock-independent) counter, so changing the
-    /// device's OS clock after sync cannot fool it. Trust expires after a configurable window
-    /// since the last successful sync.
+    /// 모노토닉(실제 시계와 무관한) 카운터에 앵커링된 서버 시간입니다. 동기화 이후
+    /// 기기의 OS 시계를 바꿔도 속일 수 없습니다. 마지막으로 동기화에 성공한 뒤 설정된
+    /// 유효 기간이 지나면 신뢰가 만료됩니다.
     ///
-    /// The monotonic clock is OS-uptime-based, so trust correctly survives the app being
-    /// closed and reopened. It does NOT survive a device reboot -- the clock resets to a
-    /// small value, which is smaller than the persisted sync reading, so IsTrusted
-    /// deliberately reports false until the next ApplyServerUtc. This is intentional: after
-    /// a reboot there's no way to verify how much wall-clock time actually passed, so
-    /// falling back to "untrusted, please resync" is the safe choice.
+    /// 모노토닉 클럭은 OS 부팅 이후 누적 시간 기준이라, 앱을 껐다 켜도 신뢰 상태가
+    /// 올바르게 유지됩니다. 다만 기기 재부팅에는 살아남지 못합니다 -- 클럭이 작은 값으로
+    /// 리셋되어 저장된 동기화 값보다 작아지므로, 다음 ApplyServerUtc 전까지 IsTrusted가
+    /// 의도적으로 false를 반환합니다. 이는 의도된 동작입니다: 재부팅 후에는 실제로
+    /// 얼마만큼의 시간이 지났는지 검증할 방법이 없으므로, "미신뢰, 재동기화 필요" 상태로
+    /// 안전하게 대체하는 것입니다.
     /// </summary>
     public sealed class HardenedServerTimeSource : ITimeSource
     {
@@ -113,9 +113,9 @@ namespace GameFramework.TimeSystem
         }
 
         /// <summary>
-        /// How much longer the current sync stays trusted. Zero if already untrusted.
-        /// Use this to decide when to proactively re-sync with the server (e.g. call
-        /// ApplyServerUtc again when this drops below a few minutes).
+        /// 현재 동기화가 앞으로 얼마나 더 신뢰되는지 나타냅니다. 이미 미신뢰 상태면 0입니다.
+        /// 서버와 선제적으로 재동기화할 시점을 판단하는 데 사용하세요 (예: 이 값이 몇 분
+        /// 이하로 떨어지면 ApplyServerUtc를 다시 호출).
         /// </summary>
         public TimeSpan GetTrustRemaining()
         {

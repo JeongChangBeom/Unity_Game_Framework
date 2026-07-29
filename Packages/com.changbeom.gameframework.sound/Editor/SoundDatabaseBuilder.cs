@@ -19,21 +19,21 @@ namespace GameFramework.SoundSystem.Editor
             SoundDatabaseSO database = FindSingleAsset<SoundDatabaseSO>();
             if (database == null)
             {
-                Debug.LogError("SoundDatabaseSO not found. Create one: Assets/Create/Game Framework/Sound System/Sound Database, saved under Assets/Resources/GameFramework/.");
+                Debug.LogError("SoundDatabaseSO를 찾지 못했습니다. Assets/Create/Game Framework/Sound System/Sound Database로 생성한 뒤 Assets/Resources/GameFramework/ 아래에 저장하세요.");
                 return;
             }
 
             ScriptableObject soundTable = FindSoundTableSo();
             if (soundTable == null)
             {
-                Debug.LogError("Sound table SO not found. Make sure Data Parsing generated a Sound table SO (e.g., SoundTable or Sound).");
+                Debug.LogError("Sound 테이블 SO를 찾지 못했습니다. Data Parsing으로 Sound 테이블 SO(예: SoundTable 또는 Sound)를 생성했는지 확인하세요.");
                 return;
             }
 
             List<Row> rows = ExtractRows(soundTable);
             if (rows.Count == 0)
             {
-                Debug.LogError("No rows extracted from Sound table. Need fields: FileName, Channel, DefaultVolume, MaxConcurrent, Loop.");
+                Debug.LogError("Sound 테이블에서 추출된 행이 없습니다. FileName, Channel, DefaultVolume, MaxConcurrent, Loop 필드가 필요합니다.");
                 return;
             }
 
@@ -48,7 +48,7 @@ namespace GameFramework.SoundSystem.Editor
                 bool parsed = EnumTryParse(r.fileName, out id);
                 if (parsed == false)
                 {
-                    Debug.LogWarning("[SoundDatabaseBuilder] FileName is not a valid ESound enum name: " + r.fileName);
+                    Debug.LogWarning("[SoundDatabaseBuilder] FileName이 유효한 ESound enum 이름이 아닙니다: " + r.fileName);
                     continue;
                 }
 
@@ -70,7 +70,7 @@ namespace GameFramework.SoundSystem.Editor
 
                 if (string.IsNullOrEmpty(clipAssetPath))
                 {
-                    Debug.LogWarning("[SoundDatabaseBuilder] Clip not found in folder. FileName: " + e.fileName);
+                    Debug.LogWarning("[SoundDatabaseBuilder] 폴더에서 클립을 찾지 못했습니다. FileName: " + e.fileName);
                     continue;
                 }
 
@@ -83,7 +83,7 @@ namespace GameFramework.SoundSystem.Editor
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
 
-            Debug.Log("[SoundDatabaseBuilder] Build completed. Entries: " + entries.Count);
+            Debug.Log("[SoundDatabaseBuilder] 빌드 완료. Entries: " + entries.Count);
         }
 
         private static Dictionary<string, string> ScanSoundFolder(string folder)
@@ -115,7 +115,7 @@ namespace GameFramework.SoundSystem.Editor
             AddressableAssetSettings settings = AddressableAssetSettingsDefaultObject.Settings;
             if (settings == null)
             {
-                Debug.LogError("AddressableAssetSettings not found. Create Addressables settings first.");
+                Debug.LogError("AddressableAssetSettings를 찾지 못했습니다. 먼저 Addressables 설정을 생성하세요.");
                 return;
             }
 

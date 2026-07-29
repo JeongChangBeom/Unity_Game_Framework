@@ -8,8 +8,8 @@ namespace GameFramework.TimeSystem
     }
 
     /// <summary>
-    /// Wall-clock-independent timer (System.Diagnostics.Stopwatch), used to anchor server
-    /// time trust so that changing the device's OS clock can't fool it.
+    /// 실제 시계와 무관한 타이머(System.Diagnostics.Stopwatch)로, 서버 시간 신뢰를
+    /// 앵커링해서 기기의 OS 시계를 바꿔도 속일 수 없게 만드는 데 사용합니다.
     /// </summary>
     public sealed class StopwatchMonotonicClock : IMonotonicClock
     {
