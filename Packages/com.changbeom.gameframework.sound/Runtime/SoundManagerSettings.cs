@@ -15,6 +15,10 @@ namespace GameFramework.SoundSystem
     {
         public const string ResourcePath = "GameFramework/SoundManagerSettings";
 
+        [Header("Sound Table")]
+        [Tooltip("Data Parsing으로 생성된 Sound 테이블의 Resources 경로입니다 (기본: GeneratedTables/SoundTable). 시트 탭 이름을 다르게 지어서 클래스 이름이 달라졌다면 여기를 맞춰주세요.")]
+        public string SoundTableResourcePath = "GeneratedTables/SoundTable";
+
         [Header("Pool")]
         public int InitialPoolSize = 10;
         public int MaxPoolSize = 30;

@@ -14,10 +14,10 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   InitialPoolSize: 10
   MaxPoolSize: 30
-  BgmMixerGroup: {fileID: 0}
-  SfxMixerGroup: {fileID: 0}
-  UiMixerGroup: {fileID: 0}
-  VoiceMixerGroup: {fileID: 0}
+  BgmMixerGroup: {fileID: -2812075003987620278, guid: 1e08a2f9a4c11ed40948a29dbd2db593, type: 2}
+  SfxMixerGroup: {fileID: -4657167606012934419, guid: 1e08a2f9a4c11ed40948a29dbd2db593, type: 2}
+  UiMixerGroup: {fileID: -1988038830650323456, guid: 1e08a2f9a4c11ed40948a29dbd2db593, type: 2}
+  VoiceMixerGroup: {fileID: 8373625990303728281, guid: 1e08a2f9a4c11ed40948a29dbd2db593, type: 2}
   BgmCrossfadeSeconds: 0.5
   DuckBgmOnVoice: 1
   DuckedBgmVolumeScale: 0.3

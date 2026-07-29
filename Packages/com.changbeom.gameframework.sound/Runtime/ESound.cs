@@ -5,4 +5,5 @@ public enum ESound
     None = 0,
     BGM_Test,
     SFX_Test,
+    BGM_Dummy,
 }

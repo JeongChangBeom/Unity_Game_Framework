@@ -1,4 +1,7 @@
+using System;
+using System.Collections;
 using System.Collections.Generic;
+using System.Reflection;
 using GameFramework.Core;
 using GameFramework.SaveLoad;
 using UnityEngine;
@@ -9,11 +12,25 @@ namespace GameFramework.SoundSystem
 {
     public sealed class SoundManager : MonoSingleton<SoundManager>
     {
+        // Data Parsing이 생성하는 Sound 테이블(SoundTable)은 프로젝트 쪽 어셈블리에 있어서
+        // 이 패키지가 타입으로 직접 참조할 수 없습니다 (패키지는 프로젝트를 참조할 수 없음).
+        // 그래서 부팅 시 1회, ScriptableObject로만 로드해 리플렉션으로 필드를 읽고
+        // ESound 기준 Dictionary로 캐싱해둡니다. 이후 조회는 전부 이 캐시로만 처리되므로
+        // 런타임 리플렉션 비용은 부팅 시 1회로 끝납니다.
+        private struct SoundEntry
+        {
+            public ESoundChannel channel;
+            public string fileName;
+            public float defaultVolume;
+            public int maxConcurrent;
+            public bool loop;
+        }
+
         private const string SettingsDomain = "settings";
         private const string SoundSettingsKey = "sound";
 
         private SoundManagerSettings _settings;
-        private SoundDatabaseSO _database;
+        private Dictionary<ESound, SoundEntry> _soundData;
         private SoundSettingsData _volumeSettings;
         private SoundPlayerPool _pool;
 
@@ -30,7 +47,7 @@ namespace GameFramework.SoundSystem
         protected override void OnInitialize()
         {
             _settings = LoadSettings();
-            _database = LoadDatabase();
+            _soundData = LoadSoundData(_settings.SoundTableResourcePath);
 
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(SoundSettingsKey);
             _volumeSettings = SaveManager.Instance.LoadOrCreate(key, () => new SoundSettingsData(), saveIfMissing: true);
@@ -55,16 +72,87 @@ namespace GameFramework.SoundSystem
             return ScriptableObject.CreateInstance<SoundManagerSettings>();
         }
 
-        private static SoundDatabaseSO LoadDatabase()
+        private static Dictionary<ESound, SoundEntry> LoadSoundData(string resourcePath)
         {
-            SoundDatabaseSO database = Resources.Load<SoundDatabaseSO>(SoundDatabaseSO.ResourcePath);
+            Dictionary<ESound, SoundEntry> data = new Dictionary<ESound, SoundEntry>();
 
-            if (database == null)
+            ScriptableObject table = Resources.Load<ScriptableObject>(resourcePath);
+            if (table == null)
             {
-                Debug.LogError($"[SoundManager] Resources/{SoundDatabaseSO.ResourcePath}에서 SoundDatabaseSO를 찾지 못했습니다. Game Framework/Sound System/Build Sound Database From Sheet + Folder로 빌드하세요. 빌드 전까지 PlaySound는 아무 동작도 하지 않습니다.");
+                Debug.LogError($"[SoundManager] Resources/{resourcePath}에서 Sound 테이블을 찾지 못했습니다. Data Parsing으로 Sound 시트를 생성했는지 확인하세요. 생성 전까지 PlaySound는 아무 동작도 하지 않습니다.");
+                return data;
             }
 
-            return database;
+            Type tableType = table.GetType();
+            PropertyInfo tableProp = tableType.GetProperty("Table", BindingFlags.Public | BindingFlags.Instance);
+
+            if (tableProp == null || !(tableProp.GetValue(table) is IEnumerable rows))
+            {
+                Debug.LogError($"[SoundManager] {tableType.Name}에서 Table 프로퍼티를 찾지 못했습니다.");
+                return data;
+            }
+
+            foreach (object row in rows)
+            {
+                if (row == null)
+                {
+                    continue;
+                }
+
+                Type rowType = row.GetType();
+
+                string fileName = GetFieldValue<string>(rowType, row, "fileName");
+                if (string.IsNullOrEmpty(fileName))
+                {
+                    continue;
+                }
+
+                if (!Enum.TryParse(fileName, out ESound id) || !Enum.IsDefined(typeof(ESound), id))
+                {
+                    Debug.LogWarning($"[SoundManager] FileName \"{fileName}\"에 해당하는 ESound 멤버가 없습니다. Game Framework/Sound System/Generate ESound + Register Addressables로 다시 생성해보세요.");
+                    continue;
+                }
+
+                string channelRaw = GetFieldValue<string>(rowType, row, "channel");
+
+                data[id] = new SoundEntry
+                {
+                    channel = ParseChannel(channelRaw),
+                    fileName = fileName,
+                    defaultVolume = GetFieldValue<float>(rowType, row, "defaultVolume"),
+                    maxConcurrent = GetFieldValue<int>(rowType, row, "maxConcurrent"),
+                    loop = GetFieldValue<bool>(rowType, row, "loop"),
+                };
+            }
+
+            return data;
+        }
+
+        private static T GetFieldValue<T>(Type type, object instance, string fieldName)
+        {
+            FieldInfo field = type.GetField(fieldName, BindingFlags.Public | BindingFlags.Instance);
+
+            if (field == null || !(field.GetValue(instance) is T value))
+            {
+                return default;
+            }
+
+            return value;
+        }
+
+        private static ESoundChannel ParseChannel(string raw)
+        {
+            if (string.IsNullOrEmpty(raw))
+            {
+                return ESoundChannel.SFX;
+            }
+
+            if (raw.Equals("BGM", StringComparison.OrdinalIgnoreCase)) return ESoundChannel.BGM;
+            if (raw.Equals("SFX", StringComparison.OrdinalIgnoreCase)) return ESoundChannel.SFX;
+            if (raw.Equals("UI", StringComparison.OrdinalIgnoreCase)) return ESoundChannel.UI;
+            if (raw.Equals("Voice", StringComparison.OrdinalIgnoreCase)) return ESoundChannel.Voice;
+
+            return ESoundChannel.SFX;
         }
 
         private AudioSource CreateBgmSource()
@@ -89,12 +177,12 @@ namespace GameFramework.SoundSystem
 
             foreach (ESound id in _settings.PreloadSounds)
             {
-                if (id == ESound.None || _database == null)
+                if (id == ESound.None)
                 {
                     continue;
                 }
 
-                if (!_database.TryGet(id, out SoundDatabaseSO.Entry entry))
+                if (!_soundData.TryGetValue(id, out SoundEntry entry))
                 {
                     continue;
                 }
@@ -110,7 +198,7 @@ namespace GameFramework.SoundSystem
             float duckSpeed = 1f / Mathf.Max(0.01f, _settings.DuckFadeSeconds);
             _duckCurrentMultiplier = Mathf.MoveTowards(_duckCurrentMultiplier, _duckTargetMultiplier, duckSpeed * Time.unscaledDeltaTime);
 
-            if (_currentBgm != ESound.None && _database != null && _database.TryGet(_currentBgm, out SoundDatabaseSO.Entry bgmEntry))
+            if (_currentBgm != ESound.None && _soundData.TryGetValue(_currentBgm, out SoundEntry bgmEntry))
             {
                 _bgmSource.volume = ComputeVolume(ESoundChannel.BGM, bgmEntry.defaultVolume) * _duckCurrentMultiplier;
             }
@@ -123,8 +211,8 @@ namespace GameFramework.SoundSystem
             // 폴링 루프를 두는 대신 여기서 덕킹을 종료하면, 두 번째 폴러가 원래 사운드가
             // 끝난 걸 알아채기 전에 풀이 SoundPlayer를 새 사운드용으로 재활용해버리는
             // 경쟁 상태를 피할 수 있습니다.
-            if (_settings.DuckBgmOnVoice && _database != null &&
-                _database.TryGet(finishedId, out SoundDatabaseSO.Entry entry) &&
+            if (_settings.DuckBgmOnVoice &&
+                _soundData.TryGetValue(finishedId, out SoundEntry entry) &&
                 entry.channel == ESoundChannel.Voice)
             {
                 EndDuck();
@@ -135,14 +223,14 @@ namespace GameFramework.SoundSystem
 
         public void PlaySound(ESound id)
         {
-            if (id == ESound.None || _database == null)
+            if (id == ESound.None)
             {
                 return;
             }
 
-            if (!_database.TryGet(id, out SoundDatabaseSO.Entry entry))
+            if (!_soundData.TryGetValue(id, out SoundEntry entry))
             {
-                Debug.LogWarning($"[SoundManager] {id}에 대한 SoundDatabaseSO 항목이 없습니다.");
+                Debug.LogWarning($"[SoundManager] {id}에 대한 Sound 데이터가 없습니다.");
                 return;
             }
 
@@ -156,7 +244,7 @@ namespace GameFramework.SoundSystem
             }
         }
 
-        private async Awaitable PlayBgm(ESound id, SoundDatabaseSO.Entry entry)
+        private async Awaitable PlayBgm(ESound id, SoundEntry entry)
         {
             if (_currentBgm == id)
             {
@@ -194,7 +282,7 @@ namespace GameFramework.SoundSystem
             _currentBgm = ESound.None;
         }
 
-        private async Awaitable PlayOneShot(ESound id, SoundDatabaseSO.Entry entry)
+        private async Awaitable PlayOneShot(ESound id, SoundEntry entry)
         {
             if (CountActive(id) >= Mathf.Max(1, entry.maxConcurrent))
             {
@@ -291,7 +379,7 @@ namespace GameFramework.SoundSystem
             for (int i = 0; i < active.Count; i++)
             {
                 SoundPlayer p = active[i];
-                if (p == null || !_database.TryGet(p.CurrentSound, out SoundDatabaseSO.Entry entry))
+                if (p == null || !_soundData.TryGetValue(p.CurrentSound, out SoundEntry entry))
                 {
                     continue;
                 }

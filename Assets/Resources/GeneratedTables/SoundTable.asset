@@ -25,3 +25,9 @@ MonoBehaviour:
     defaultVolume: 0.5
     maxConcurrent: 3
     loop: 0
+  - RowKey: 1003
+    fileName: BGM_Dummy
+    channel: BGM
+    defaultVolume: 0.2
+    maxConcurrent: 1
+    loop: 1
