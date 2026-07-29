@@ -18,3 +18,13 @@ MonoBehaviour:
     prewarmCount: 10
     maxCount: 30
     autoExpand: 1
+  - key: UIPopup_TestB
+    prefab: {fileID: 1481888737560607695, guid: ff5bcfa1613bec145bb68804cea4d2e1, type: 3}
+    prewarmCount: 1
+    maxCount: 1
+    autoExpand: 1
+  - key: UIPopup_TestA
+    prefab: {fileID: 7391743919702655556, guid: 05074e17927fc0a438e093d0ca631426, type: 3}
+    prewarmCount: 1
+    maxCount: 1
+    autoExpand: 1

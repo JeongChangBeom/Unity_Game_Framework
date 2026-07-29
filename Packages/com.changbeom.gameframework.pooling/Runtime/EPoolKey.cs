@@ -6,5 +6,7 @@ namespace GameFramework.Pooling
     {
         None = 0,
         Test,
+        UIPopup_TestA,
+        UIPopup_TestB,
     }
 }
