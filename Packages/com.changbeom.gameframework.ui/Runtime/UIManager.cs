@@ -165,6 +165,66 @@ namespace GameFramework.UISystem
                 result => onResult?.Invoke(result is TResult typed ? typed : default));
         }
 
+        /// <summary>Pool Settings에 등록된 Key로 팝업 프리팹을 찾아 요청합니다. 프리팹 참조를 직접 들고 있을 필요가 없습니다.</summary>
+        public void RequestPopup(
+            EPoolKey key,
+            EPopupPriority priority,
+            object payload = null,
+            bool unique = true,
+            EPopupPolicy policy = EPopupPolicy.PreemptIfHigher,
+            Action<object> onResult = null)
+        {
+            UIPopupBase prefab = ResolvePopupPrefab(key);
+
+            if (prefab == null)
+            {
+                return;
+            }
+
+            RequestPopup(prefab, priority, payload, unique, policy, onResult);
+        }
+
+        /// <summary>Key 기반 RequestPopup의 결과 콜백(<typeparamref name="TResult"/>) 버전입니다.</summary>
+        public void RequestPopup<TResult>(
+            EPoolKey key,
+            EPopupPriority priority,
+            Action<TResult> onResult,
+            object payload = null,
+            bool unique = true,
+            EPopupPolicy policy = EPopupPolicy.PreemptIfHigher)
+        {
+            UIPopupBase prefab = ResolvePopupPrefab(key);
+
+            if (prefab == null)
+            {
+                return;
+            }
+
+            RequestPopup(prefab, priority, onResult, payload, unique, policy);
+        }
+
+        private UIPopupBase ResolvePopupPrefab(EPoolKey key)
+        {
+            if (key == EPoolKey.None)
+            {
+                return null;
+            }
+
+            if (!PoolManager.Instance.TryGetPrefab(key.ToString(), out GameObject prefabGo))
+            {
+                Debug.LogError($"[UIManager] PoolSettings에 등록되지 않은 key입니다: {key}");
+                return null;
+            }
+
+            if (!prefabGo.TryGetComponent(out UIPopupBase prefab))
+            {
+                Debug.LogError($"[UIManager] \"{key}\" 프리팹에 UIPopupBase 컴포넌트가 없습니다.");
+                return null;
+            }
+
+            return prefab;
+        }
+
         public void CloseTopPopup(object result = null)
         {
             if (_current == null)
