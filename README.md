@@ -198,6 +198,7 @@ enum은 시트에 문자열로 적은 값(`"Fire"` 등)을 실제 C# enum으로 
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 - Pool Settings에 등록한 Key로 프리팹 참조 없이 바로 Spawn 가능
 - `EPoolKey` 자동 생성 - Key 오타를 컴파일 타임 에러로 잡음 (Sound System의 `ESound`와 동일한 방식)
+- `Assets/02.Prefabs/Pooling/`에 프리팹을 넣기만 하면 Pool Settings 등록 + `EPoolKey` 재생성까지 전부 자동 (버튼 조작 불필요)
 
 ---
 
@@ -236,7 +237,19 @@ PoolManager.Instance.Despawn(obj);
 #### Key로 바로 스폰하기
 Pool Settings의 Entry마다 `Key`를 적어두면, 프리팹 참조를 스포너 스크립트에 다시 연결하지 않고도 Key만으로 스폰할 수 있습니다. `Key`는 영문/숫자/밑줄만 가능하고 숫자로 시작할 수 없습니다 (아래 `EPoolKey` enum의 멤버 이름으로 그대로 쓰이기 때문).
 
-**1) `EPoolKey` 생성 (오타 방지, 권장)**
+**0) `Assets/02.Prefabs/Pooling/` 폴더에 넣기만 하면 자동 등록**
+
+`Assets/02.Prefabs/Pooling/` 폴더에 프리팹을 넣으면, Unity가 임포트하는 순간 자동으로:
+1. Pool Settings에 새 Entry로 등록 (Key = 프리팹 이름, Prewarm = 1, Max = 1, AutoExpand = true)
+2. `EPoolKey`도 곧바로 재생성
+
+버튼을 누를 필요가 없습니다. 이미 등록된 Entry는 절대 건드리지 않으므로, 나중에 Inspector에서 Prewarm/Max 값을 직접 조정해도 다음 동기화 때 덮어써지지 않습니다. Pool Settings 에셋 자체를 Inspector에서 손으로 고치고 저장해도(Key 변경 등) 마찬가지로 `EPoolKey`가 자동으로 다시 생성됩니다.
+
+이 폴더 기능이 생기기 전부터 있던 프리팹처럼, 자동 감지를 못 받은 경우에는 아래 메뉴로 한 번에 몰아서 등록할 수 있습니다.
+
+`Game Framework/Pooling/Sync Pool Settings From Folder`
+
+**1) `EPoolKey` 직접 생성 (위 자동 동기화 없이 수동으로 하고 싶을 때)**
 
 Pool Settings에 Key들을 다 적은 뒤, Unity Editor에서 아래 메뉴를 누릅니다.
 
@@ -244,7 +257,6 @@ Pool Settings에 Key들을 다 적은 뒤, Unity Editor에서 아래 메뉴를 �
 
 * 동작: Pool Settings의 모든 `Key`를 모아 `EPoolKey.cs`를 자동 생성 (유효하지 않은 Key/중복 Key는 Console에 에러·경고를 남기고 건너뜀)
 * 생성 위치: `Packages/com.changbeom.gameframework.pooling/Runtime/EPoolKey.cs`
-* Key를 추가/변경/삭제할 때마다 이 메뉴를 다시 눌러야 `EPoolKey`가 최신 상태로 반영됩니다.
 
 ```cs
 // PoolSettings에 Key="Orc"로 등록해둔 프리팹을 스폰. 오타는 컴파일 에러로 즉시 드러남
@@ -291,6 +303,7 @@ Orc orcComp = PoolManager.Instance.Spawn<Orc>("Orc", spawnPosition, Quaternion.i
 - Open / Resume / Suspend / Close, Toast Show / Hide 전 구간에 애니메이션 훅 제공 (기본 스케일 연출 포함, 원하는 연출 코드로 교체 가능)
 - Modal 입력 차단
 - Pooling 패키지(`PoolManager`) 연계 (자체 풀 없음)
+- Pool Settings에 등록한 `EPoolKey`로 팝업 프리팹 참조 없이 바로 `RequestPopup` 가능
 - 팝업 결과 콜백 - 확인/취소처럼 "어떻게 닫혔는지" 결과값을 호출한 쪽이 받을 수 있음
 - 전체 닫기(`CloseAll`) - 씬 전환 시 대기열까지 한번에 정리
 - 비모달 토스트(Toast) - 모달 팝업과 별개로 여러 개 동시 표시 가능, 자동 사라짐
@@ -309,6 +322,21 @@ UIManager.Instance.RequestPopup(
     EPopupPriority.High
 );
 ```
+
+---
+
+#### Key로 팝업 열기
+팝업 프리팹도 Pooling의 `PoolSettings`에 Key로 등록해두면(`Assets/02.Prefabs/Pooling/`에 넣기만 해도 자동 등록), 프리팹 참조 없이 Key만으로 열 수 있습니다.
+
+```cs
+UIManager.Instance.RequestPopup(EPoolKey.ConfirmPopup, EPopupPriority.High);
+
+// 결과 콜백 버전도 동일하게 지원
+UIManager.Instance.RequestPopup<bool>(EPoolKey.ConfirmPopup, EPopupPriority.High,
+    result => Debug.Log($"확인 결과: {result}"));
+```
+
+> 등록된 프리팹에 `UIPopupBase`가 없거나 Key가 없으면 Console에 에러를 남기고 아무 일도 일어나지 않습니다.
 
 ---
 
@@ -429,6 +457,7 @@ public class MandatoryConfirmPopup : UIPopupBase
 - Addressables 자동 등록
   * Sound 폴더 스캔 후 Addressables 그룹에 자동 등록
   * Addressables address = fileName 규칙 강제
+- Sound 데이터는 Data Parsing이 생성하는 `SoundTable` 하나로 통일 (별도의 데이터베이스 에셋 없음) - `SoundTable`이 갱신될 때마다 ESound 재생성 + Addressables 등록까지 버튼 없이 자동 동기화
 - 사운드 재생 통합 API
   * `SoundManager.Instance.PlaySound(ESound.xxx)` 형태로 단순 사용
   * Channel이 BGM이면 자동으로 크로스페이드 전환, 그 외에는 원샷 재생
@@ -475,20 +504,18 @@ public class MandatoryConfirmPopup : UIPopupBase
 
 ---
 
-#### 3) ESound 생성
-Sound 테이블 SO가 준비되면 `FileName`을 기반으로 enum을 자동 생성합니다.
+#### 3) SoundTable 생성 (Data Parsing) → ESound·Addressables 자동 처리
+Data Parsing의 `Game Framework/Data Parsing/DataTable Importer`에서 Sound 탭을 다른 테이블(Item/Monster/Quest 등)과 완전히 똑같은 방식으로 "선택 시트 생성"/"선택 시트 갱신"합니다. Sound만을 위한 별도 절차나 예외는 없습니다 - `SoundTable.cs`/`SoundTable.asset`이 그대로 생성됩니다.
 
-Unity Editor에서 아래 버튼을 누릅니다.
+`SoundTable`이 (재)생성되는 순간 **버튼 조작 없이 자동으로**:
+1. `ESound.cs` 재생성 (`FileName` 기반)
+2. `Assets/03.Sound/`의 AudioClip을 Addressables `Sound` 그룹에 자동 등록 (address = fileName)
 
-`Game Framework/Sound System/Generate ESound From Sound Table`
+`ESound`는 `SoundPlayer`/`SoundManager`가 직접 참조하는 프로젝트 전용 타입이라 패키지 어셈블리 내부(`Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs`)에 생성됩니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, `SoundTable`을 처음 생성하는 순간 실제 사운드 id들로 덮어써집니다.
 
-* 동작:
-  * Sound 테이블 SO를 읽어 `FileName` 목록 수집
-  * `ESound.cs`를 자동 생성
-* 생성 위치:
-  * `Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs`
+`SoundManager`는 이 패키지가 프로젝트가 생성한 `SoundTable` 타입을 직접 참조할 수 없기 때문에(패키지는 프로젝트를 참조할 수 없음), 부팅 시 `SoundTable`을 1회 리플렉션으로 읽어 Channel/Volume/MaxConcurrent/Loop를 자체 Dictionary로 캐싱합니다 - 별도의 데이터베이스 에셋은 없습니다.
 
-> `ESound`는 `SoundDatabaseSO`/`SoundPlayer`/`SoundManager`가 직접 참조하는 프로젝트 전용 타입이라 패키지 어셈블리 내부에 함께 있어야 합니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, 프로젝트마다 위 메뉴로 재생성해서 덮어써서 사용합니다.
+수동으로 다시 실행하고 싶을 때를 위한 메뉴도 남아 있습니다: `Game Framework/Sound System/Generate ESound + Register Addressables`.
 
 이제 런타임에서 다음처럼 바로 사용 가능합니다.
 
@@ -502,6 +529,7 @@ Unity Editor에서 아래 버튼을 누릅니다.
 `Assets/Resources/GameFramework/SoundManagerSettings.asset`
 
 설정 가능한 항목:
+* Sound Table Resource Path (기본: `GeneratedTables/SoundTable`) - 시트 탭 이름을 다르게 지어서 생성된 클래스명이 다르면 여기를 맞춰주세요
 * Initial/Max Pool Size
 * 채널별 AudioMixerGroup (선택)
 * BGM Crossfade Seconds
@@ -510,25 +538,7 @@ Unity Editor에서 아래 버튼을 누릅니다.
 
 ---
 
-#### 5) SoundDatabase 빌드 + Addressables 자동 등록
-`Assets/Create/Game Framework/Sound System/Sound Database`로 에셋을 만들고 아래 경로에 저장합니다.
-
-`Assets/Resources/GameFramework/SoundDatabaseSO.asset`
-
-그 다음 SoundDatabaseSO를 갱신하고 AudioClip을 Addressables에 자동 등록합니다.
-
-`Game Framework/Sound System/Build Sound Database From Sheet + Folder`
-
-* 입력:
-  * Sound 테이블 SO (시트 파싱 결과)
-  * `Assets/03.Sound/` 폴더의 AudioClip들
-* 출력:
-  * `SoundDatabaseSO` entries 자동 갱신
-  * Addressables `Sound` 그룹에 자동 등록 + address 통일(fileName)
-
----
-
-#### 6) 런타임 사용
+#### 5) 런타임 사용
 
 ```cs
 // SFX/UI/Voice - 원샷 재생
