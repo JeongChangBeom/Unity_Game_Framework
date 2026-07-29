@@ -347,6 +347,10 @@ namespace GameFramework.UISystem
                 instance = PoolManager.Instance.Spawn(req.prefab, Vector3.zero, Quaternion.identity, _popupRoot);
                 if (instance == null)
                 {
+                    // 스폰 실패(풀이 가득 찼을 가능성)로 이 요청은 버리지만, 대기열에 남은
+                    // 다른 요청까지 같이 멈추면 안 되므로 다음 LateUpdate에 처리를 재예약합니다.
+                    Debug.LogWarning($"[UIManager] {req.prefab.GetType().Name} 팝업을 스폰하지 못했습니다 (풀이 가득 찼을 수 있습니다). 이 요청은 건너뜁니다.");
+                    _processScheduled = true;
                     return;
                 }
 

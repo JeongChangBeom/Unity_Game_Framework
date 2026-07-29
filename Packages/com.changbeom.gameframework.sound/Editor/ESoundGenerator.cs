@@ -53,8 +53,23 @@ namespace GameFramework.SoundSystem.Editor
 
             for (int i = 0; i < rawNames.Count; i++)
             {
-                string safe = MakeEnumName(rawNames[i]);
-                if (string.IsNullOrEmpty(safe) || !unique.Add(safe))
+                string raw = rawNames[i];
+                string safe = MakeEnumName(raw);
+
+                if (string.IsNullOrEmpty(safe))
+                {
+                    continue;
+                }
+
+                if (safe != raw)
+                {
+                    // SoundManager는 런타임에 테이블에 적힌 원본 FileName 문자열로
+                    // Enum.TryParse하기 때문에, 여기서 이름이 바뀌면(공백/하이픈 등) 그
+                    // 사운드는 절대 재생되지 않습니다. 조용히 넘어가지 않고 바로 알려줍니다.
+                    Debug.LogError($"[ESoundGenerator] FileName \"{raw}\"은(는) 유효한 식별자가 아니라서 enum 멤버는 \"{safe}\"로 생성되지만, 런타임에는 원본 이름으로 조회하므로 이 사운드는 재생되지 않습니다. 시트의 FileName과 오디오 파일명을 영문/숫자/밑줄로만 바꿔주세요.");
+                }
+
+                if (!unique.Add(safe))
                 {
                     continue;
                 }

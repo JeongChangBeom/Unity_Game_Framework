@@ -108,8 +108,10 @@ namespace GameFramework.Pooling.Editor
                     continue;
                 }
 
+                string key = ResolveKey(settings, prefab.name);
+
                 PoolSettings.Entry entry = new PoolSettings.Entry();
-                entry.key = prefab.name;
+                entry.key = key;
                 entry.prefab = prefab;
                 entry.prewarmCount = 1;
                 entry.maxCount = 1;
@@ -122,6 +124,31 @@ namespace GameFramework.Pooling.Editor
             }
 
             return changed;
+        }
+
+        // 프리팹 이름을 Key로 그대로 쓰기 전에 유효한 식별자인지, 이미 다른 엔트리가 같은
+        // Key를 쓰고 있진 않은지 확인합니다. 둘 중 하나라도 걸리면 Key 없이(null) 등록만
+        // 하고 경고를 남깁니다 -- PoolKeyGenerator가 나중에 똑같이 걸러내긴 하지만, 그때는
+        // "왜 이 프리팹만 EPoolKey에 안 생겼는지" 원인을 알기 어렵기 때문에 여기서 먼저
+        // 명확한 이유를 알려줍니다.
+        private static string ResolveKey(PoolSettings settings, string prefabName)
+        {
+            if (!PoolKeyGenerator.IsValidIdentifier(prefabName))
+            {
+                Debug.LogWarning($"[PoolFolderSync] \"{prefabName}\"은(는) 유효한 Key 이름이 아니라서(영문/숫자/밑줄만, 숫자로 시작 불가) Key 없이 등록합니다. Key로 스폰하려면 Inspector에서 직접 지정하세요.");
+                return null;
+            }
+
+            for (int i = 0; i < settings.entries.Count; i++)
+            {
+                if (settings.entries[i] != null && string.Equals(settings.entries[i].key, prefabName, StringComparison.Ordinal))
+                {
+                    Debug.LogWarning($"[PoolFolderSync] \"{prefabName}\" Key가 이미 다른 프리팹에 등록되어 있어 Key 없이 등록합니다. Inspector에서 직접 다른 Key를 지정하세요.");
+                    return null;
+                }
+            }
+
+            return prefabName;
         }
 
         private static bool IsAlreadyRegistered(PoolSettings settings, GameObject prefab)

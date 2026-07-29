@@ -514,7 +514,7 @@ Data Parsing의 `Game Framework/Data Parsing/DataTable Importer`에서 Sound 탭
 
 `ESound`는 `SoundPlayer`/`SoundManager`가 직접 참조하는 프로젝트 전용 타입이라 패키지 어셈블리 내부(`Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs`)에 생성됩니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, `SoundTable`을 처음 생성하는 순간 실제 사운드 id들로 덮어써집니다.
 
-`SoundManager`는 이 패키지가 프로젝트가 생성한 `SoundTable` 타입을 직접 참조할 수 없기 때문에(패키지는 프로젝트를 참조할 수 없음), 부팅 시 `SoundTable`을 1회 리플렉션으로 읽어 Channel/Volume/MaxConcurrent/Loop를 자체 Dictionary로 캐싱합니다 - 별도의 데이터베이스 에셋은 없습니다.
+`SoundManager`는 프로젝트가 생성한 `SoundTable` 타입을 직접 참조할 수 없기 때문에(패키지는 프로젝트를 참조할 수 없음), 부팅 시 `SoundTable`을 1회 리플렉션으로 읽어 Channel/Volume/MaxConcurrent/Loop를 자체 Dictionary로 캐싱합니다 - 별도의 데이터베이스 에셋은 없습니다.
 
 수동으로 다시 실행하고 싶을 때를 위한 메뉴도 남아 있습니다: `Game Framework/Sound System/Generate ESound + Register Addressables`.
 

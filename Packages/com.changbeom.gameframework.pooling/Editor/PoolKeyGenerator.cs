@@ -99,7 +99,8 @@ namespace GameFramework.Pooling.Editor
             return result;
         }
 
-        private static bool IsValidIdentifier(string s)
+        // PoolFolderSync도 폴더에서 자동 등록할 때 같은 검증을 재사용합니다.
+        internal static bool IsValidIdentifier(string s)
         {
             if (string.IsNullOrEmpty(s))
             {
