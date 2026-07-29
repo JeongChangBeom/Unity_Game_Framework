@@ -9,8 +9,8 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: 22cf9c8b48a25844f8955f889013450f, type: 3}
-  m_Name: Monster
+  m_Script: {fileID: 11500000, guid: 31d989f64ba9b3e4d89383ec6b50bcad, type: 3}
+  m_Name: MonsterTable
   m_EditorClassIdentifier: 
   _table:
   - RowKey: 100

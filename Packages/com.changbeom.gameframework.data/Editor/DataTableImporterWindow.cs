@@ -274,8 +274,10 @@ namespace GameFramework.DataParsing.Editor
                     continue;
                 }
 
+                // 스크립트 파일명/클래스명/에셋 파일명이 전부 같은 className에서 나와야
+                // DataManager.GetTable<T>()의 "Resources/GeneratedTables/{타입명}" 관례가
+                // 항상 실제 저장된 .asset 파일명과 일치합니다 (따로 sanitize하면 어긋날 수 있음).
                 string className = TableClassGenerator.ToSafeClassName(p.title);
-                string safeTabFile = TableClassGenerator.ToSafeAssetFileName(p.title);
 
                 SheetTabInfo item = new SheetTabInfo();
                 item.title = p.title;
@@ -284,8 +286,8 @@ namespace GameFramework.DataParsing.Editor
                 item.className = className;
                 item.scriptPath = _generatedScriptFolder + "/" + className + ".cs";
 
-                item.assetPath = _resourcesFolder + "/" + safeTabFile + ".asset";
-                item.resourcesPath = "GeneratedTables/" + safeTabFile;
+                item.assetPath = _resourcesFolder + "/" + className + ".asset";
+                item.resourcesPath = "GeneratedTables/" + className;
 
                 item.assetExists = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(item.assetPath) != null;
 

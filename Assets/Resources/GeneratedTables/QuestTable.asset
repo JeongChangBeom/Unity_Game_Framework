@@ -9,19 +9,16 @@ MonoBehaviour:
   m_GameObject: {fileID: 0}
   m_Enabled: 1
   m_EditorHideFlags: 0
-  m_Script: {fileID: 11500000, guid: fdfc741acca496f4b824a9a205d37df7, type: 3}
-  m_Name: Item
+  m_Script: {fileID: 11500000, guid: d23c16ea25ec2c947917434426d56b71, type: 3}
+  m_Name: QuestTable
   m_EditorClassIdentifier: 
   _table:
-  - RowKey: 1
-    name: a
-    description: A
-  - RowKey: 2
-    name: b
-    description: B
-  - RowKey: 3
-    name: c
-    description: C
-  - RowKey: 4
-    name: d
-    description: D
+  - RowKey: 10
+    name: aa
+    description: AA
+  - RowKey: 20
+    name: bb
+    description: BB
+  - RowKey: 30
+    name: cc
+    description: CC

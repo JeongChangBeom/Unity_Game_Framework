@@ -473,25 +473,15 @@ namespace GameFramework.DataParsing.Editor
                 }
             }
 
+            // 시트 탭 이름이 나중에 게임플레이 클래스(예: Monster, Item)와 겹치는 것을
+            // 원천적으로 막기 위해, 생성되는 클래스 이름에는 항상 Table 접미사를 붙입니다.
+            // 이미 Table로 끝나는 이름(예: "ItemTable")에는 중복으로 붙이지 않습니다.
+            if (!result.EndsWith("Table", StringComparison.Ordinal))
+            {
+                result += "Table";
+            }
+
             return result;
-        }
-
-        public static string ToSafeAssetFileName(string tabName)
-        {
-            if (string.IsNullOrEmpty(tabName))
-            {
-                return "Table";
-            }
-
-            char[] invalid = Path.GetInvalidFileNameChars();
-            string s = tabName;
-
-            for (int i = 0; i < invalid.Length; i++)
-            {
-                s = s.Replace(invalid[i], '_');
-            }
-
-            return s;
         }
 
         private static string ToSafeFieldName(string columnName)

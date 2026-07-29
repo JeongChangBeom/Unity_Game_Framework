@@ -124,6 +124,7 @@ MyManager.Instance.DoSomething();
 - Sheet Tab 선택 후 C# 테이블 스크립트 + .asset 자동 생성
 - 기존 테이블 갱신(Update)/삭제 지원
 - `DataManager`가 타입별로 로드 결과를 캐싱
+- 생성되는 클래스 이름에 `Table` 접미사 자동 부여 (탭 이름이 `{TabName}`이면 클래스는 `{TabName}Table`) - 나중에 같은 이름의 게임플레이 클래스를 만들어도 충돌하지 않도록 방지
 
 ---
 
@@ -137,7 +138,7 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 #### 1) 시트 임포트 (Editor 전용)
 `Game Framework/Data Parsing/DataTable Importer` 메뉴에서:
 1. Sheet URL, API Key 입력 후 **시트 불러오기**
-2. 원하는 탭 선택 후 **선택 시트 생성** - `{ScriptFolder}/{TabName}.cs`와 `Resources/GeneratedTables/{TabName}.asset`이 만들어집니다
+2. 원하는 탭 선택 후 **선택 시트 생성** - `{ScriptFolder}/{TabName}Table.cs`와 `Resources/GeneratedTables/{TabName}Table.asset`이 만들어집니다 (탭 이름이 이미 `Table`로 끝나면 중복으로 붙지 않습니다)
 3. 시트 내용이 바뀌면 **선택 시트 갱신**, 탭을 지우려면 **선택 시트 삭제**
 
 > 시트 형식: 1행=컬럼명, 3행=타입, 4행부터 데이터. 1열은 항상 `RowKey`(int)로 취급됩니다. 컬럼명이 `~`로 시작하면 무시됩니다.
@@ -169,7 +170,7 @@ enum은 시트에 문자열로 적은 값(`"Fire"` 등)을 실제 C# enum으로 
 
 #### 2) 런타임 데이터 접근
 ```cs
-Item.Data item = DataManager.Instance.GetTable<Item>().Get(1001);
+{TabName}Table.Data item = DataManager.Instance.GetTable<{TabName}Table>().Get(1001);
 ```
 
 - **`DataManager.Instance.GetTable<T>()`**
@@ -180,7 +181,7 @@ Item.Data item = DataManager.Instance.GetTable<Item>().Get(1001);
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/DataTester.cs`를 아무 GameObject에 붙이고 Play하면, RowKey를 입력하고 Item/Monster/Quest/Sound 각 테이블에서 조회한 결과를 버튼으로 확인할 수 있습니다.
+`Assets/00.Scripts/Tests/DataTester.cs`를 아무 GameObject에 붙이고 Play하면, RowKey를 입력하고 각 테이블에서 조회한 결과를 버튼으로 확인할 수 있습니다.
 
 </details>
 

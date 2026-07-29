@@ -4,7 +4,7 @@ using UnityEngine;
 using GameFramework.DataParsing;
 
 // 자동 생성됨. 직접 편집하지 마세요.
-public class Item : ScriptableObject
+public class MonsterTable : ScriptableObject
 {
     [SerializeField] private List<Data> _table = new List<Data>();
     public IReadOnlyList<Data> Table => _table;

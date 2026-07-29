@@ -23,38 +23,38 @@ namespace GameFramework.Tests
 
             GUILayout.Space(10);
 
-            if (GUILayout.Button("1) Item.Get(rowKey)"))
+            if (GUILayout.Button("1) ItemTable.Get(rowKey)"))
             {
-                Item table = DataManager.Instance.GetTable<Item>();
+                ItemTable table = DataManager.Instance.GetTable<ItemTable>();
                 Log(table, table?.Get(ParseRowKey()));
             }
 
-            if (GUILayout.Button("2) Monster.Get(rowKey)"))
+            if (GUILayout.Button("2) MonsterTable.Get(rowKey)"))
             {
-                Monster table = DataManager.Instance.GetTable<Monster>();
+                MonsterTable table = DataManager.Instance.GetTable<MonsterTable>();
                 Log(table, table?.Get(ParseRowKey()));
             }
 
-            if (GUILayout.Button("3) Quest.Get(rowKey)"))
+            if (GUILayout.Button("3) QuestTable.Get(rowKey)"))
             {
-                Quest table = DataManager.Instance.GetTable<Quest>();
+                QuestTable table = DataManager.Instance.GetTable<QuestTable>();
                 Log(table, table?.Get(ParseRowKey()));
             }
 
-            if (GUILayout.Button("4) Sound.Get(rowKey)"))
+            if (GUILayout.Button("4) SoundTable.Get(rowKey)"))
             {
-                Sound table = DataManager.Instance.GetTable<Sound>();
+                SoundTable table = DataManager.Instance.GetTable<SoundTable>();
 
                 if (table == null)
                 {
-                    Log("Sound 테이블을 찾을 수 없습니다");
+                    Log("SoundTable 테이블을 찾을 수 없습니다");
                 }
                 else
                 {
-                    Sound.Data d = table.Get(ParseRowKey());
+                    SoundTable.Data d = table.Get(ParseRowKey());
                     Log(d == null
-                        ? $"Sound: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
-                        : $"Sound: fileName={d.fileName}, channel={d.channel}, volume={d.defaultVolume}, maxConcurrent={d.maxConcurrent}, loop={d.loop}");
+                        ? $"SoundTable: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
+                        : $"SoundTable: fileName={d.fileName}, channel={d.channel}, volume={d.defaultVolume}, maxConcurrent={d.maxConcurrent}, loop={d.loop}");
                 }
             }
 
@@ -78,43 +78,43 @@ namespace GameFramework.Tests
             return key;
         }
 
-        private void Log(Item table, Item.Data d)
+        private void Log(ItemTable table, ItemTable.Data d)
         {
             if (table == null)
             {
-                Log("Item 테이블을 찾을 수 없습니다");
+                Log("ItemTable 테이블을 찾을 수 없습니다");
                 return;
             }
 
             Log(d == null
-                ? $"Item: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
-                : $"Item: name={d.name}, description={d.description}");
+                ? $"ItemTable: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
+                : $"ItemTable: name={d.name}, description={d.description}");
         }
 
-        private void Log(Monster table, Monster.Data d)
+        private void Log(MonsterTable table, MonsterTable.Data d)
         {
             if (table == null)
             {
-                Log("Monster 테이블을 찾을 수 없습니다");
+                Log("MonsterTable 테이블을 찾을 수 없습니다");
                 return;
             }
 
             Log(d == null
-                ? $"Monster: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
-                : $"Monster: name={d.name}, description={d.description}");
+                ? $"MonsterTable: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
+                : $"MonsterTable: name={d.name}, description={d.description}");
         }
 
-        private void Log(Quest table, Quest.Data d)
+        private void Log(QuestTable table, QuestTable.Data d)
         {
             if (table == null)
             {
-                Log("Quest 테이블을 찾을 수 없습니다");
+                Log("QuestTable 테이블을 찾을 수 없습니다");
                 return;
             }
 
             Log(d == null
-                ? $"Quest: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
-                : $"Quest: name={d.name}, description={d.description}");
+                ? $"QuestTable: key={ParseRowKey()}에 해당하는 행 없음 (테이블에 {table.Table.Count}개 행 존재)"
+                : $"QuestTable: name={d.name}, description={d.description}");
         }
 
         private void Log(string msg)
