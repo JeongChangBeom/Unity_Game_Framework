@@ -23,6 +23,7 @@ namespace GameFramework.UISystem
 
         private UIPopupBase _current;
         private Action<object> _currentResultCallback;
+        private bool _isClosingCurrent;
 
         private int _sequenceCounter;
         private bool _processScheduled;
@@ -243,11 +244,16 @@ namespace GameFramework.UISystem
         /// <summary><paramref name="result"/>은 이 팝업의 RequestPopup 호출 시 전달된 onResult 콜백으로 전달됩니다.</summary>
         public void ClosePopup(UIPopupBase target, object result)
         {
-            if (_current != target)
+            // _isClosingCurrent를 확인하지 않으면, 닫기 애니메이션이 끝나기 전에
+            // ClosePopup이 한 번 더 호출됐을 때 target.RequestClose가 두 번 걸리면서
+            // 두 번째 호출의 onResult(이미 null로 비워진 상태)가 첫 번째 호출의
+            // onResult를 덮어써 원래 콜백이 영영 호출되지 않는 문제가 있었습니다.
+            if (_current != target || _isClosingCurrent)
             {
                 return;
             }
 
+            _isClosingCurrent = true;
             _modalBlocker.SetActive(false);
 
             Action<object> onResult = _currentResultCallback;
@@ -257,6 +263,7 @@ namespace GameFramework.UISystem
             {
                 PoolManager.Instance.Despawn(target.gameObject);
                 _current = null;
+                _isClosingCurrent = false;
                 _processScheduled = true;
                 onResult?.Invoke(result);
             });
@@ -265,13 +272,26 @@ namespace GameFramework.UISystem
         /// <summary>대기열을 즉시 비우고 현재 팝업을 닫습니다 (결과값 전달 없음). 씬 전환 시 정리용입니다.</summary>
         public void CloseAll()
         {
+            // 대기열에는 선점(Preempt)으로 인해 정지된 채 인스턴스를 들고 있는 요청이
+            // 섞여 있을 수 있습니다. 그냥 Clear만 하면 그 인스턴스가 풀로 반환되지 않고
+            // 비활성 상태로 영구히 남아 풀의 maxCount를 잠식하므로, 반드시 Despawn한 뒤 비웁니다.
+            for (int i = 0; i < _pending.Count; i++)
+            {
+                UIPopupBase suspended = _pending[i].instance;
+                if (suspended != null)
+                {
+                    PoolManager.Instance.Despawn(suspended.gameObject);
+                }
+            }
+
             _pending.Clear();
 
-            if (_current == null)
+            if (_current == null || _isClosingCurrent)
             {
                 return;
             }
 
+            _isClosingCurrent = true;
             UIPopupBase target = _current;
             _current = null;
             _currentResultCallback = null;
@@ -280,6 +300,7 @@ namespace GameFramework.UISystem
             target.RequestClose(() =>
             {
                 PoolManager.Instance.Despawn(target.gameObject);
+                _isClosingCurrent = false;
             });
         }
 
