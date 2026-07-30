@@ -84,6 +84,8 @@ namespace GameFramework.DataParsing.Editor
                     return false;
                 }
 
+                string fieldName = ToSafeFieldName(name);
+
                 for (int i = 0; i < columns.Count; i++)
                 {
                     if (columns[i].columnName == name)
@@ -91,12 +93,22 @@ namespace GameFramework.DataParsing.Editor
                         error = "중복 컬럼 이름: " + name;
                         return false;
                     }
+
+                    // 컬럼 이름 자체는 달라도(예: "Item Name" vs "Item-Name") sanitize 후
+                    // 필드 이름이 같아지면, 생성되는 클래스에 같은 이름의 필드가 두 번
+                    // 선언되어 컴파일이 깨집니다. sanitize된 이름 기준으로도 검사합니다.
+                    if (columns[i].fieldName == fieldName)
+                    {
+                        error = "컬럼 이름 \"" + columns[i].columnName + "\"와(과) \"" + name +
+                                "\"가 같은 필드 이름(\"" + fieldName + "\")으로 변환됩니다. 컬럼 이름을 다르게 바꿔주세요.";
+                        return false;
+                    }
                 }
 
                 ColumnInfo info = new ColumnInfo();
                 info.colIndex = c;
                 info.columnName = name;
-                info.fieldName = ToSafeFieldName(name);
+                info.fieldName = fieldName;
                 info.type = type;
                 info.isArray = isArray;
                 info.enumTypeFullName = enumTypeFullName;
@@ -526,12 +538,29 @@ namespace GameFramework.DataParsing.Editor
                 }
             }
 
-            if (s == "class" || s == "namespace" || s == "public" || s == "private")
+            if (CSharpKeywords.Contains(s))
             {
                 s = "_" + s;
             }
 
             return s;
         }
+
+        // 컬럼 이름이 int/new/string 같은 C# 예약어와 그대로 겹치면 생성된 필드 선언이
+        // 컴파일 에러가 나므로, 일부(class/namespace/public/private)만이 아니라 전체
+        // 예약어 목록과 대조합니다.
+        private static readonly HashSet<string> CSharpKeywords = new HashSet<string>
+        {
+            "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char",
+            "checked", "class", "const", "continue", "decimal", "default", "delegate",
+            "do", "double", "else", "enum", "event", "explicit", "extern", "false",
+            "finally", "fixed", "float", "for", "foreach", "goto", "if", "implicit",
+            "in", "int", "interface", "internal", "is", "lock", "long", "namespace",
+            "new", "null", "object", "operator", "out", "override", "params", "private",
+            "protected", "public", "readonly", "ref", "return", "sbyte", "sealed",
+            "short", "sizeof", "stackalloc", "static", "string", "struct", "switch",
+            "this", "throw", "true", "try", "typeof", "uint", "ulong", "unchecked",
+            "unsafe", "ushort", "using", "virtual", "void", "volatile", "while",
+        };
     }
 }

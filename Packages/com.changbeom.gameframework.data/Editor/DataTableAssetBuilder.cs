@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Text;
 using UnityEditor;
 using UnityEngine;
 
@@ -64,7 +65,7 @@ namespace GameFramework.DataParsing.Editor
                 string className = parts[0];
                 string assetPath = parts[1];
                 string escapedTsv = parts[2];
-                string tsv = escapedTsv.Replace("\\n", "\n");
+                string tsv = UnescapePendingTsv(escapedTsv);
 
                 Type t = FindScriptableObjectTypeByName(className);
                 if (t == null)
@@ -87,6 +88,49 @@ namespace GameFramework.DataParsing.Editor
 
             AssetDatabase.SaveAssets();
             AssetDatabase.Refresh();
+        }
+
+        // DataTableImporterWindow.EscapeForPrefs가 만든 이스케이프(\\ -> \, \p -> |, \n -> 줄바꿈)를
+        // 되돌립니다. '|'를 구분자로 쓰는 payload 형식상 원본 시트 데이터의 '|'/줄바꿈이
+        // 그대로 남아있으면 안 되므로, 인코딩과 반드시 짝을 맞춰야 합니다.
+        private static string UnescapePendingTsv(string escaped)
+        {
+            StringBuilder sb = new StringBuilder(escaped.Length);
+
+            for (int i = 0; i < escaped.Length; i++)
+            {
+                char c = escaped[i];
+
+                if (c == '\\' && i + 1 < escaped.Length)
+                {
+                    char next = escaped[i + 1];
+
+                    if (next == 'n')
+                    {
+                        sb.Append('\n');
+                        i++;
+                        continue;
+                    }
+
+                    if (next == 'p')
+                    {
+                        sb.Append('|');
+                        i++;
+                        continue;
+                    }
+
+                    if (next == '\\')
+                    {
+                        sb.Append('\\');
+                        i++;
+                        continue;
+                    }
+                }
+
+                sb.Append(c);
+            }
+
+            return sb.ToString();
         }
 
         private static Type FindScriptableObjectTypeByName(string className)

@@ -711,7 +711,13 @@ namespace GameFramework.DataParsing.Editor
                 return "";
             }
 
-            string s = tsv.Replace("|", " ");
+            // payloadLine이 "className|assetPath|tsv" 형태로 '|'를 구분자로 쓰기 때문에,
+            // 시트 셀 내용에 들어있는 '|'를 공백으로 지워버리면 데이터가 조용히
+            // 손상됩니다. 대신 역이스케이프 가능한 형태로 바꿔서 원본을 보존합니다.
+            // '\'를 가장 먼저 이스케이프해야 이후 삽입하는 "\\n"/"\\p" 시퀀스와
+            // 원본 데이터에 있던 문자를 구분할 수 있습니다.
+            string s = tsv.Replace("\\", "\\\\");
+            s = s.Replace("|", "\\p");
             s = s.Replace("\r\n", "\n").Replace("\r", "\n");
 
             s = s.Replace("\n", "\\n");
