@@ -10,6 +10,10 @@ namespace GameFramework.SaveLoad
     /// 외부 JSON 라이브러리 없이 UnityEngine.JsonUtility만 사용합니다. 쓰기는 원자적으로
     /// (임시 파일 + File.Replace) 처리되고, 이전 정상 파일을 ".bak"으로 자동 보관하므로
     /// 쓰는 도중 크래시가 나도 두 사본이 동시에 손상되지 않습니다.
+    /// ".bak"(자동 롤링 백업)과 ".manual.bak"(BackupNow로 만드는 수동 체크포인트)은
+    /// 서로 다른 파일입니다. 매 Flush마다 갱신되는 ".bak"과 같은 경로를 썼다면,
+    /// 이후의 평범한 자동 저장 한 번만으로 사용자가 의도적으로 남긴 체크포인트가
+    /// 조용히 덮어써지기 때문에 분리했습니다.
     /// </summary>
     public sealed class JsonFileSaveProvider : ISaveProvider, ISaveBackupProvider
     {
@@ -28,6 +32,7 @@ namespace GameFramework.SaveLoad
 
         private readonly string _filePath;
         private readonly string _backupPath;
+        private readonly string _manualBackupPath;
         private readonly bool _autoRestoreOnInit;
 
         private Dictionary<string, string> _data;
@@ -42,6 +47,7 @@ namespace GameFramework.SaveLoad
 
             _filePath = Path.Combine(Application.persistentDataPath, fileName);
             _backupPath = _filePath + ".bak";
+            _manualBackupPath = _filePath + ".manual.bak";
             _autoRestoreOnInit = autoRestoreOnInit;
 
             Load();
@@ -93,7 +99,7 @@ namespace GameFramework.SaveLoad
 
         public bool HasBackup()
         {
-            return File.Exists(_backupPath);
+            return File.Exists(_manualBackupPath);
         }
 
         public void BackupNow()
@@ -105,25 +111,25 @@ namespace GameFramework.SaveLoad
 
             if (File.Exists(_filePath))
             {
-                File.Copy(_filePath, _backupPath, true);
+                File.Copy(_filePath, _manualBackupPath, true);
             }
         }
 
         public bool RestoreFromBackup()
         {
-            if (!File.Exists(_backupPath))
+            if (!File.Exists(_manualBackupPath))
             {
                 return false;
             }
 
-            Dictionary<string, string> restored = Deserialize(SafeReadAllText(_backupPath));
+            Dictionary<string, string> restored = Deserialize(SafeReadAllText(_manualBackupPath));
 
             if (restored == null)
             {
                 return false;
             }
 
-            File.Copy(_backupPath, _filePath, true);
+            File.Copy(_manualBackupPath, _filePath, true);
             _data = restored;
             _dirty = false;
             return true;
