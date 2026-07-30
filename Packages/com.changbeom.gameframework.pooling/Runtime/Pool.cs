@@ -12,6 +12,7 @@ namespace GameFramework.Pooling
         private readonly bool _autoExpand;
 
         private readonly Queue<GameObject> _inactive = new Queue<GameObject>();
+        private readonly HashSet<GameObject> _inactiveSet = new HashSet<GameObject>();
         private int _totalCreated;
 
         public GameObject Prefab => _prefab;
@@ -30,6 +31,7 @@ namespace GameFramework.Pooling
                     GameObject go = CreateNew(owner);
                     SetInactive(go);
                     _inactive.Enqueue(go);
+                    _inactiveSet.Add(go);
                 }
             }
         }
@@ -56,6 +58,7 @@ namespace GameFramework.Pooling
             if (_inactive.Count > 0)
             {
                 go = _inactive.Dequeue();
+                _inactiveSet.Remove(go);
             }
             else
             {
@@ -88,10 +91,17 @@ namespace GameFramework.Pooling
 
         public void Despawn(GameObject go)
         {
+            if (_inactiveSet.Contains(go))
+            {
+                Debug.LogWarning($"[Pool] 이미 풀에 반환된 오브젝트를 다시 Despawn 시도했습니다: {go.name}");
+                return;
+            }
+
             InvokeOnDespawned(go);
 
             SetInactive(go);
             _inactive.Enqueue(go);
+            _inactiveSet.Add(go);
         }
 
         private GameObject CreateNew(PoolManager owner)
