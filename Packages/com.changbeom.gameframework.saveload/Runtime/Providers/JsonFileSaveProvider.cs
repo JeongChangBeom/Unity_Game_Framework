@@ -85,8 +85,10 @@ namespace GameFramework.SaveLoad
                 return;
             }
 
-            WriteAtomic(Serialize(_data));
-            _dirty = false;
+            if (WriteAtomic(Serialize(_data)))
+            {
+                _dirty = false;
+            }
         }
 
         public bool HasBackup()
@@ -221,7 +223,7 @@ namespace GameFramework.SaveLoad
             return JsonUtility.ToJson(fileData, true);
         }
 
-        private void WriteAtomic(string json)
+        private bool WriteAtomic(string json)
         {
             try
             {
@@ -245,10 +247,15 @@ namespace GameFramework.SaveLoad
                 {
                     File.Move(tempPath, _filePath);
                 }
+
+                return true;
             }
             catch (Exception e)
             {
+                // 쓰기가 실패하면 dirty 상태를 유지시켜 다음 Flush에서 재시도하도록
+                // 호출부(Flush)에 실패를 알립니다. 여기서 삼키면 데이터가 조용히 유실됩니다.
                 Debug.LogError($"[JsonFileSaveProvider] 저장 실패: {e}");
+                return false;
             }
         }
     }
