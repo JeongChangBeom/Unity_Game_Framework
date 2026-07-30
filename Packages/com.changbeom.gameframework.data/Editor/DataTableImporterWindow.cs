@@ -724,19 +724,30 @@ namespace GameFramework.DataParsing.Editor
             return s;
         }
 
+        // EditorPrefs 대신 EditorUserSettings를 씁니다. EditorPrefs는 이 머신에 설치된
+        // 모든 Unity 프로젝트에 걸쳐 전역으로 공유되므로, 같은 PC에서 다른 프로젝트로
+        // 전환하면 시트 URL/API Key가 서로 덮어써지거나 새어나갑니다. EditorUserSettings는
+        // 프로젝트 로컬의 UserSettings/ 폴더에 저장되고(.gitignore에도 이미 제외되어 있음),
+        // 값이 없으면 null을 반환하므로 GetConfig에서 기본값 처리를 대신합니다.
+        private static string GetConfig(string key, string defaultValue)
+        {
+            string value = EditorUserSettings.GetConfigValue(PrefPrefix + key);
+            return value ?? defaultValue;
+        }
+
         private void LoadPrefs()
         {
-            _sheetUrl = EditorPrefs.GetString(PrefPrefix + "sheetUrl", _sheetUrl);
-            _apiKey = EditorPrefs.GetString(PrefPrefix + "apiKey", _apiKey);
+            _sheetUrl = GetConfig("sheetUrl", _sheetUrl);
+            _apiKey = GetConfig("apiKey", _apiKey);
 
-            _generatedScriptFolder = EditorPrefs.GetString(PrefPrefix + "genScriptFolder", _generatedScriptFolder);
-            _resourcesFolder = EditorPrefs.GetString(PrefPrefix + "resourcesFolder", _resourcesFolder);
+            _generatedScriptFolder = GetConfig("genScriptFolder", _generatedScriptFolder);
+            _resourcesFolder = GetConfig("resourcesFolder", _resourcesFolder);
 
-            _overwriteScript = EditorPrefs.GetBool(PrefPrefix + "overwriteScript", _overwriteScript);
+            _overwriteScript = GetConfig("overwriteScript", _overwriteScript ? "true" : "false") == "true";
 
-            _status = EditorPrefs.GetString(PrefPrefix + "status", _status);
+            _status = GetConfig("status", _status);
 
-            string tabsJson = EditorPrefs.GetString(PrefPrefix + "tabsJson", "");
+            string tabsJson = GetConfig("tabsJson", "");
             if (!string.IsNullOrEmpty(tabsJson))
             {
                 try
@@ -755,21 +766,21 @@ namespace GameFramework.DataParsing.Editor
 
         private void SavePrefs()
         {
-            EditorPrefs.SetString(PrefPrefix + "sheetUrl", _sheetUrl ?? "");
-            EditorPrefs.SetString(PrefPrefix + "apiKey", _apiKey ?? "");
+            EditorUserSettings.SetConfigValue(PrefPrefix + "sheetUrl", _sheetUrl ?? "");
+            EditorUserSettings.SetConfigValue(PrefPrefix + "apiKey", _apiKey ?? "");
 
-            EditorPrefs.SetString(PrefPrefix + "genScriptFolder", _generatedScriptFolder ?? "");
-            EditorPrefs.SetString(PrefPrefix + "resourcesFolder", _resourcesFolder ?? "");
+            EditorUserSettings.SetConfigValue(PrefPrefix + "genScriptFolder", _generatedScriptFolder ?? "");
+            EditorUserSettings.SetConfigValue(PrefPrefix + "resourcesFolder", _resourcesFolder ?? "");
 
-            EditorPrefs.SetBool(PrefPrefix + "overwriteScript", _overwriteScript);
+            EditorUserSettings.SetConfigValue(PrefPrefix + "overwriteScript", _overwriteScript ? "true" : "false");
 
             TabListWrapper wrapper = new TabListWrapper();
             wrapper.tabs = _tabs;
 
             string tabsJson = JsonUtility.ToJson(wrapper);
-            EditorPrefs.SetString(PrefPrefix + "tabsJson", tabsJson);
+            EditorUserSettings.SetConfigValue(PrefPrefix + "tabsJson", tabsJson);
 
-            EditorPrefs.SetString(PrefPrefix + "status", _status ?? "");
+            EditorUserSettings.SetConfigValue(PrefPrefix + "status", _status ?? "");
         }
     }
 }
