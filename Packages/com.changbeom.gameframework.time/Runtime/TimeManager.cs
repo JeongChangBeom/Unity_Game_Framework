@@ -243,6 +243,8 @@ namespace GameFramework.TimeSystem
 
         public bool IsCooldownReady(string id)
         {
+            ValidateCooldownId(id);
+
             if (!_cooldowns.TryGetValue(id, out long endTicks))
             {
                 return true;
@@ -253,6 +255,8 @@ namespace GameFramework.TimeSystem
 
         public void StartCooldown(string id, TimeSpan duration)
         {
+            ValidateCooldownId(id);
+
             DateTimeOffset end = UtcNow.Add(duration);
             _cooldowns[id] = TimeUtil.ToUtcTicks(end);
             SaveCooldowns();
@@ -260,6 +264,8 @@ namespace GameFramework.TimeSystem
 
         public TimeSpan GetCooldownRemaining(string id)
         {
+            ValidateCooldownId(id);
+
             if (!_cooldowns.TryGetValue(id, out long endTicks))
             {
                 return TimeSpan.Zero;
@@ -271,9 +277,22 @@ namespace GameFramework.TimeSystem
 
         public void ClearCooldown(string id)
         {
+            ValidateCooldownId(id);
+
             if (_cooldowns.Remove(id))
             {
                 SaveCooldowns();
+            }
+        }
+
+        // Dictionary 키로 바로 쓰이기 때문에, id가 null이면 TryGetValue/인덱서에서
+        // ArgumentNullException이 그대로 튀어나와 원인을 알기 어려운 크래시가 됩니다.
+        // TimeStore.MakeKey와 동일한 방식으로 명확한 예외를 던집니다.
+        private static void ValidateCooldownId(string id)
+        {
+            if (string.IsNullOrWhiteSpace(id))
+            {
+                throw new ArgumentException("Cooldown id is null or whitespace.", nameof(id));
             }
         }
 
@@ -322,10 +341,18 @@ namespace GameFramework.TimeSystem
 
         private void OnApplicationPause(bool pause)
         {
+            DateTimeOffset now = UtcNow;
+
             if (pause)
             {
-                _cheatGuard.RecordLastSeen(UtcNow);
+                _cheatGuard.RecordLastSeen(now);
+                return;
             }
+
+            // 백그라운드 상태에서 기기 시계를 되돌린 뒤 앱을 재개하는 경로는 완전
+            // 재시작을 거치지 않으므로, OnInitialize의 1회성 CheckBackward만으로는
+            // 세션 중에 감지되지 않습니다. Resume 시점에도 다시 검사해야 합니다.
+            _cheatGuard.CheckBackward(now, IsTrusted);
         }
 
         protected override void OnApplicationQuit()
