@@ -256,9 +256,11 @@ namespace GameFramework.SoundSystem.Editor
 
             sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
             sb.AppendLine();
-            sb.AppendLine("public enum ESound");
+            sb.AppendLine("namespace GameFramework.SoundSystem");
             sb.AppendLine("{");
-            sb.AppendLine("    None = 0,");
+            sb.AppendLine("    public enum ESound");
+            sb.AppendLine("    {");
+            sb.AppendLine("        None = 0,");
 
             for (int i = 0; i < enumNames.Count; i++)
             {
@@ -269,11 +271,12 @@ namespace GameFramework.SoundSystem.Editor
                     continue;
                 }
 
-                sb.Append("    ");
+                sb.Append("        ");
                 sb.Append(name);
                 sb.AppendLine(",");
             }
 
+            sb.AppendLine("    }");
             sb.AppendLine("}");
 
             return sb.ToString();

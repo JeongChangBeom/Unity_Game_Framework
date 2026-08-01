@@ -7,6 +7,7 @@ using GameFramework.SaveLoad;
 using UnityEngine;
 using UnityEngine.AddressableAssets;
 using UnityEngine.Audio;
+using UnityEngine.ResourceManagement.AsyncOperations;
 
 namespace GameFramework.SoundSystem
 {
@@ -35,6 +36,7 @@ namespace GameFramework.SoundSystem
         private SoundPlayerPool _pool;
 
         private readonly Dictionary<string, AudioClip> _clipCache = new Dictionary<string, AudioClip>();
+        private readonly Dictionary<string, AsyncOperationHandle<AudioClip>> _clipHandles = new Dictionary<string, AsyncOperationHandle<AudioClip>>();
 
         private AudioSource _bgmSource;
         private ESound _currentBgm = ESound.None;
@@ -476,15 +478,38 @@ namespace GameFramework.SoundSystem
                 return cached;
             }
 
-            var handle = Addressables.LoadAssetAsync<AudioClip>(fileName);
+            AsyncOperationHandle<AudioClip> handle = Addressables.LoadAssetAsync<AudioClip>(fileName);
             AudioClip clip = await handle.Task;
 
             if (clip != null)
             {
+                // handle을 들고 있지 않으면 Addressables 참조 카운트를 절대 낮출 수 없어서,
+                // 로드한 클립마다 세션 내내 번들이 고정(pin)된 채로 남습니다. 클립 캐시
+                // 자체는 앱 생명주기 동안 유지하는 게 의도된 설계지만, 참조 카운트는
+                // 정확히 짝을 맞춰둬야 나중에 세션 중 캐시를 비우는 기능을 추가하거나
+                // OnApplicationQuit에서 정리할 때 이 handle을 그대로 쓸 수 있습니다.
                 _clipCache[fileName] = clip;
+                _clipHandles[fileName] = handle;
+            }
+            else
+            {
+                Addressables.Release(handle);
             }
 
             return clip;
+        }
+
+        protected override void OnApplicationQuit()
+        {
+            base.OnApplicationQuit();
+
+            foreach (AsyncOperationHandle<AudioClip> handle in _clipHandles.Values)
+            {
+                Addressables.Release(handle);
+            }
+
+            _clipHandles.Clear();
+            _clipCache.Clear();
         }
     }
 }
