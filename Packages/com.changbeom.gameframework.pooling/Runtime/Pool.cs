@@ -134,7 +134,7 @@ namespace GameFramework.Pooling
 
         private void InvokeOnSpawned(GameObject go)
         {
-            IPoolable[] list = go.GetComponentsInChildren<IPoolable>(true);
+            IPoolable[] list = GetPoolables(go);
             if (list == null)
             {
                 return;
@@ -151,7 +151,7 @@ namespace GameFramework.Pooling
 
         private void InvokeOnDespawned(GameObject go)
         {
-            IPoolable[] list = go.GetComponentsInChildren<IPoolable>(true);
+            IPoolable[] list = GetPoolables(go);
             if (list == null)
             {
                 return;
@@ -164,6 +164,15 @@ namespace GameFramework.Pooling
                     list[i].OnDespawn();
                 }
             }
+        }
+
+        // GetComponentsInChildren<IPoolable>는 호출마다 새 배열을 할당합니다. 풀링 시스템의
+        // 목적 자체가 할당을 줄이는 것이므로, PooledObject.Initialize가 생성 시점에 한 번만
+        // 캐싱해둔 배열을 Spawn/Despawn마다 재사용합니다.
+        private static IPoolable[] GetPoolables(GameObject go)
+        {
+            PooledObject pooled = go.GetComponent<PooledObject>();
+            return pooled != null ? pooled.Poolables : null;
         }
     }
 }
