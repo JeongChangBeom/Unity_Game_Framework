@@ -108,9 +108,14 @@ namespace GameFramework.SaveLoad
             return _provider is ISaveBackupProvider backup && backup.RestoreFromBackup();
         }
 
+        // 공개 API가 SaveKey가 아니라 string을 받기 때문에, 호출자가 SaveKey 생성자의
+        // 검증/정규화(null/공백 거부, 백슬래시 통일, 중복 슬래시 정리)를 그냥 건너뛰고
+        // 다듬어지지 않은 문자열을 바로 넘길 수 있었습니다. 여기서 SaveKey를 한 번 거치게
+        // 해서, SaveKey를 거쳐 온 값이든 리터럴 문자열이든 항상 같은 규칙이 적용되도록 합니다.
         private string WithRoot(string key)
         {
-            return string.IsNullOrEmpty(_rootKey) ? key : $"{_rootKey}/{key}";
+            string normalized = new SaveKey(key).Value;
+            return string.IsNullOrEmpty(_rootKey) ? normalized : $"{_rootKey}/{normalized}";
         }
     }
 }
