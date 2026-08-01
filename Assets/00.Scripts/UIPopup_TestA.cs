@@ -26,25 +26,25 @@ public class UIPopup_TestA : UIPopupBase
     public override void OnOpen(object payload)
     {
         base.OnOpen(payload);
-        Debug.Log("Popup A Open");
+        Debug.Log("[UIPopup_TestA] 팝업 열림");
     }
 
     protected override void PlayCloseAnimation()
     {
-        Debug.Log("Popup A Close Animation Start");
+        Debug.Log("[UIPopup_TestA] 닫기 애니메이션 시작");
         Invoke(nameof(FinishClose), _closeDelay);
     }
 
     private void FinishClose()
     {
-        Debug.Log("Popup A Close Animation End");
+        Debug.Log("[UIPopup_TestA] 닫기 애니메이션 종료");
         CompleteClose();
     }
 
     public override void OnBeforeReturnToPool()
     {
         base.OnBeforeReturnToPool();
-        Debug.Log("Popup A ReturnToPool");
+        Debug.Log("[UIPopup_TestA] 풀로 반환");
     }
 
     private void OnDestroy()

@@ -1,4 +1,5 @@
 using GameFramework.UISystem;
+using TMPro;
 using UnityEngine;
 using UnityEngine.UI;
 
@@ -65,8 +66,8 @@ namespace GameFramework.Tests
             GUILayout.Label("Toast (non-modal, auto-dismiss)");
             if (GUILayout.Button("6) Show Toast (2s)"))
             {
-                UIManager.Instance.ShowToast(_toastTemplate, "Item obtained!");
-                Log("ShowToast(\"Item obtained!\")");
+                UIManager.Instance.ShowToast(_toastTemplate, "아이템 획득!");
+                Log("ShowToast(\"아이템 획득!\")");
             }
 
             GUILayout.Space(10);
@@ -103,9 +104,8 @@ namespace GameFramework.Tests
             textRt.offsetMin = Vector2.zero;
             textRt.offsetMax = Vector2.zero;
 
-            Text text = textGo.AddComponent<Text>();
-            text.font = Resources.GetBuiltinResource<Font>("LegacyRuntime.ttf");
-            text.alignment = TextAnchor.MiddleCenter;
+            TextMeshProUGUI text = textGo.AddComponent<TextMeshProUGUI>();
+            text.alignment = TextAlignmentOptions.Center;
             text.color = Color.white;
 
             SimpleTestToast toast = go.AddComponent<SimpleTestToast>();
@@ -124,9 +124,9 @@ namespace GameFramework.Tests
 
     internal sealed class SimpleTestToast : UIToastBase
     {
-        private Text _text;
+        private TextMeshProUGUI _text;
 
-        public void SetText(Text text)
+        public void SetText(TextMeshProUGUI text)
         {
             _text = text;
         }
@@ -137,7 +137,7 @@ namespace GameFramework.Tests
 
             if (_text != null)
             {
-                _text.text = payload as string ?? "Toast!";
+                _text.text = payload as string ?? "토스트!";
             }
         }
     }
