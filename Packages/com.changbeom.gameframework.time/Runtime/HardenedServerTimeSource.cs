@@ -94,16 +94,13 @@ namespace GameFramework.TimeSystem
                     return false;
                 }
 
-                DateTimeOffset deviceNow = DateTimeOffset.UtcNow;
-                long ageTicks = TimeUtil.ToUtcTicks(deviceNow) - _deviceUtcAtSyncTicks;
-
-                if (ageTicks < 0)
-                {
-                    return false;
-                }
-
-                long limitTicks = (long)_trustWindowSeconds * TimeSpan.TicksPerSecond;
-                if (ageTicks > limitTicks)
+                // 클래스 설명에서 약속한 대로, 만료 판정도 반드시 모노토닉 클럭 기준으로
+                // 계산해야 합니다. 기기 벽시계(DateTimeOffset.UtcNow) 기준으로 계산하면
+                // 동기화 이후 시계가 앞으로 조정될 때 신뢰가 조기 만료되고, 뒤로 조정되면
+                // 오히려 즉시 미신뢰 처리되어(아래 ageSeconds < 0) 이 클래스가 막으려는
+                // 바로 그 시계 조작에 그대로 휘둘리게 됩니다.
+                double ageSeconds = nowMono - _monoAtSyncSeconds;
+                if (ageSeconds > _trustWindowSeconds)
                 {
                     return false;
                 }
@@ -124,12 +121,10 @@ namespace GameFramework.TimeSystem
                 return TimeSpan.Zero;
             }
 
-            DateTimeOffset deviceNow = DateTimeOffset.UtcNow;
-            long ageTicks = TimeUtil.ToUtcTicks(deviceNow) - _deviceUtcAtSyncTicks;
-            long limitTicks = (long)_trustWindowSeconds * TimeSpan.TicksPerSecond;
-            long remainingTicks = limitTicks - ageTicks;
+            double ageSeconds = _mono.Seconds - _monoAtSyncSeconds;
+            double remainingSeconds = _trustWindowSeconds - ageSeconds;
 
-            return remainingTicks > 0 ? TimeSpan.FromTicks(remainingTicks) : TimeSpan.Zero;
+            return remainingSeconds > 0 ? TimeSpan.FromSeconds(remainingSeconds) : TimeSpan.Zero;
         }
 
         public void ApplyServerUtc(DateTimeOffset serverUtc)

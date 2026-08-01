@@ -20,24 +20,6 @@ namespace GameFramework.TimeSystem
             return utc.ToUniversalTime().Ticks;
         }
 
-        public static string FormatDaysHoursMinutes(TimeSpan span)
-        {
-            if (span < TimeSpan.Zero)
-            {
-                span = TimeSpan.Zero;
-            }
-
-            int days = span.Days;
-            int hours = span.Hours;
-            int minutes = span.Minutes;
-
-            return days.ToString(CultureInfo.InvariantCulture)
-                   + " : "
-                   + hours.ToString(CultureInfo.InvariantCulture)
-                   + " : "
-                   + minutes.ToString(CultureInfo.InvariantCulture);
-        }
-
         public static string FormatHhMmSs(TimeSpan span)
         {
             if (span < TimeSpan.Zero)
