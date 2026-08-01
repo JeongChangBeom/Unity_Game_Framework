@@ -82,7 +82,7 @@ namespace GameFramework.DataParsing
         {
             if (string.IsNullOrEmpty(raw))
             {
-                return new int[0];
+                return Array.Empty<int>();
             }
 
             string[] parts = raw.Split(ArrayDelimiter);
@@ -100,7 +100,7 @@ namespace GameFramework.DataParsing
         {
             if (string.IsNullOrEmpty(raw))
             {
-                return new long[0];
+                return Array.Empty<long>();
             }
 
             string[] parts = raw.Split(ArrayDelimiter);
@@ -118,7 +118,7 @@ namespace GameFramework.DataParsing
         {
             if (string.IsNullOrEmpty(raw))
             {
-                return new float[0];
+                return Array.Empty<float>();
             }
 
             string[] parts = raw.Split(ArrayDelimiter);
@@ -136,7 +136,7 @@ namespace GameFramework.DataParsing
         {
             if (string.IsNullOrEmpty(raw))
             {
-                return new double[0];
+                return Array.Empty<double>();
             }
 
             string[] parts = raw.Split(ArrayDelimiter);
@@ -154,7 +154,7 @@ namespace GameFramework.DataParsing
         {
             if (string.IsNullOrEmpty(raw))
             {
-                return new bool[0];
+                return Array.Empty<bool>();
             }
 
             string[] parts = raw.Split(ArrayDelimiter);
@@ -172,7 +172,7 @@ namespace GameFramework.DataParsing
         {
             if (string.IsNullOrEmpty(raw))
             {
-                return new string[0];
+                return Array.Empty<string>();
             }
 
             string[] parts = raw.Split(ArrayDelimiter);
