@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using GameFramework.Pooling;
 using UnityEngine;
 
@@ -7,6 +8,14 @@ namespace GameFramework.UISystem
     public abstract class UIPopupBase : MonoBehaviour, IPoolable
     {
         [SerializeField] private float _animationDuration = 0.2f;
+
+        // destroyCancellationToken은 실제 Destroy에서만 취소되는데, 풀링된 오브젝트는
+        // Destroy가 아니라 SetActive(false)로만 반환됩니다. 그걸 그대로 쓰면 이전
+        // 생애의 애니메이션이 취소되지 않은 채 살아남아, 나중에 같은 인스턴스가 다른
+        // 팝업으로 재활용된 뒤 CompleteX()를 호출해버릴 수 있습니다. 그래서 애니메이션은
+        // 이 자체 토큰을 쓰고, OnBeforeReturnToPool에서 확실히 취소합니다.
+        private CancellationTokenSource _animCts = new CancellationTokenSource();
+        protected CancellationToken AnimationToken => _animCts.Token;
 
         public bool IsOpen { get; private set; }
 
@@ -31,6 +40,7 @@ namespace GameFramework.UISystem
 
         public virtual void OnOpen(object payload)
         {
+            RestartAnimationToken();
             CachedPayload = payload;
             IsOpen = true;
             gameObject.SetActive(true);
@@ -42,7 +52,7 @@ namespace GameFramework.UISystem
             // 기본: 스케일 0 -> 1로 커지면서 열림.
             // TODO: 원하는 연출로 바꾸려면 이 메서드를 override 하세요.
             //       연출이 끝나면 반드시 CompleteOpen()을 호출해야 합니다.
-            _ = DefaultUIAnimation.ScaleTo(transform, 0f, 1f, _animationDuration, destroyCancellationToken, CompleteOpen);
+            _ = DefaultUIAnimation.ScaleTo(transform, 0f, 1f, _animationDuration, AnimationToken, CompleteOpen);
         }
 
         protected virtual void CompleteOpen()
@@ -52,6 +62,7 @@ namespace GameFramework.UISystem
 
         public virtual void OnResume(object payload)
         {
+            RestartAnimationToken();
             CachedPayload = payload;
             IsOpen = true;
             gameObject.SetActive(true);
@@ -63,7 +74,7 @@ namespace GameFramework.UISystem
             // 기본: Open과 동일하게 스케일 0 -> 1로 커지면서 재개.
             // TODO: 원하는 연출로 바꾸려면 이 메서드를 override 하세요.
             //       연출이 끝나면 반드시 CompleteResume()을 호출해야 합니다.
-            _ = DefaultUIAnimation.ScaleTo(transform, 0f, 1f, _animationDuration, destroyCancellationToken, CompleteResume);
+            _ = DefaultUIAnimation.ScaleTo(transform, 0f, 1f, _animationDuration, AnimationToken, CompleteResume);
         }
 
         protected virtual void CompleteResume()
@@ -73,6 +84,7 @@ namespace GameFramework.UISystem
 
         public virtual void OnSuspend()
         {
+            RestartAnimationToken();
             PlaySuspendAnimation();
         }
 
@@ -81,7 +93,7 @@ namespace GameFramework.UISystem
             // 기본: 스케일 1 -> 0으로 작아지면서 숨김.
             // TODO: 원하는 연출로 바꾸려면 이 메서드를 override 하세요.
             //       연출이 끝나면 반드시 CompleteSuspend()를 호출해야 합니다.
-            _ = DefaultUIAnimation.ScaleTo(transform, 1f, 0f, _animationDuration, destroyCancellationToken, CompleteSuspend);
+            _ = DefaultUIAnimation.ScaleTo(transform, 1f, 0f, _animationDuration, AnimationToken, CompleteSuspend);
         }
 
         protected void CompleteSuspend()
@@ -92,6 +104,7 @@ namespace GameFramework.UISystem
 
         public void RequestClose(Action onClosed)
         {
+            RestartAnimationToken();
             _onClosed = onClosed;
             PlayCloseAnimation();
         }
@@ -101,7 +114,7 @@ namespace GameFramework.UISystem
             // 기본: 스케일 1 -> 0으로 작아지면서 닫힘.
             // TODO: 원하는 연출로 바꾸려면 이 메서드를 override 하세요.
             //       연출이 끝나면 반드시 CompleteClose()를 호출해야 합니다.
-            _ = DefaultUIAnimation.ScaleTo(transform, 1f, 0f, _animationDuration, destroyCancellationToken, CompleteClose);
+            _ = DefaultUIAnimation.ScaleTo(transform, 1f, 0f, _animationDuration, AnimationToken, CompleteClose);
         }
 
         protected void CompleteClose()
@@ -115,7 +128,22 @@ namespace GameFramework.UISystem
 
         public virtual void OnBeforeReturnToPool()
         {
-            // 풀에 반환되기 전 처리
+            // 풀에 반환되기 전 처리. 진행 중이던 애니메이션이 이 인스턴스가 다른
+            // 팝업으로 재활용된 뒤에도 계속 돌다가 CompleteX()를 부르는 걸 막기 위해
+            // 반드시 취소합니다. override하는 경우 base.OnBeforeReturnToPool()을 호출하세요.
+            RestartAnimationToken();
+        }
+
+        // Open/Resume/Suspend/Close는 전부 같은 인스턴스 안에서(풀 반환 없이) 서로를
+        // 가로챌 수 있습니다 (예: Suspend 애니메이션이 끝나기 전에 선점 해제로 Resume이
+        // 호출되는 경우). 풀 반환 시점에만 토큰을 갱신하면, 먼저 시작한 Suspend가 나중에
+        // 끝나면서 Resume이 만들어둔 "열린" 상태를 CompleteSuspend가 도로 닫아버릴 수
+        // 있습니다. 그래서 네 전환 시작 시점마다 토큰을 갱신해 이전 애니메이션을 취소합니다.
+        private void RestartAnimationToken()
+        {
+            _animCts.Cancel();
+            _animCts.Dispose();
+            _animCts = new CancellationTokenSource();
         }
 
         public virtual void OnAfterGetFromPool()

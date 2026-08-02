@@ -1,5 +1,6 @@
 using System;
 using System.Collections.Generic;
+using System.Threading;
 using GameFramework.Core;
 using GameFramework.Pooling;
 using UnityEngine;
@@ -126,12 +127,17 @@ namespace GameFramework.UISystem
             req.instance = null;
             req.priority = priority;
             req.payload = payload;
-            req.unique = unique;
             req.onResult = onResult;
             req.sequence = _sequenceCounter;
             _sequenceCounter++;
 
-            if (_current != null)
+            // _isClosingCurrent인 동안(닫기 애니메이션이 아직 진행 중인 동안)에는 _current를
+            // 건드리지 않습니다. 여기서 SuspendCurrentToPending/ClosePopup을 또 호출하면,
+            // 같은 인스턴스가 "닫히는 중"이면서 동시에 "_pending에서 재개 가능"한 모순된
+            // 상태가 되어, 닫기 완료 콜백이 풀에 반환한 인스턴스를 ProcessPending이 다시
+            // 꺼내 쓰려고 하는 이중 사용으로 이어질 수 있습니다. 이 창에서는 그냥 대기열에
+            // 넣어두면, 닫기가 끝나는 순간 _processScheduled로 자연스럽게 처리됩니다.
+            if (_current != null && _isClosingCurrent == false)
             {
                 if (policy == EPopupPolicy.PreemptIfHigher &&
                     priority > (EPopupPriority)_current.OpenPriority)
@@ -208,6 +214,7 @@ namespace GameFramework.UISystem
         {
             if (key == EPoolKey.None)
             {
+                Debug.LogError("[UIManager] EPoolKey.None으로는 팝업을 열 수 없습니다.");
                 return null;
             }
 
@@ -262,7 +269,14 @@ namespace GameFramework.UISystem
             target.RequestClose(() =>
             {
                 PoolManager.Instance.Despawn(target.gameObject);
-                _current = null;
+
+                // _current가 그 사이 다른 팝업으로 바뀌어 있다면(정상 흐름에서는 위의
+                // RequestPopup 가드 때문에 일어나지 않아야 하지만) 덮어쓰지 않습니다.
+                if (_current == target)
+                {
+                    _current = null;
+                }
+
                 _isClosingCurrent = false;
                 _processScheduled = true;
                 onResult?.Invoke(result);
@@ -291,16 +305,26 @@ namespace GameFramework.UISystem
                 return;
             }
 
+            // ClosePopup과 마찬가지로 _current는 RequestClose의 완료 콜백에서만 비웁니다.
+            // 여기서 미리 null로 만들면, 애니메이션이 끝나기 전 그 사이에 들어온
+            // RequestPopup이 "열려 있는 팝업이 없다"고 착각해 새 팝업을 바로 열어버려서
+            // 옛 팝업이 화면에서 채 사라지기도 전에 두 팝업이 동시에 보이는 경쟁 상태가 있었습니다.
             _isClosingCurrent = true;
             UIPopupBase target = _current;
-            _current = null;
             _currentResultCallback = null;
             _modalBlocker.SetActive(false);
 
             target.RequestClose(() =>
             {
                 PoolManager.Instance.Despawn(target.gameObject);
+
+                if (_current == target)
+                {
+                    _current = null;
+                }
+
                 _isClosingCurrent = false;
+                _processScheduled = true;
             });
         }
 
@@ -333,7 +357,6 @@ namespace GameFramework.UISystem
             r.prefab = null;
             r.priority = (EPopupPriority)cur.OpenPriority;
             r.payload = cur.CachedPayload;
-            r.unique = true;
             r.sequence = cur.OpenSequence;
             r.onResult = _currentResultCallback;
 
@@ -423,7 +446,7 @@ namespace GameFramework.UISystem
             _activeToasts.Add(instance);
 
             float d = duration >= 0f ? duration : _settings.DefaultToastDuration;
-            _ = AutoHideToastAfterDelay(instance, d);
+            _ = AutoHideToastAfterDelay(instance, d, instance.DespawnToken);
         }
 
         /// <summary>토스트를 조기에 닫습니다. 이미 자동으로 사라진 뒤에 호출해도 안전합니다.</summary>
@@ -442,9 +465,21 @@ namespace GameFramework.UISystem
             toast.RequestHide(() => PoolManager.Instance.Despawn(toast.gameObject));
         }
 
-        private async Awaitable AutoHideToastAfterDelay(UIToastBase toast, float delay)
+        private async Awaitable AutoHideToastAfterDelay(UIToastBase toast, float delay, CancellationToken despawnToken)
         {
-            await Awaitable.WaitForSecondsAsync(Mathf.Max(0.01f, delay));
+            // despawnToken은 이 toast 인스턴스가 (수동으로 먼저 숨겨지는 등의 이유로) 풀에
+            // 반환되는 순간 취소됩니다. 취소 없이 그냥 두면, 이 타이머가 나중에 발동했을 때
+            // 이 인스턴스가 이미 다른 토스트로 재활용된 뒤일 수 있어 방금 새로 표시된
+            // 토스트를 엉뚱하게 조기 숨김 처리해버릴 수 있습니다.
+            try
+            {
+                await Awaitable.WaitForSecondsAsync(Mathf.Max(0.01f, delay), despawnToken);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
             HideToast(toast);
         }
 

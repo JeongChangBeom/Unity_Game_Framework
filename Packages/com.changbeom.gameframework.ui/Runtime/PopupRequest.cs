@@ -10,7 +10,6 @@ namespace GameFramework.UISystem
 
         public EPopupPriority priority;
         public object payload;
-        public bool unique;
         public int sequence;
         public Action<object> onResult;
 

@@ -1,4 +1,5 @@
 using System;
+using System.Threading;
 using GameFramework.Pooling;
 using UnityEngine;
 
@@ -11,6 +12,17 @@ namespace GameFramework.UISystem
     public abstract class UIToastBase : MonoBehaviour, IPoolable
     {
         [SerializeField] private float _animationDuration = 0.2f;
+
+        // destroyCancellationToken은 실제 Destroy에서만 취소되는데, 풀링된 오브젝트는
+        // Destroy가 아니라 SetActive(false)로만 반환됩니다. 애니메이션은 이 자체 토큰을
+        // 쓰고, OnBeforeReturnToPool에서 확실히 취소해서 재활용 후에도 살아남지 않게 합니다.
+        private CancellationTokenSource _animCts = new CancellationTokenSource();
+        protected CancellationToken AnimationToken => _animCts.Token;
+
+        /// <summary>이 인스턴스의 현재 생애(스폰~풀 반환)에서만 유효한 토큰입니다. 애니메이션뿐
+        /// 아니라, 이 토스트 인스턴스에 묶여 있지만 클래스 밖(UIManager의 자동 숨김 타이머 등)에서
+        /// 도는 비동기 작업도 재활용 이후까지 살아남으면 안 되므로 이 토큰으로 취소하세요.</summary>
+        public CancellationToken DespawnToken => _animCts.Token;
 
         private Action _onHidden;
 
@@ -25,7 +37,7 @@ namespace GameFramework.UISystem
             // 기본: 스케일 0 -> 1로 커지면서 표시.
             // TODO: 원하는 연출로 바꾸려면 이 메서드를 override 하세요.
             //       연출이 끝나면 반드시 CompleteShow()를 호출해야 합니다.
-            _ = DefaultUIAnimation.ScaleTo(transform, 0f, 1f, _animationDuration, destroyCancellationToken, CompleteShow);
+            _ = DefaultUIAnimation.ScaleTo(transform, 0f, 1f, _animationDuration, AnimationToken, CompleteShow);
         }
 
         protected virtual void CompleteShow()
@@ -45,7 +57,7 @@ namespace GameFramework.UISystem
             // 기본: 스케일 1 -> 0으로 작아지면서 숨김.
             // TODO: 원하는 연출로 바꾸려면 이 메서드를 override 하세요.
             //       연출이 끝나면 반드시 CompleteHide()를 호출해야 합니다.
-            _ = DefaultUIAnimation.ScaleTo(transform, 1f, 0f, _animationDuration, destroyCancellationToken, CompleteHide);
+            _ = DefaultUIAnimation.ScaleTo(transform, 1f, 0f, _animationDuration, AnimationToken, CompleteHide);
         }
 
         protected void CompleteHide()
@@ -58,7 +70,12 @@ namespace GameFramework.UISystem
 
         public virtual void OnBeforeReturnToPool()
         {
-            // 풀에 반환되기 전 처리
+            // 풀에 반환되기 전 처리. 진행 중이던 애니메이션이 이 인스턴스가 다른
+            // 토스트로 재활용된 뒤에도 계속 돌다가 CompleteX()를 부르는 걸 막기 위해
+            // 반드시 취소합니다. override하는 경우 base.OnBeforeReturnToPool()을 호출하세요.
+            _animCts.Cancel();
+            _animCts.Dispose();
+            _animCts = new CancellationTokenSource();
         }
 
         public virtual void OnAfterGetFromPool()
