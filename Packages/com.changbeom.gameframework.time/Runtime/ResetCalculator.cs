@@ -43,13 +43,6 @@ namespace GameFramework.TimeSystem
             return GetNextResetUtc(nowUtc, rule) - nowUtc;
         }
 
-        public static bool HasCrossedReset(DateTimeOffset lastCheckUtc, DateTimeOffset nowUtc, ResetRule rule)
-        {
-            DateTimeOffset a = GetLastResetUtc(lastCheckUtc, rule);
-            DateTimeOffset b = GetLastResetUtc(nowUtc, rule);
-            return a.UtcDateTime != b.UtcDateTime;
-        }
-
         public static DateTimeOffset GetLastDailyResetUtc(DateTimeOffset nowUtc, int resetHour)
         {
             DateTime now = nowUtc.UtcDateTime;
