@@ -13,6 +13,7 @@ namespace GameFramework.Pooling
 
         private readonly Queue<GameObject> _inactive = new Queue<GameObject>();
         private readonly HashSet<GameObject> _inactiveSet = new HashSet<GameObject>();
+        private readonly Dictionary<GameObject, PooledObject> _pooledByInstance = new Dictionary<GameObject, PooledObject>();
         private int _totalCreated;
 
         public GameObject Prefab => _prefab;
@@ -29,6 +30,16 @@ namespace GameFramework.Pooling
                 for (int i = 0; i < prewarmCount; i++)
                 {
                     GameObject go = CreateNew(owner);
+
+                    // maxCount가 prewarmCount보다 작게 설정되어 있으면 CreateNew가 null을
+                    // 반환합니다. 여기서 멈추지 않으면 SetInactive(go)가 바로 NRE를 던져
+                    // PoolManager.OnInitialize() 전체가 죽습니다.
+                    if (go == null)
+                    {
+                        Debug.LogWarning($"[Pool] {_prefab.name}: prewarmCount({prewarmCount})가 maxCount({maxCount})보다 커서 나머지 프리웜을 건너뜁니다.");
+                        break;
+                    }
+
                     SetInactive(go);
                     _inactive.Enqueue(go);
                     _inactiveSet.Add(go);
@@ -121,6 +132,7 @@ namespace GameFramework.Pooling
             }
 
             pooled.Initialize(owner, _prefab);
+            _pooledByInstance[go] = pooled;
 
             _totalCreated++;
             return go;
@@ -166,13 +178,13 @@ namespace GameFramework.Pooling
             }
         }
 
-        // GetComponentsInChildren<IPoolable>는 호출마다 새 배열을 할당합니다. 풀링 시스템의
-        // 목적 자체가 할당을 줄이는 것이므로, PooledObject.Initialize가 생성 시점에 한 번만
-        // 캐싱해둔 배열을 Spawn/Despawn마다 재사용합니다.
-        private static IPoolable[] GetPoolables(GameObject go)
+        // GetComponentsInChildren<IPoolable>는 호출마다 새 배열을 할당하므로, PooledObject.
+        // Initialize가 생성 시점에 한 번만 캐싱해둔 배열을 재사용합니다. PooledObject 자체도
+        // CreateNew 시점에 한 번만 조회해 _pooledByInstance에 저장해두고, 여기서는
+        // GetComponent를 다시 부르지 않고 그 캐시를 그대로 씁니다.
+        private IPoolable[] GetPoolables(GameObject go)
         {
-            PooledObject pooled = go.GetComponent<PooledObject>();
-            return pooled != null ? pooled.Poolables : null;
+            return _pooledByInstance.TryGetValue(go, out PooledObject pooled) ? pooled.Poolables : null;
         }
     }
 }

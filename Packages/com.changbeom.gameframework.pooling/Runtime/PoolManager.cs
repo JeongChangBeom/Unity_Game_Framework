@@ -175,6 +175,7 @@ namespace GameFramework.Pooling
         {
             if (key == EPoolKey.None)
             {
+                Debug.LogError("[PoolManager] EPoolKey.None으로는 Spawn할 수 없습니다.");
                 return null;
             }
 
@@ -186,6 +187,7 @@ namespace GameFramework.Pooling
         {
             if (key == EPoolKey.None)
             {
+                Debug.LogError("[PoolManager] EPoolKey.None으로는 Spawn할 수 없습니다.");
                 return null;
             }
 
