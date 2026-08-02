@@ -41,6 +41,11 @@ public class UIPopup_TestB : UIPopupBase
     public override void OnBeforeReturnToPool()
     {
         base.OnBeforeReturnToPool();
+
+        // CloseAll처럼 RequestClose 경로를 건너뛰고 바로 Despawn하는 경우, 여기서
+        // 취소하지 않으면 예약된 FinishClose()가 나중에 재활용된 인스턴스에서 실행됩니다.
+        CancelInvoke();
+
         Debug.Log("[UIPopup_TestB] 풀로 반환");
     }
 

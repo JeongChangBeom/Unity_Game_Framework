@@ -72,8 +72,8 @@ namespace GameFramework.Tests
 
             if (GUILayout.Button("6) Flush (force write to disk now)"))
             {
-                SaveManager.Instance.Flush();
-                Log("Flush 완료");
+                bool ok = SaveManager.Instance.Flush();
+                Log("Flush: " + ok);
             }
 
             GUILayout.Space(10);
@@ -86,8 +86,8 @@ namespace GameFramework.Tests
 
             if (GUILayout.Button("8) BackupNow"))
             {
-                SaveManager.Instance.BackupNow();
-                Log("BackupNow 호출됨");
+                bool ok = SaveManager.Instance.BackupNow();
+                Log("BackupNow: " + ok);
             }
 
             if (GUILayout.Button("9) RestoreFromBackup"))

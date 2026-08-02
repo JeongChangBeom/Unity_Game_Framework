@@ -51,8 +51,8 @@ namespace GameFramework.Tests
             GUILayout.BeginArea(new Rect(560, 20, 460, 220));
             GUILayout.Box("Boot Order Tester");
 
-            GUILayout.Label("Expected on Play: A, B already recorded below (auto-booted before scene load).");
-            GUILayout.Label("C only appears after you press the button (lazy init, no [BootPriority]).");
+            GUILayout.Label("Play 시 기대 동작: A, B는 씬 로드 전에 이미 자동 초기화되어 아래에 기록됨.");
+            GUILayout.Label("C는 버튼을 눌러야만 나타남 (지연 초기화, [BootPriority] 없음).");
 
             GUILayout.Space(10);
             GUILayout.Label("Recorded order: " + (BootOrderLog.Entries.Count == 0 ? "(empty)" : string.Join(" -> ", BootOrderLog.Entries)));
