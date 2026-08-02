@@ -93,7 +93,7 @@ namespace GameFramework.DataParsing
                 {
                     row.Add(field.ToString());
                     field.Clear();
-                    AddRowIfNotBlank(table, row);
+                    table.AddRow(row.ToArray());
                     row = new List<string>();
                     i++;
                     continue;
@@ -106,22 +106,10 @@ namespace GameFramework.DataParsing
             if (field.Length > 0 || row.Count > 0)
             {
                 row.Add(field.ToString());
-                AddRowIfNotBlank(table, row);
+                table.AddRow(row.ToArray());
             }
 
             return table;
-        }
-
-        private static void AddRowIfNotBlank(TsvTable table, List<string> row)
-        {
-            for (int i = 0; i < row.Count; i++)
-            {
-                if (!string.IsNullOrWhiteSpace(row[i]))
-                {
-                    table.AddRow(row.ToArray());
-                    return;
-                }
-            }
         }
     }
 }

@@ -86,6 +86,15 @@ namespace GameFramework.DataParsing.Editor
 
                 string fieldName = ToSafeFieldName(name);
 
+                // 생성되는 Data 클래스는 컬럼 필드 옆에 RowKey 필드를 이미 고정으로
+                // 선언합니다 (WriteTableScript 참고). 컬럼 이름이 sanitize 후 "RowKey"가
+                // 되면 같은 클래스에 필드가 두 번 선언되어 생성 스크립트가 컴파일되지 않습니다.
+                if (fieldName == "RowKey")
+                {
+                    error = "컬럼 이름 \"" + name + "\"는 sanitize 후 \"RowKey\"가 되어, 모든 테이블에 이미 고정으로 있는 RowKey 필드와 충돌합니다. 컬럼 이름을 다르게 바꿔주세요.";
+                    return false;
+                }
+
                 for (int i = 0; i < columns.Count; i++)
                 {
                     if (columns[i].columnName == name)

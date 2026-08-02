@@ -341,66 +341,75 @@ namespace GameFramework.DataParsing.Editor
 
         private IEnumerator CreateCoroutine(List<SheetTabInfo> targets)
         {
+            // try 안에 yield가 있으면 catch는 같이 못 쓰지만(C# 컴파일 제약), finally는
+            // 됩니다. 루프 중간에 예외가 나도 ClearProgressBar/_isBusy 해제가 반드시
+            // 실행되도록 해서, 안 그러면 진행바가 뜬 채로 멈추고 _isBusy가 영원히 true로
+            // 남아 창의 모든 버튼이 막혀버리는 문제를 방지합니다.
             List<string> pending = new List<string>();
 
-            for (int i = 0; i < targets.Count; i++)
+            try
             {
-                SheetTabInfo tab = targets[i];
-
-                EditorUtility.DisplayProgressBar(
-                    "DataTable Importer",
-                    "TSV 다운로드 중: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
-                    (float)(i + 1) / targets.Count);
-
-                UnityWebRequest req = GoogleSheetUtility.BuildTsvRequest(_spreadsheetId, tab.gid);
-                yield return req.SendWebRequest();
-
-                if (req.result != UnityWebRequest.Result.Success)
+                for (int i = 0; i < targets.Count; i++)
                 {
-                    Debug.LogError("[DataTableImporter] TSV 다운로드 실패: " + tab.title + " / " + req.error);
-                    continue;
+                    SheetTabInfo tab = targets[i];
+
+                    EditorUtility.DisplayProgressBar(
+                        "DataTable Importer",
+                        "TSV 다운로드 중: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
+                        (float)(i + 1) / targets.Count);
+
+                    UnityWebRequest req = GoogleSheetUtility.BuildTsvRequest(_spreadsheetId, tab.gid);
+                    yield return req.SendWebRequest();
+
+                    if (req.result != UnityWebRequest.Result.Success)
+                    {
+                        Debug.LogError("[DataTableImporter] TSV 다운로드 실패: " + tab.title + " / " + req.error);
+                        continue;
+                    }
+
+                    string tsv = req.downloadHandler.text;
+
+                    List<TableClassGenerator.ColumnInfo> cols;
+                    string err;
+                    if (!TableClassGenerator.TryExtractColumnsFromTsv(tsv, out cols, out err))
+                    {
+                        Debug.LogError("[DataTableImporter] 컬럼 분석 실패: " + tab.title + " / " + err);
+                        continue;
+                    }
+
+                    if (File.Exists(tab.scriptPath) && !_overwriteScript)
+                    {
+                    }
+                    else
+                    {
+                        TableClassGenerator.WriteTableScript(tab.scriptPath, tab.className, cols);
+                    }
+
+                    string payloadLine = tab.className + "|" + tab.assetPath + "|" + EscapeForPrefs(tsv);
+                    pending.Add(payloadLine);
                 }
 
-                string tsv = req.downloadHandler.text;
-
-                List<TableClassGenerator.ColumnInfo> cols;
-                string err;
-                if (!TableClassGenerator.TryExtractColumnsFromTsv(tsv, out cols, out err))
+                if (pending.Count > 0)
                 {
-                    Debug.LogError("[DataTableImporter] 컬럼 분석 실패: " + tab.title + " / " + err);
-                    continue;
+                    DataTableAssetBuilder.SetPending(pending);
                 }
 
-                if (File.Exists(tab.scriptPath) && !_overwriteScript)
+                AssetDatabase.Refresh();
+
+                for (int i = 0; i < _tabs.Count; i++)
                 {
-                }
-                else
-                {
-                    TableClassGenerator.WriteTableScript(tab.scriptPath, tab.className, cols);
+                    _tabs[i].assetExists = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(_tabs[i].assetPath) != null;
                 }
 
-                string payloadLine = tab.className + "|" + tab.assetPath + "|" + EscapeForPrefs(tsv);
-                pending.Add(payloadLine);
+                _status = "완료. 컴파일 후 Resources에 .asset이 생성됩니다.";
             }
-
-            EditorUtility.ClearProgressBar();
-
-            if (pending.Count > 0)
+            finally
             {
-                DataTableAssetBuilder.SetPending(pending);
+                EditorUtility.ClearProgressBar();
+                _isBusy = false;
+                SavePrefs();
+                Repaint();
             }
-
-            AssetDatabase.Refresh();
-
-            for (int i = 0; i < _tabs.Count; i++)
-            {
-                _tabs[i].assetExists = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(_tabs[i].assetPath) != null;
-            }
-
-            _isBusy = false;
-            _status = "완료. 컴파일 후 Resources에 .asset이 생성됩니다.";
-            SavePrefs();
-            Repaint();
         }
 
         private void RefreshSelected()
@@ -432,111 +441,116 @@ namespace GameFramework.DataParsing.Editor
 
         private IEnumerator RefreshCoroutine(List<SheetTabInfo> targets)
         {
-            for (int i = 0; i < targets.Count; i++)
+            try
             {
-                SheetTabInfo tab = targets[i];
-
-                EditorUtility.DisplayProgressBar(
-                    "DataTable Importer",
-                    "갱신 중: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
-                    (float)(i + 1) / targets.Count);
-
-                UnityWebRequest req = GoogleSheetUtility.BuildTsvRequest(_spreadsheetId, tab.gid);
-                yield return req.SendWebRequest();
-
-                if (req.result != UnityWebRequest.Result.Success)
+                for (int i = 0; i < targets.Count; i++)
                 {
-                    Debug.LogError("[DataTableImporter] TSV 다운로드 실패: " + tab.title + " / " + req.error);
-                    continue;
-                }
+                    SheetTabInfo tab = targets[i];
 
-                string tsv = req.downloadHandler.text;
+                    EditorUtility.DisplayProgressBar(
+                        "DataTable Importer",
+                        "갱신 중: " + tab.title + " (" + (i + 1) + "/" + targets.Count + ")",
+                        (float)(i + 1) / targets.Count);
 
-                UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(tab.assetPath);
-                if (asset == null)
-                {
-                    Debug.LogWarning("[DataTableImporter] asset 없음(스킵): " + tab.assetPath);
-                    continue;
-                }
+                    UnityWebRequest req = GoogleSheetUtility.BuildTsvRequest(_spreadsheetId, tab.gid);
+                    yield return req.SendWebRequest();
 
-                List<TableClassGenerator.ColumnInfo> columns;
-                string schemaError;
-
-                if (!TableClassGenerator.TryExtractColumnsFromTsv(tsv, out columns, out schemaError))
-                {
-                    Debug.LogError("[DataTableImporter] 컬럼 분석 실패: " + tab.title + " / " + schemaError);
-                    continue;
-                }
-
-                Type dataType = asset.GetType().GetNestedType(
-                    "Data",
-                    System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
-
-                if (dataType == null)
-                {
-                    Debug.LogError("[DataTableImporter] Data 타입 없음: " + asset.GetType().FullName);
-                    continue;
-                }
-
-                var fields = dataType.GetFields(
-                    System.Reflection.BindingFlags.Public |
-                    System.Reflection.BindingFlags.Instance);
-
-                HashSet<string> fieldSet = new HashSet<string>();
-                for (int f = 0; f < fields.Length; f++)
-                {
-                    fieldSet.Add(fields[f].Name);
-                }
-
-                fieldSet.Remove("RowKey");
-
-                bool schemaMismatch = columns.Count != fieldSet.Count;
-
-                if (!schemaMismatch)
-                {
-                    for (int c = 0; c < columns.Count; c++)
+                    if (req.result != UnityWebRequest.Result.Success)
                     {
-                        if (!fieldSet.Contains(columns[c].fieldName))
+                        Debug.LogError("[DataTableImporter] TSV 다운로드 실패: " + tab.title + " / " + req.error);
+                        continue;
+                    }
+
+                    string tsv = req.downloadHandler.text;
+
+                    UnityEngine.Object asset = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(tab.assetPath);
+                    if (asset == null)
+                    {
+                        Debug.LogWarning("[DataTableImporter] asset 없음(스킵): " + tab.assetPath);
+                        continue;
+                    }
+
+                    List<TableClassGenerator.ColumnInfo> columns;
+                    string schemaError;
+
+                    if (!TableClassGenerator.TryExtractColumnsFromTsv(tsv, out columns, out schemaError))
+                    {
+                        Debug.LogError("[DataTableImporter] 컬럼 분석 실패: " + tab.title + " / " + schemaError);
+                        continue;
+                    }
+
+                    Type dataType = asset.GetType().GetNestedType(
+                        "Data",
+                        System.Reflection.BindingFlags.Public | System.Reflection.BindingFlags.NonPublic);
+
+                    if (dataType == null)
+                    {
+                        Debug.LogError("[DataTableImporter] Data 타입 없음: " + asset.GetType().FullName);
+                        continue;
+                    }
+
+                    var fields = dataType.GetFields(
+                        System.Reflection.BindingFlags.Public |
+                        System.Reflection.BindingFlags.Instance);
+
+                    HashSet<string> fieldSet = new HashSet<string>();
+                    for (int f = 0; f < fields.Length; f++)
+                    {
+                        fieldSet.Add(fields[f].Name);
+                    }
+
+                    fieldSet.Remove("RowKey");
+
+                    bool schemaMismatch = columns.Count != fieldSet.Count;
+
+                    if (!schemaMismatch)
+                    {
+                        for (int c = 0; c < columns.Count; c++)
                         {
-                            schemaMismatch = true;
-                            break;
+                            if (!fieldSet.Contains(columns[c].fieldName))
+                            {
+                                schemaMismatch = true;
+                                break;
+                            }
                         }
                     }
+
+                    if (schemaMismatch)
+                    {
+                        Debug.LogWarning(
+                            "[DataTableImporter] 스키마가 서로 다릅니다: " + tab.title +
+                            "\n열 추가/삭제/이름 변경이 있었다면 '선택 시트 생성'을 다시 실행하세요.");
+                        continue;
+                    }
+
+                    var method = asset.GetType().GetMethod("ParseFromTsv");
+                    if (method == null)
+                    {
+                        Debug.LogError("[DataTableImporter] ParseFromTsv 메서드 없음: " + asset.GetType().FullName);
+                        continue;
+                    }
+
+                    method.Invoke(asset, new object[] { tsv });
+                    EditorUtility.SetDirty(asset);
                 }
 
-                if (schemaMismatch)
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                for (int i = 0; i < _tabs.Count; i++)
                 {
-                    Debug.LogWarning(
-                        "[DataTableImporter] 스키마가 서로 다릅니다: " + tab.title +
-                        "\n열 추가/삭제/이름 변경이 있었다면 '선택 시트 생성'을 다시 실행하세요.");
-                    continue;
+                    _tabs[i].assetExists = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(_tabs[i].assetPath) != null;
                 }
 
-                var method = asset.GetType().GetMethod("ParseFromTsv");
-                if (method == null)
-                {
-                    Debug.LogError("[DataTableImporter] ParseFromTsv 메서드 없음: " + asset.GetType().FullName);
-                    continue;
-                }
-
-                method.Invoke(asset, new object[] { tsv });
-                EditorUtility.SetDirty(asset);
+                _status = "갱신 완료.";
             }
-
-            EditorUtility.ClearProgressBar();
-
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            for (int i = 0; i < _tabs.Count; i++)
+            finally
             {
-                _tabs[i].assetExists = AssetDatabase.LoadAssetAtPath<UnityEngine.Object>(_tabs[i].assetPath) != null;
+                EditorUtility.ClearProgressBar();
+                _isBusy = false;
+                SavePrefs();
+                Repaint();
             }
-
-            _isBusy = false;
-            _status = "갱신 완료.";
-            SavePrefs();
-            Repaint();
         }
 
         private void DeleteSelected()
@@ -595,43 +609,49 @@ namespace GameFramework.DataParsing.Editor
 
         private void PerformDelete(List<SheetTabInfo> targets)
         {
-            HashSet<int> deleteGids = new HashSet<int>();
-
-            for (int i = 0; i < targets.Count; i++)
+            try
             {
-                SheetTabInfo tab = targets[i];
+                HashSet<int> deleteGids = new HashSet<int>();
 
-                deleteGids.Add(tab.gid);
-
-                if (!string.IsNullOrEmpty(tab.assetPath))
+                for (int i = 0; i < targets.Count; i++)
                 {
-                    AssetDatabase.DeleteAsset(tab.assetPath);
+                    SheetTabInfo tab = targets[i];
+
+                    deleteGids.Add(tab.gid);
+
+                    if (!string.IsNullOrEmpty(tab.assetPath))
+                    {
+                        AssetDatabase.DeleteAsset(tab.assetPath);
+                    }
+
+                    if (!string.IsNullOrEmpty(tab.scriptPath))
+                    {
+                        AssetDatabase.DeleteAsset(tab.scriptPath);
+                    }
                 }
 
-                if (!string.IsNullOrEmpty(tab.scriptPath))
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                for (int i = _tabs.Count - 1; i >= 0; i--)
                 {
-                    AssetDatabase.DeleteAsset(tab.scriptPath);
+                    if (deleteGids.Contains(_tabs[i].gid))
+                    {
+                        _tabs.RemoveAt(i);
+                    }
                 }
+
+                AssetDatabase.SaveAssets();
+                AssetDatabase.Refresh();
+
+                _status = "삭제 완료.";
             }
-
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            for (int i = _tabs.Count - 1; i >= 0; i--)
+            finally
             {
-                if (deleteGids.Contains(_tabs[i].gid))
-                {
-                    _tabs.RemoveAt(i);
-                }
+                _isBusy = false;
+                SavePrefs();
+                Repaint();
             }
-
-            AssetDatabase.SaveAssets();
-            AssetDatabase.Refresh();
-
-            _isBusy = false;
-            _status = "삭제 완료.";
-            SavePrefs();
-            Repaint();
         }
 
         private List<SheetTabInfo> GetSelected()

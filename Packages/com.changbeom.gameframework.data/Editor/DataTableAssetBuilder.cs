@@ -82,7 +82,16 @@ namespace GameFramework.DataParsing.Editor
                 }
 
                 var method = t.GetMethod("ParseFromTsv");
-                method?.Invoke(asset, new object[] { tsv });
+                if (method == null)
+                {
+                    // 여기서 조용히 넘어가면 asset은 생성됐지만 데이터가 하나도 채워지지
+                    // 않은 채로 남아, 원인을 알기 어렵습니다. RefreshCoroutine의 동일한
+                    // 실패 케이스(DataTableImporterWindow.cs)와 같은 방식으로 로그를 남깁니다.
+                    Debug.LogError("[GameFramework.DataParsing] ParseFromTsv 메서드 없음: " + t.FullName);
+                    continue;
+                }
+
+                method.Invoke(asset, new object[] { tsv });
                 EditorUtility.SetDirty(asset);
             }
 
