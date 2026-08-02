@@ -84,17 +84,20 @@ namespace GameFramework.SaveLoad
             return JsonUtilityCodec.TryFromJson(json, out value);
         }
 
-        public void Flush()
+        public bool Flush()
         {
             if (!_dirty)
             {
-                return;
+                return true;
             }
 
-            if (WriteAtomic(Serialize(_data)))
+            bool ok = WriteAtomic(Serialize(_data));
+            if (ok)
             {
                 _dirty = false;
             }
+
+            return ok;
         }
 
         public bool HasBackup()
@@ -102,16 +105,30 @@ namespace GameFramework.SaveLoad
             return File.Exists(_manualBackupPath);
         }
 
-        public void BackupNow()
+        public bool BackupNow()
         {
-            if (_dirty)
+            if (_dirty && !Flush())
             {
-                Flush();
+                // Flush 실패를 무시하고 그대로 진행하면, 디스크에 있는 오래된 파일을
+                // "최신 백업"인 것처럼 복사해버려 실패가 겉으로 드러나지 않습니다.
+                Debug.LogError("[JsonFileSaveProvider] 백업 실패: 백업 직전 Flush가 실패했습니다.");
+                return false;
             }
 
-            if (File.Exists(_filePath))
+            if (!File.Exists(_filePath))
+            {
+                return false;
+            }
+
+            try
             {
                 File.Copy(_filePath, _manualBackupPath, true);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[JsonFileSaveProvider] 백업 실패: {e}");
+                return false;
             }
         }
 
@@ -129,7 +146,16 @@ namespace GameFramework.SaveLoad
                 return false;
             }
 
-            File.Copy(_manualBackupPath, _filePath, true);
+            try
+            {
+                File.Copy(_manualBackupPath, _filePath, true);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[JsonFileSaveProvider] 백업 복구 실패: {e}");
+                return false;
+            }
+
             _data = restored;
             _dirty = false;
             return true;

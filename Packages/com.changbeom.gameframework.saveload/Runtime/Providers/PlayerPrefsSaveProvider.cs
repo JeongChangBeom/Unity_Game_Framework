@@ -35,9 +35,10 @@ namespace GameFramework.SaveLoad
             return JsonUtilityCodec.TryFromJson(PlayerPrefs.GetString(key), out value);
         }
 
-        public void Flush()
+        public bool Flush()
         {
             PlayerPrefs.Save();
+            return true;
         }
     }
 }

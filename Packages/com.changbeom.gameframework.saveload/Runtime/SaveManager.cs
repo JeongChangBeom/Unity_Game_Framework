@@ -102,9 +102,10 @@ namespace GameFramework.SaveLoad
             _core.Delete(key);
         }
 
-        public void Flush()
+        /// <summary>실제로 영속 저장소에 쓰기까지 성공했으면 true입니다. false면 다음 Flush(자동 저장 포함)에서 재시도됩니다.</summary>
+        public bool Flush()
         {
-            _core.Flush();
+            return _core.Flush();
         }
 
         public bool HasBackup()
@@ -112,9 +113,9 @@ namespace GameFramework.SaveLoad
             return _core.HasBackup();
         }
 
-        public void BackupNow()
+        public bool BackupNow()
         {
-            _core.BackupNow();
+            return _core.BackupNow();
         }
 
         public bool RestoreFromBackup()

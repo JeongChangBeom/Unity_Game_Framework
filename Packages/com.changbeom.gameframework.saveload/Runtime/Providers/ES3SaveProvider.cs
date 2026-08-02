@@ -1,4 +1,5 @@
 #if USE_ES3
+using System;
 using System.IO;
 using UnityEngine;
 
@@ -27,40 +28,75 @@ namespace GameFramework.SaveLoad
             _settings = new ES3Settings(fileName);
         }
 
+        // JsonFile/PlayerPrefs/Memory는 실패를 안전하게 삼키고 기본값(false/no-op)을
+        // 반환하는데, ES3의 각 호출(KeyExists/Save/Load/DeleteKey)은 전부 실제 파일 I/O라
+        // 던질 수 있습니다. 여기서 잡지 않으면 이 Provider만 SaveManager 호출부까지
+        // 예외가 그대로 전파되어 Provider 간 동작이 달라집니다.
         public bool HasKey(string key)
         {
-            return ES3.KeyExists(key, _settings);
+            try
+            {
+                return ES3.KeyExists(key, _settings);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] {key} 존재 확인 실패: {e}");
+                return false;
+            }
         }
 
         public void DeleteKey(string key)
         {
-            if (ES3.KeyExists(key, _settings))
+            try
             {
-                ES3.DeleteKey(key, _settings);
+                if (ES3.KeyExists(key, _settings))
+                {
+                    ES3.DeleteKey(key, _settings);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] {key} 삭제 실패: {e}");
             }
         }
 
         public void Set<T>(string key, T value)
         {
-            ES3.Save(key, value, _settings);
+            try
+            {
+                ES3.Save(key, value, _settings);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] {key} 저장 실패: {e}");
+            }
         }
 
         public bool TryGet<T>(string key, out T value)
         {
             value = default;
 
-            if (!ES3.KeyExists(key, _settings))
+            try
             {
+                if (!ES3.KeyExists(key, _settings))
+                {
+                    return false;
+                }
+
+                value = ES3.Load<T>(key, _settings);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] {key} 로드 실패: {e}");
                 return false;
             }
-
-            value = ES3.Load<T>(key, _settings);
-            return true;
         }
 
-        public void Flush()
+        public bool Flush()
         {
             // ES3는 Save 호출마다 즉시 기록하므로, 별도로 flush할 것이 없습니다.
+            return true;
         }
 
         public bool HasBackup()
@@ -68,11 +104,22 @@ namespace GameFramework.SaveLoad
             return File.Exists(_backupPath);
         }
 
-        public void BackupNow()
+        public bool BackupNow()
         {
-            if (File.Exists(_filePath))
+            if (!File.Exists(_filePath))
+            {
+                return false;
+            }
+
+            try
             {
                 File.Copy(_filePath, _backupPath, true);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] 백업 실패: {e}");
+                return false;
             }
         }
 
@@ -83,8 +130,16 @@ namespace GameFramework.SaveLoad
                 return false;
             }
 
-            File.Copy(_backupPath, _filePath, true);
-            return true;
+            try
+            {
+                File.Copy(_backupPath, _filePath, true);
+                return true;
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] 백업 복구 실패: {e}");
+                return false;
+            }
         }
     }
 }

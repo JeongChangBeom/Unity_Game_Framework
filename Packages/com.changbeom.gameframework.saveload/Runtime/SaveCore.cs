@@ -61,16 +61,23 @@ namespace GameFramework.SaveLoad
             _dirty = true;
         }
 
-        public void Flush()
+        /// <summary>실제로 영속 저장소에 쓰기까지 성공했으면 true입니다. false면 dirty 상태가 유지되어 다음 Flush에서 재시도됩니다.</summary>
+        public bool Flush()
         {
             if (!_dirty)
             {
-                return;
+                return true;
             }
 
             _provider.Set(WithRoot(SaveMeta.LastSavedAtUtc), DateTime.UtcNow.Ticks);
-            _provider.Flush();
-            _dirty = false;
+
+            bool ok = _provider.Flush();
+            if (ok)
+            {
+                _dirty = false;
+            }
+
+            return ok;
         }
 
         public void EnsureMeta(int currentVersion)
@@ -95,12 +102,9 @@ namespace GameFramework.SaveLoad
             return _provider is ISaveBackupProvider backup && backup.HasBackup();
         }
 
-        public void BackupNow()
+        public bool BackupNow()
         {
-            if (_provider is ISaveBackupProvider backup)
-            {
-                backup.BackupNow();
-            }
+            return _provider is ISaveBackupProvider backup && backup.BackupNow();
         }
 
         public bool RestoreFromBackup()

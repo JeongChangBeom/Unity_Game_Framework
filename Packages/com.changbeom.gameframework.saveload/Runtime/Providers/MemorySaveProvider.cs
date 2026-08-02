@@ -42,8 +42,9 @@ namespace GameFramework.SaveLoad
             return false;
         }
 
-        public void Flush()
+        public bool Flush()
         {
+            return true;
         }
     }
 }

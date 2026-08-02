@@ -600,6 +600,7 @@ SoundManager.Instance.SetChannelVolume(ESoundChannel.Voice, 1.0f);
   - `SaveKey`를 통해 `root/domain/key` 형태로 안전하게 키 관리
 - **Auto Flush (Dirty 기반 자동 저장)**
   - 변경 발생 시 Dirty 처리 -> 일정 시간 후 자동 Flush
+  - `Flush()`/`BackupNow()`는 실제 쓰기 성공 여부를 `bool`로 반환. 실패(false)면 Dirty 상태가 유지되어 다음 자동 Flush에서 재시도됨
 - **Pause/Quit 저장**
   - `OnApplicationPause`, `OnApplicationQuit`에서 Flush 처리
 - **크래시/강제종료 대응**
@@ -716,14 +717,14 @@ SaveManager.Instance.Delete(key);
 
 
 // Flush
-SaveManager.Instance.Flush();
+bool flushed = SaveManager.Instance.Flush();
 
 
 
 // Backup / Restore
 bool hasBackup = SaveManager.Instance.HasBackup();
 
-SaveManager.Instance.BackupNow();
+bool backedUp = SaveManager.Instance.BackupNow();
 SaveManager.Instance.RestoreFromBackup();
 ```
 
