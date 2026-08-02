@@ -31,6 +31,15 @@
         "com.changbeom.gameframework.core": "0.1.0"
       }
     },
+    "com.changbeom.gameframework.sceneloading": {
+      "version": "file:com.changbeom.gameframework.sceneloading",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.ui": "0.1.0"
+      }
+    },
     "com.changbeom.gameframework.sound": {
       "version": "file:com.changbeom.gameframework.sound",
       "depth": 0,

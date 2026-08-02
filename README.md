@@ -41,6 +41,9 @@
 - **[Time System](#time)**  
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
+- **[Scene Loading](#sceneloading)**  
+  비동기 씬 전환 + 최소 노출시간이 보장되는 로딩 화면
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -57,12 +60,14 @@
 |Sound System|Addressables + Sheet 기반 사운드 재생|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sound`|
 |Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
+|Scene Loading|비동기 씬 전환 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
 > * Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
 >   * 사운드 데이터(`SoundTable`)를 직접 만드는 건 번거로우니, Data Parsing으로 시트에서 생성하는 걸 권장합니다.
 > * UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
+> * Scene Loading은 Core, UI System에 의존하므로 함께 설치해야 합니다.
 
 ---
 
@@ -938,6 +943,133 @@ game/time/...
 
 ### 테스트 방법
 `Assets/00.Scripts/Tests/TimeTester.cs`를 아무 GameObject에 붙이고 Play하면 버튼으로 스냅샷/쿨타임/서버 동기화/Mock 시간/리셋 키/오프라인 경과/치트 플래그를 전부 확인할 수 있고, 리셋 이벤트가 발생하면 로그에 자동으로 찍힙니다.
+
+</details>
+
+---
+
+<details id="sceneloading">
+<summary><h2>7. Scene Loading</h2></summary>
+
+### 기능
+- `UnityEngine.SceneManagement` 기반 비동기 씬 전환 (`LoadSceneMode.Single`)
+- 씬 이름 오타를 컴파일 타임 에러로 잡는 `ESceneKey` 자동 생성 (Build Settings의 씬 목록 기준, Pooling의 `EPoolKey`와 동일한 방식)
+- 최소 로딩 화면 노출시간 보장 - 빠른 로드에서 화면이 깜빡이고 바로 사라지는 것 방지
+- 진행률(`Progress`, `OnProgressChanged`)과 로드 시작/완료/실패 이벤트(`OnSceneLoadStarted`/`OnSceneLoadCompleted`/`OnSceneLoadFailed`) 제공
+- 예외가 나도(사용자 코드의 `ISceneEntryPoint`/`ISceneExitPoint` 구현 포함) `IsLoading`과 로딩 화면이 항상 정상 상태로 복구됨 - 한 번 실패했다고 이후 씬 전환이 영구히 막히지 않음
+- 씬 전환 전 `UIManager.CloseAll()` 자동 호출로 팝업/토스트 대기열 정리
+- `ISceneEntryPoint`/`ISceneExitPoint` - 등록 절차 없이 씬에 배치하기만 하면 씬 진입/퇴장 시점에 자동 호출되는 훅
+- `UIManager.OverlayRoot` 위에 표시되는 내장 기본 로딩 화면 (검은 배경 + 퍼센트 텍스트), 필요하면 직접 만든 프리팹으로 교체 가능
+- 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
+- 이미 로딩 중일 때 추가 요청은 대기열에 넣지 않고 경고 로그와 함께 무시 (동시 전환 방지)
+
+> **v1 제한사항**: `LoadSceneMode.Single`만 지원합니다. Additive 씬 로드(부분 로드/언로드)는 아직 지원하지 않습니다.
+
+---
+
+### 사용 방법
+
+```cs
+// 생성된 ESceneKey로 씬 전환 (오타는 컴파일 에러로 즉시 드러남)
+_ = SceneLoadingManager.Instance.LoadSceneAsync(ESceneKey.GameScene);
+
+// ESceneKey 생성 전이거나 동적으로 씬 이름을 다뤄야 할 때는 문자열도 가능
+_ = SceneLoadingManager.Instance.LoadSceneAsync("GameScene");
+
+// 진행률 구독
+SceneLoadingManager.Instance.OnProgressChanged += p => progressBar.value = p;
+
+// 상태 조회
+bool isLoading = SceneLoadingManager.Instance.IsLoading;
+```
+
+- **`LoadSceneAsync(sceneName)`** (`ESceneKey` 또는 `string` 오버로드)
+  -> 로딩 화면 표시 -> 씬 비동기 로드 -> 최소 노출시간 대기 -> 씬 활성화 -> 로딩 화면 숨김 순으로 진행. 이미 로딩 중이면 경고 로그만 남기고 무시
+- **`IsLoading` / `Progress` / `CurrentSceneName`**
+  -> 현재 로딩 상태 조회
+- **`OnSceneLoadStarted` / `OnProgressChanged` / `OnSceneLoadCompleted` / `OnSceneLoadFailed`**
+  -> 각각 로드 시작, 진행률 변경(0~1), 로드 성공 완료, 로드 실패(잘못된 씬 이름, 예외 발생 등) 시점에 발행
+
+#### `ESceneKey` 생성하기
+Build Settings에 씬을 등록한 뒤, Unity Editor에서 아래 메뉴를 누릅니다.
+
+`Game Framework/Scene Loading/Generate ESceneKey From Build Settings`
+
+* 동작: Build Settings에 등록된(활성화된) 모든 씬 이름을 모아 `ESceneKey.cs`를 자동 생성 (유효하지 않은 이름/중복 이름은 Console에 에러를 남기고 건너뜀)
+* 생성 위치: `Packages/com.changbeom.gameframework.sceneloading/Runtime/ESceneKey.cs`
+* 기존 멤버의 선언 순서(=정수 값)는 재생성해도 보존되고, 새로 등록한 씬만 맨 뒤에 추가됩니다.
+
+---
+
+### Scene Loading Manager Settings (선택, 씬 배치 불필요)
+* `Assets/Create/Game Framework/Scene Loading/Scene Loading Manager Settings`로 에셋 생성
+* 반드시 `Assets/Resources/GameFramework/SceneLoadingManagerSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
+* 항목: Minimum Loading Screen Duration(최소 노출시간, 초) / Fade Duration(페이드 인/아웃 시간, 초) / Loading Screen Prefab Override(비워두면 내장 기본 화면 사용) / Entry Exit Point Timeout Seconds(`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행, 0 이하면 무한 대기, 기본 10초)
+* 에셋이 없으면 Console에 경고가 남고 기본값으로 동작합니다.
+
+---
+
+### 커스텀 로딩 화면 만들기
+내장 기본 화면(검은 배경 + 퍼센트 텍스트) 대신 직접 만든 연출을 쓰려면 `SceneLoadingScreenBase`를 상속하세요.
+
+```cs
+public class MyLoadingScreen : SceneLoadingScreenBase
+{
+    protected override void PlayShow()
+    {
+        // 원하는 연출 재생 후 반드시 CompleteShow() 호출
+    }
+
+    protected override void PlayHide()
+    {
+        // 원하는 연출 재생 후 반드시 CompleteHide() 호출
+    }
+
+    public override void SetProgress(float progress01)
+    {
+        // 프로그레스바 등에 반영
+    }
+}
+```
+
+만든 컴포넌트를 프리팹으로 만들어 `SceneLoadingManagerSettings`의 `Loading Screen Prefab Override`에 연결하면 됩니다.
+
+---
+
+### 씬 진입/퇴장 훅 (`ISceneEntryPoint` / `ISceneExitPoint`)
+씬이 켜질 때/떠날 때 그 씬만의 초기화·정리 로직이 필요하면 이 두 인터페이스를 구현하세요. 별도의 등록 절차가 없습니다 - 씬 안의 아무 GameObject에 구현체를 붙여두기만 하면, `SceneLoadingManager`가 씬 전환 시점에 자동으로 찾아서 호출합니다.
+
+```cs
+public class GameSceneBootstrap : MonoBehaviour, ISceneEntryPoint
+{
+    public async Awaitable OnSceneEnterAsync()
+    {
+        // 플레이어 스폰, 씬 전용 데이터 로드 등. 끝날 때까지 로딩 화면이 유지됩니다.
+    }
+}
+```
+
+- **`ISceneEntryPoint.OnSceneEnterAsync()`**
+  -> 새 씬이 활성화된 직후 호출됩니다. 로딩 화면은 모든 `ISceneEntryPoint`가 끝날 때까지 유지되므로, "씬이 실제로 준비된 뒤에" 화면이 사라져야 하는 작업(플레이어 스폰 등)에 적합합니다. 한 씬에 여러 개가 있으면 `Order`(기본값 0, 작을수록 먼저)순으로 순서대로 실행됩니다.
+- **`ISceneExitPoint.OnSceneExitAsync()`**
+  -> 다음 씬 로드가 시작되어 로딩 화면이 이미 화면을 덮은 뒤, 지금 씬이 실제로 전환되기 전에 호출됩니다. 여기서 하는 정리 작업은 사용자에게 보이지 않습니다.
+- 비활성화(`SetActive(false)`)된 오브젝트에 붙은 훅은 호출되지 않습니다. 나중에 쓰려고 꺼둔 오브젝트가 있다면 그 위에는 이 인터페이스를 두지 마세요.
+
+> 주의: `ISceneEntryPoint`는 "씬이 뜨는 시점에 1회성으로 할 일"에만 쓰세요. 예를 들어 "메뉴에서 올린 공격력 스텟을 게임 중 소환되는 모든 유닛에 적용"처럼 이후에도 계속 생겨나는 대상에 적용해야 하는 값이라면, EntryPoint에서는 그 값을 `UnitManager` 같은 지속되는 매니저에 세팅만 해두고, 실제 적용은 유닛 자신이 스폰될 때 그 값을 읽어가는 방식으로 구현해야 새로 소환되는 유닛도 빠짐없이 적용됩니다.
+>
+> 주의: `OnSceneEnterAsync()`/`OnSceneExitAsync()` 안에서 `SceneLoadingManager.Instance.LoadSceneAsync(...)`를 다시 호출하지 마세요. 그 시점엔 이미 `IsLoading`이 true라 경고 로그와 함께 조용히 무시됩니다. 다른 씬으로 리다이렉트해야 한다면, 현재 로드가 완전히 끝난 뒤(`OnSceneLoadCompleted` 등에서) 호출하세요.
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/SceneLoadingTester.cs`를 아무 GameObject에 붙이고 Play하면 다음 5개 버튼을 제공합니다.
+1. 문자열로 씬 전환
+2. `ESceneKey`(`None` 아닌 정상 키)로 씬 전환
+3. `ESceneKey.None`으로 전환 시도해 에러 로그 확인
+4. 존재하지 않는 씬 이름으로 로드해 에러 로그 확인
+5. 연속으로 두 번 빠르게 호출해 중복 요청 방지(`IsLoading` 가드) 확인
+
+상단에는 `IsLoading`/`Progress`/`CurrentSceneName`과 `OnProgressChanged` 발행 횟수가 실시간으로 표시되고, 로드 시작/완료/실패 이벤트는 로그에 자동으로 찍힙니다. 실제 씬 전환을 확인하려면 Build Settings에 씬이 최소 2개 등록되어 있어야 합니다. `ESceneKey`를 생성하지 않아도(즉 `None`만 있는 상태여도) 컴파일에 문제가 없도록 2번 버튼을 제외하면 문자열 오버로드만 사용합니다.
 
 </details>
 

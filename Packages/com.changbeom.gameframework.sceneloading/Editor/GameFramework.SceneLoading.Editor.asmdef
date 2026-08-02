@@ -1,0 +1,18 @@
+{
+    "name": "GameFramework.SceneLoading.Editor",
+    "rootNamespace": "GameFramework.SceneLoading.Editor",
+    "references": [
+        "GameFramework.SceneLoading"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

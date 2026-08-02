@@ -1,0 +1,14 @@
+{
+    "name": "com.changbeom.gameframework.sceneloading",
+    "version": "0.1.0",
+    "displayName": "Game Framework - SceneLoading",
+    "description": "Async scene loading via UnityEngine.SceneManagement, backed by a generated scene-key enum, with a minimum-display-duration loading screen shown on UI System's Overlay layer. Depends on Game Framework Core and UI System.",
+    "unity": "6000.0",
+    "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.ui": "0.1.0"
+    },
+    "author": {
+        "name": "ChangBeom"
+    }
+}
