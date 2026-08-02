@@ -2,6 +2,7 @@ using System;
 using System.Collections;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Threading.Tasks;
 using GameFramework.Core;
 using GameFramework.SaveLoad;
 using UnityEngine;
@@ -37,9 +38,12 @@ namespace GameFramework.SoundSystem
 
         private readonly Dictionary<string, AudioClip> _clipCache = new Dictionary<string, AudioClip>();
         private readonly Dictionary<string, AsyncOperationHandle<AudioClip>> _clipHandles = new Dictionary<string, AsyncOperationHandle<AudioClip>>();
+        private readonly Dictionary<string, Task<AudioClip>> _pendingClipLoads = new Dictionary<string, Task<AudioClip>>();
+        private readonly Dictionary<ESound, int> _pendingOneShotCounts = new Dictionary<ESound, int>();
 
         private AudioSource _bgmSource;
         private ESound _currentBgm = ESound.None;
+        private ESound _requestedBgm = ESound.None;
         private int _bgmPlayToken;
 
         private int _voiceActiveCount;
@@ -248,16 +252,29 @@ namespace GameFramework.SoundSystem
 
         private async Awaitable PlayBgm(ESound id, SoundEntry entry)
         {
-            if (_currentBgm == id)
+            if (_requestedBgm == id)
             {
                 return;
             }
 
             int myToken = ++_bgmPlayToken;
+            _requestedBgm = id;
 
             AudioClip clip = await LoadClip(entry.fileName);
-            if (clip == null || myToken != _bgmPlayToken)
+
+            if (myToken != _bgmPlayToken)
             {
+                // 그 사이 다른 PlayBgm/StopBgm 호출이 있었다는 뜻입니다. _requestedBgm은
+                // 이미 그 호출이 관리하고 있으므로 여기서 건드리면 안 됩니다.
+                return;
+            }
+
+            if (clip == null)
+            {
+                // 로드 실패입니다. _requestedBgm을 이 id로 남겨두면, 이후 같은 id로
+                // PlaySound를 다시 호출해도 위쪽의 "if (_requestedBgm == id) return;"에
+                // 막혀 영원히 재생되지 않습니다. 실제로 지금 재생 중인 곡(없으면 None)으로 되돌립니다.
+                _requestedBgm = _currentBgm;
                 return;
             }
 
@@ -279,6 +296,7 @@ namespace GameFramework.SoundSystem
         public void StopBgm()
         {
             _bgmPlayToken++;
+            _requestedBgm = ESound.None;
             _bgmSource.Stop();
             _bgmSource.clip = null;
             _currentBgm = ESound.None;
@@ -286,31 +304,57 @@ namespace GameFramework.SoundSystem
 
         private async Awaitable PlayOneShot(ESound id, SoundEntry entry)
         {
-            if (CountActive(id) >= Mathf.Max(1, entry.maxConcurrent))
+            int maxConcurrent = Mathf.Max(1, entry.maxConcurrent);
+            int pending = _pendingOneShotCounts.TryGetValue(id, out int p) ? p : 0;
+
+            if (CountActive(id) + pending >= maxConcurrent)
             {
                 return;
             }
 
-            AudioClip clip = await LoadClip(entry.fileName);
-            if (clip == null)
+            // _pool.Active는 Rent()가 성공한 뒤에야 늘어나므로, 아직 캐싱 안 된 사운드의
+            // 로드를 기다리는 동안(clip == null || null 반환) CountActive만 보면 그 사이의
+            // 중복 요청이 전부 같은(낮은) 값을 보고 maxConcurrent 제한을 그냥 통과해버립니다.
+            // await 전에 자리를 미리 예약해서 이 창을 막습니다.
+            _pendingOneShotCounts[id] = pending + 1;
+
+            try
             {
-                return;
-            }
+                AudioClip clip = await LoadClip(entry.fileName);
+                if (clip == null)
+                {
+                    return;
+                }
 
-            SoundPlayer player = _pool.Rent();
-            if (player == null)
+                SoundPlayer player = _pool.Rent();
+                if (player == null)
+                {
+                    Debug.LogWarning($"[SoundManager] {id} 재생 실패: SoundPlayerPool이 가득 찼습니다 (MaxPoolSize 확인).");
+                    return;
+                }
+
+                player.SetOutputGroup(GetMixerGroup(entry.channel));
+
+                if (entry.channel == ESoundChannel.Voice && _settings.DuckBgmOnVoice)
+                {
+                    BeginDuck();
+                }
+
+                player.Play(id, entry.channel, clip, ComputeVolume(entry.channel, entry.defaultVolume), 1f, entry.loop);
+            }
+            finally
             {
-                return;
+                int remaining = (_pendingOneShotCounts.TryGetValue(id, out int cur) ? cur : 1) - 1;
+
+                if (remaining <= 0)
+                {
+                    _pendingOneShotCounts.Remove(id);
+                }
+                else
+                {
+                    _pendingOneShotCounts[id] = remaining;
+                }
             }
-
-            player.SetOutputGroup(GetMixerGroup(entry.channel));
-
-            if (entry.channel == ESoundChannel.Voice && _settings.DuckBgmOnVoice)
-            {
-                BeginDuck();
-            }
-
-            player.Play(id, entry.channel, clip, ComputeVolume(entry.channel, entry.defaultVolume), 1f, entry.loop);
         }
 
         /// <summary>이 사운드가 현재 재생 중인 모든 인스턴스를 정지합니다 (BGM 또는 원샷).</summary>
@@ -321,7 +365,11 @@ namespace GameFramework.SoundSystem
                 return;
             }
 
-            if (_currentBgm == id)
+            // _currentBgm이 아니라 _requestedBgm으로 확인합니다. _currentBgm은 로드와
+            // 크로스페이드가 끝난 뒤에야 채워지므로, 아직 로딩 중인 BGM은 _currentBgm과
+            // 절대 같아지지 않아 이 시점에 StopSound를 호출해도 무시되고 로드가 끝나면
+            // 그대로 재생돼버렸습니다.
+            if (_requestedBgm == id)
             {
                 StopBgm();
             }
@@ -478,8 +526,29 @@ namespace GameFramework.SoundSystem
                 return cached;
             }
 
+            // 같은 fileName에 대한 로드가 이미 진행 중이면(예: PreloadSounds가 아직 로딩
+            // 중인데 게임플레이 쪽에서 같은 사운드를 재생 요청) 새로 Addressables 로드를
+            // 또 시작하지 않고 진행 중인 것을 같이 기다립니다. 안 그러면 handle이 여러 개
+            // 생겨서 _clipHandles[fileName]에 마지막 것만 남고 나머지는 Release되지 않은
+            // 채 참조 카운트가 영구히 새는 것도 문제고, 로드 자체도 중복으로 낭비됩니다.
+            if (_pendingClipLoads.TryGetValue(fileName, out Task<AudioClip> inFlight))
+            {
+                return await inFlight;
+            }
+
             AsyncOperationHandle<AudioClip> handle = Addressables.LoadAssetAsync<AudioClip>(fileName);
-            AudioClip clip = await handle.Task;
+            Task<AudioClip> task = handle.Task;
+            _pendingClipLoads[fileName] = task;
+
+            AudioClip clip;
+            try
+            {
+                clip = await task;
+            }
+            finally
+            {
+                _pendingClipLoads.Remove(fileName);
+            }
 
             if (clip != null)
             {
