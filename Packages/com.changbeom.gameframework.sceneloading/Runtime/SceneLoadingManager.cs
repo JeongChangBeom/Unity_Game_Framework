@@ -277,6 +277,7 @@ namespace GameFramework.SceneLoading
             }
 
             bool activated = false;
+            bool succeeded = false;
 
             try
             {
@@ -324,7 +325,14 @@ namespace GameFramework.SceneLoading
                 // 이미 활성화가 시작된 Addressables 핸들을 건드리지 않도록 하기 위함입니다.
                 op.Activate();
                 activated = true;
-                await op.WaitUntilActivationDoneAsync(destroyCancellationToken);
+
+                // Build Settings 경로는 여기서 이전 씬들을 직접 언로드합니다(Additive로
+                // 로드했으므로). 그 언로드 대기에도 다른 모든 훅/오퍼레이션과 동일하게
+                // 타임아웃을 적용합니다 - 여기서 안 끝나면 activated가 이미 true라 finally의
+                // 정리 로직도 적용되지 않아, 타임아웃 없이는 파이프라인 전체가 멈출 수 있습니다.
+                await RunWithTimeoutAsync(() => op.WaitUntilActivationDoneAsync(destroyCancellationToken),
+                    _settings.SceneOperationTimeoutSeconds, destroyCancellationToken,
+                    $"\"{request.Label}\" 활성화 마무리", treatTimeoutAsSuccess: true);
 
                 TrackAddressableSceneHandle(op);
 
@@ -334,9 +342,21 @@ namespace GameFramework.SceneLoading
                 await RunEntryPointsAsync();
 
                 OnSceneLoadCompleted?.Invoke(request.Label);
+                succeeded = true;
             }
             finally
             {
+                if (activated && !succeeded)
+                {
+                    // 활성화까지는 끝났는데(=이전 씬들은 이미 언로드됨, 되돌릴 방법 없음)
+                    // 그 이후(ISceneEntryPoint 등)에 실패한 경우입니다. 재시도/폴백이
+                    // 꺼져있으면(기본값) 아무도 이 상태를 정리하지 않아 이 깨진 씬이 계속
+                    // 활성 씬으로 남습니다 - 다음에 어떤 씬이든 다시 로드되면 그때 자동으로
+                    // 정리되지만, 그 전까지는 게임이 이 상태로 멈춰있게 되므로 반드시
+                    // 눈에 띄게 남깁니다.
+                    Debug.LogError($"[SceneLoadingManager] \"{request.Label}\" 씬은 이미 활성화됐지만 이후 단계(ISceneEntryPoint 등)에서 실패했습니다. 이전 씬은 이미 언로드되어 되돌릴 수 없어, 지금 이 씬이 깨진 상태로 계속 활성 씬입니다. MaxRetryCount/FallbackSceneName을 설정해두면 다음 시도가 이 씬을 자동으로 정리합니다.");
+                }
+
                 if (!activated)
                 {
                     // 여기서 반드시 완료를 기다려야 합니다 - 그냥 fire-and-forget으로 던져두면
@@ -575,7 +595,7 @@ namespace GameFramework.SceneLoading
             public static SceneLoadRequest FromAddressable(string address) => new SceneLoadRequest(address, true);
 
             public ISceneLoadOperation Begin(float cleanupTimeoutSeconds) => _isAddressable
-                ? new AddressableSceneLoadOperation(Label)
+                ? new AddressableSceneLoadOperation(Label, cleanupTimeoutSeconds)
                 : (ISceneLoadOperation)new BuildSettingsSceneLoadOperation(Label, cleanupTimeoutSeconds);
         }
 
@@ -744,12 +764,14 @@ namespace GameFramework.SceneLoading
         private sealed class AddressableSceneLoadOperation : ISceneLoadOperation
         {
             private readonly string _address;
+            private readonly float _cleanupTimeoutSeconds;
             private readonly AsyncOperationHandle<SceneInstance> _handle;
             private AsyncOperation _activation;
 
-            public AddressableSceneLoadOperation(string address)
+            public AddressableSceneLoadOperation(string address, float cleanupTimeoutSeconds)
             {
                 _address = address;
+                _cleanupTimeoutSeconds = cleanupTimeoutSeconds;
                 _handle = Addressables.LoadSceneAsync(address, LoadSceneMode.Single, activateOnLoad: false);
             }
 
@@ -789,18 +811,41 @@ namespace GameFramework.SceneLoading
 
             public AsyncOperationHandle<SceneInstance>? Handle => _handle.IsValid() ? _handle : (AsyncOperationHandle<SceneInstance>?)null;
 
-            public Awaitable ReleaseOnFailure()
+            public async Awaitable ReleaseOnFailure()
             {
-                if (_handle.IsValid())
+                if (!_handle.IsValid())
                 {
-                    Addressables.Release(_handle);
+                    return;
                 }
 
-                // Addressables.Release는 동기 호출이라 기다릴 게 없지만, 인터페이스
-                // 시그니처를 맞추기 위해 이미 완료된 Awaitable을 반환합니다.
-                AwaitableCompletionSource tcs = new AwaitableCompletionSource();
-                tcs.SetResult();
-                return tcs.Awaitable;
+                // activateOnLoad:false로 시작한 로드는 활성화를 허용하지 않는 한 씬이 계속
+                // "로딩 중"(SceneInstance.isLoaded == false) 상태로 남아있습니다. 이 상태에서
+                // Addressables.Release를 바로 호출하면 참조 카운트만 정리될 뿐 실제 씬은
+                // 언로드되지 않습니다(Addressables 내부에서 isLoaded가 아니면 씬 언로드
+                // 자체를 건너뜀) - Build Settings 경로에서 이미 고친 것과 똑같이 Hierarchy에
+                // "(is loading)"로 영구히 남는 문제가 재현됩니다. 그래서 Build Settings와
+                // 동일하게, 일단 활성화를 허용해 로드를 끝까지 완료시킨 뒤에 Release해야
+                // 실제로 씬이 언로드됩니다. Status가 Succeeded가 아니면(주소 오타 등으로
+                // 애초에 로드 자체가 실패한 경우) 활성화할 대상이 없으므로 곧바로 Release합니다.
+                await RunWithTimeoutAsync(ActivateThenReleaseAsync, _cleanupTimeoutSeconds, CancellationToken.None,
+                    $"실패한 Addressables 씬(\"{_address}\") 정리", treatTimeoutAsSuccess: true);
+            }
+
+            private async Awaitable ActivateThenReleaseAsync()
+            {
+                if (_handle.Status == AsyncOperationStatus.Succeeded)
+                {
+                    AsyncOperation activation = _handle.Result.ActivateAsync();
+                    if (activation != null)
+                    {
+                        while (!activation.isDone)
+                        {
+                            await Awaitable.NextFrameAsync(CancellationToken.None);
+                        }
+                    }
+                }
+
+                Addressables.Release(_handle);
             }
         }
 

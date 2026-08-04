@@ -27,7 +27,7 @@ namespace GameFramework.SceneLoading
         public SceneLoadingScreenBase LoadingScreenPrefabOverride;
 
         [Header("Safety")]
-        [Tooltip("씬 오퍼레이션 자신(Build Settings/Addressables 공통)이 활성화 준비 상태가 될 때까지 이 시간(초) 안에 끝나지 않으면 실패로 처리합니다(재시도/폴백 대상). Build Settings에서 비활성화된 씬 이름으로 로드를 시도하거나, Addressables 원격 다운로드가 멈추는 등 진행률이 전혀 안 올라가는 상태로 영원히 대기하는 것을 방지합니다. 같은 시간을, Build Settings 경로에서 실패한 로드를 정리(끝까지 로드시킨 뒤 언로드)할 때도 재사용합니다 - 정리 자체가 안 끝나면 재시도/폴백 파이프라인이 멈추기 때문입니다. 큰 씬/느린 다운로드를 고려해 넉넉하게 잡았습니다. 0 이하이면 타임아웃 없이 무한 대기합니다.")]
+        [Tooltip("씬 오퍼레이션 자신(Build Settings/Addressables 공통)이 활성화 준비 상태가 될 때까지 이 시간(초) 안에 끝나지 않으면 실패로 처리합니다(재시도/폴백 대상). Build Settings에서 비활성화된 씬 이름으로 로드를 시도하거나, Addressables 원격 다운로드가 멈추는 등 진행률이 전혀 안 올라가는 상태로 영원히 대기하는 것을 방지합니다. 같은 시간을 다음 곳에도 재사용합니다: (1) 실패한 로드를 정리(끝까지 로드시킨 뒤 언로드)할 때(Build Settings/Addressables 공통), (2) 활성화 성공 후 이전 씬들을 언로드하는 마무리 단계. 이런 대기가 안 끝나면 재시도/폴백 파이프라인 전체가 멈추기 때문입니다. 큰 씬/느린 다운로드를 고려해 넉넉하게 잡았습니다. 0 이하이면 타임아웃 없이 무한 대기합니다.")]
         [Min(0f)] public float SceneOperationTimeoutSeconds = 60f;
 
         [Tooltip("로딩 화면의 RequestShow/RequestHide 콜백(CompleteShow/CompleteHide)이 이 시간(초) 안에 호출되지 않으면 성공한 걸로 치고 넘어갑니다. LoadingScreenPrefabOverride로 만든 커스텀 로딩 화면이 CompleteShow()/CompleteHide()를 호출하지 않는 버그가 있어도 IsLoading이 영구 고착되지 않도록 방지합니다(내장 기본 로딩 화면은 이 문제가 없습니다). 0 이하이면 타임아웃 없이 무한 대기합니다.")]

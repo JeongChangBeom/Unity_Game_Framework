@@ -1084,6 +1084,8 @@ SceneLoadingManager.Instance.OnSceneLoadFallback += (original, fallback) =>
 * 재시도/폴백 전체가 끝날 때까지 `IsLoading`은 계속 `true`로 유지되므로, 그 사이 다른 `LoadSceneAsync` 호출은 기존과 동일하게 무시됩니다.
 * `Fallback Scene Name`이 방금 실패한 요청과 같은 이름이면(자기 자신을 폴백으로 지정한 경우) 무한 루프를 막기 위해 폴백을 건너뛰고 경고 로그만 남긴 뒤 `OnSceneLoadFailed`로 끝납니다.
 
+> **주의**: 씬이 이미 활성화된 뒤(`ISceneEntryPoint` 실행 도중) 실패하면, 이전 씬은 이미 언로드된 상태라 되돌릴 방법이 없습니다. `MaxRetryCount`/`FallbackSceneName`을 켜두면 다음 시도가 이 깨진 씬을 "이전 씬"으로 취급해서 자동으로 정리하지만, 둘 다 기본값(꺼짐)이면 아무도 정리하지 않아 이 깨진 씬이 계속 활성 씬으로 남습니다(Console에 눈에 띄는 에러 로그는 남습니다). `ISceneEntryPoint`에서 예외가 날 가능성이 있다면 `FallbackSceneName` 설정을 권장합니다.
+
 ---
 
 ### Scene Loading Manager Settings (선택, 씬 배치 불필요)
@@ -1096,7 +1098,7 @@ SceneLoadingManager.Instance.OnSceneLoadFallback += (original, fallback) =>
 |Minimum Loading Screen Duration|로딩 화면 최소 노출시간(초)|0.5|
 |Fade Duration|로딩 화면 페이드 인/아웃 시간(초)|0.25|
 |Loading Screen Prefab Override|커스텀 로딩 화면 프리팹 (비워두면 내장 기본 화면 사용)|없음|
-|Scene Operation Timeout Seconds|씬 오퍼레이션 자신(Build Settings/Addressables 공통)이 이 시간 안에 준비되지 않으면 실패 처리. Build Settings 경로에서 실패한 로드를 정리(언로드)하는 시간에도 재사용 (0 이하면 무한 대기)|60|
+|Scene Operation Timeout Seconds|씬 오퍼레이션 자신(Build Settings/Addressables 공통)이 이 시간 안에 준비되지 않으면 실패 처리. 실패한 로드를 정리(언로드)하는 시간, 활성화 성공 후 이전 씬들을 언로드하는 마무리 단계에도 재사용 (0 이하면 무한 대기)|60|
 |Loading Screen Timeout Seconds|로딩 화면의 RequestShow/RequestHide 콜백이 이 시간 안에 안 불리면 성공한 걸로 치고 건너뜀 (0 이하면 무한 대기)|10|
 |Entry Exit Point Timeout Seconds|`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행 (0 이하면 무한 대기)|10|
 |Load Step Timeout Seconds|`SceneLoadStep` 하나가 이 시간 안에 끝나지 않으면 실패 처리 (0 이하면 무한 대기)|30|
