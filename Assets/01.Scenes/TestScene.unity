@@ -609,6 +609,8 @@ MonoBehaviour:
   m_EditorClassIdentifier: 
   _sceneName: TestScene2
   _missingSceneName: "\uC774\uB7F0\uC52C\uC740\uC5C6\uC74C"
+  _addressableSceneAddress: TestScene2
+  _invalidAddressableAddress: "\uC774\uB7F0\uC8FC\uC18C\uB294\uC5C6\uC74C"
 --- !u!4 &2039706002
 Transform:
   m_ObjectHideFlags: 0

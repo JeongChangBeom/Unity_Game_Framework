@@ -15,4 +15,11 @@ MonoBehaviour:
   MinimumLoadingScreenDuration: 0.5
   FadeDuration: 0.25
   LoadingScreenPrefabOverride: {fileID: 0}
+  SceneOperationTimeoutSeconds: 60
+  LoadingScreenTimeoutSeconds: 10
   EntryExitPointTimeoutSeconds: 10
+  LoadStepTimeoutSeconds: 30
+  MaxRetryCount: 0
+  RetryDelaySeconds: 1
+  FallbackSceneName: 
+  FallbackMaxRetryCount: 0

@@ -2,7 +2,8 @@
     "name": "GameFramework.SceneLoading.Editor",
     "rootNamespace": "GameFramework.SceneLoading.Editor",
     "references": [
-        "GameFramework.SceneLoading"
+        "GameFramework.SceneLoading",
+        "Unity.Addressables.Editor"
     ],
     "includePlatforms": [
         "Editor"

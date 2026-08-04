@@ -257,7 +257,7 @@ namespace GameFramework.SceneLoading
             CurrentSceneName = request.Label;
             SetProgress(0f);
 
-            ISceneLoadOperation op = request.Begin();
+            ISceneLoadOperation op = request.Begin(_settings.SceneOperationTimeoutSeconds);
             if (op.FailedToStart)
             {
                 CurrentSceneName = SceneManager.GetActiveScene().name;
@@ -283,7 +283,7 @@ namespace GameFramework.SceneLoading
                 // 씬 오퍼레이션 자신(가중치 1)과 extraSteps를 전부 동일한 취급의 "기여자"로
                 // 모아 동시에 시작하고, 매 프레임 가중 평균으로 Progress를 갱신합니다.
                 List<LoadContributor> contributors = new List<LoadContributor> { new LoadContributor(request.Label, 1f) };
-                _ = RunSceneReadyContributorAsync(op, contributors[0], destroyCancellationToken);
+                _ = RunSceneReadyContributorAsync(op, contributors[0], _settings.SceneOperationTimeoutSeconds, destroyCancellationToken);
 
                 if (extraSteps != null)
                 {
@@ -339,7 +339,29 @@ namespace GameFramework.SceneLoading
             {
                 if (!activated)
                 {
-                    op.ReleaseOnFailure();
+                    // 여기서 반드시 완료를 기다려야 합니다 - 그냥 fire-and-forget으로 던져두면
+                    // (예: 폴백이 곧바로 다음 시도를 시작해) 이 정리 작업과 다음 시도의
+                    // BuildSettingsSceneLoadOperation이 동시에 씬 목록을 건드리게 되고,
+                    // 그러면 "방금 로드된 씬"을 찾는 로직이 서로 다른 오퍼레이션의 씬을
+                    // 잘못 집을 수 있는 경쟁 상태가 생깁니다. await로 완전히 끝난 뒤에만
+                    // 다음 시도가 시작되도록 해서 이 경쟁 상태 자체가 생기지 않게 합니다.
+                    // try/catch로 감싸는 이유: 여기서 예외가 나면 finally 블록의 특성상
+                    // 원래 실패 원인(Critical 단계 실패 등)이 이 예외로 덮여버려 재시도
+                    // 루프의 로그가 진짜 원인을 알 수 없게 되기 때문입니다.
+                    try
+                    {
+                        await op.ReleaseOnFailure();
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError($"[SceneLoadingManager] 실패한 로드를 정리하지 못했습니다: {e}");
+                    }
+
+                    // 활성화까지 못 갔으니 실제 씬은 바뀌지 않았습니다(정리까지 끝난
+                    // 지금은 원래 씬으로 완전히 복원된 상태). op.FailedToStart 경로(261-266줄)는
+                    // 이 finally에 오기 전에 이미 따로 복원하지만, Critical 단계 실패 등
+                    // 나머지 실패 경로는 전부 여기서 한 번에 복원합니다.
+                    CurrentSceneName = SceneManager.GetActiveScene().name;
                 }
             }
         }
@@ -552,9 +574,9 @@ namespace GameFramework.SceneLoading
             public static SceneLoadRequest FromBuildSettings(string sceneName) => new SceneLoadRequest(sceneName, false);
             public static SceneLoadRequest FromAddressable(string address) => new SceneLoadRequest(address, true);
 
-            public ISceneLoadOperation Begin() => _isAddressable
+            public ISceneLoadOperation Begin(float cleanupTimeoutSeconds) => _isAddressable
                 ? new AddressableSceneLoadOperation(Label)
-                : (ISceneLoadOperation)new BuildSettingsSceneLoadOperation(Label);
+                : (ISceneLoadOperation)new BuildSettingsSceneLoadOperation(Label, cleanupTimeoutSeconds);
         }
 
         // "씬 오퍼레이션을 어떻게 시작·진행·활성화하는지"만 추상화합니다. 로딩 화면 표시,
@@ -572,17 +594,34 @@ namespace GameFramework.SceneLoading
             void Activate();
             Awaitable WaitUntilActivationDoneAsync(CancellationToken token);
 
-            /// <summary>이 시도가 실패해서 버려질 때 리소스를 정리합니다 (Addressables 핸들 해제 등).</summary>
-            void ReleaseOnFailure();
+            /// <summary>이 시도가 실패해서 버려질 때 리소스를 정리합니다 (Addressables 핸들 해제,
+            /// Build Settings 경로의 경우 어차피 끝까지 로드된 씬을 언로드하는 것 등). 호출부는
+            /// 이 정리가 완전히 끝난 뒤에야 다음 시도를 시작하므로, 반드시 실제로 완료될 때까지
+            /// 기다리는 Awaitable을 반환해야 합니다 - fire-and-forget으로 구현하면 다음 시도의
+            /// 씬 오퍼레이션과 동시에 진행되면서 서로의 씬을 혼동할 수 있는 경쟁 상태가 생깁니다.</summary>
+            Awaitable ReleaseOnFailure();
         }
 
         private sealed class BuildSettingsSceneLoadOperation : ISceneLoadOperation
         {
             private readonly AsyncOperation _op;
+            private readonly float _cleanupTimeoutSeconds;
 
-            public BuildSettingsSceneLoadOperation(string sceneName)
+            // LoadSceneMode.Single + allowSceneActivation=false는 한 번 시작하면 취소할
+            // 방법이 없습니다 - 활성화하거나, 영원히 "로딩 중"으로 방치하거나 둘 중
+            // 하나뿐입니다(Unity에 씬 로드를 중간에 멈추는 API 자체가 없음). Critical
+            // SceneLoadStep 실패 등으로 이 로드를 포기해야 할 때, 씬이 Hierarchy에
+            // 영원히 "(is loading)"로 남아 재시도마다 하나씩 쌓이는 문제가 있었습니다.
+            // 그래서 내부적으로는 항상 Additive로 로드해두고, 성공하면
+            // WaitUntilActivationDoneAsync에서 이전 씬들을 직접 언로드하고 새 씬을 활성
+            // 씬으로 지정해 Single 모드처럼 보이게 하고, 실패하면 ReleaseOnFailure에서
+            // 이 씬만 깨끗하게 언로드합니다. Additive는 성공적으로 로드되어도(=활성화되어도)
+            // 다른 씬에 영향을 주지 않으므로, 실패 경로에서도 안전하게 끝까지 로드시킨 뒤
+            // 바로 지울 수 있습니다.
+            public BuildSettingsSceneLoadOperation(string sceneName, float cleanupTimeoutSeconds)
             {
-                _op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Single);
+                _cleanupTimeoutSeconds = cleanupTimeoutSeconds;
+                _op = SceneManager.LoadSceneAsync(sceneName, LoadSceneMode.Additive);
                 if (_op != null)
                 {
                     _op.allowSceneActivation = false;
@@ -610,10 +649,95 @@ namespace GameFramework.SceneLoading
                 {
                     await Awaitable.NextFrameAsync(token);
                 }
+
+                // 같은 이름의 씬을 자기 자신 위에 다시 로드하는 경우(자기 자신 리로드)
+                // GetSceneByName(sceneName)은 기존 인스턴스와 새 인스턴스 중 어느 쪽인지
+                // 구분하지 못합니다. Unity는 Additive로 새로 로드된 씬을 항상 씬 목록
+                // 맨 끝에 추가하므로, isDone이 true가 된 직후(중간에 다른 await 없이)
+                // 바로 마지막 인덱스를 읽으면 이 오퍼레이션이 방금 추가한 씬을 정확히
+                // 집을 수 있습니다.
+                Scene newScene = SceneManager.GetSceneAt(SceneManager.sceneCount - 1);
+
+                List<Scene> previousScenes = new List<Scene>();
+                for (int i = 0; i < SceneManager.sceneCount; i++)
+                {
+                    Scene scene = SceneManager.GetSceneAt(i);
+                    if (scene != newScene)
+                    {
+                        previousScenes.Add(scene);
+                    }
+                }
+
+                // DontDestroyOnLoad에 있는 오브젝트들은 SceneManager.GetSceneAt에 아예
+                // 잡히지 않는 별도의 씬이라, 이 목록에 포함되지 않고 자동으로 보존됩니다.
+                SceneManager.SetActiveScene(newScene);
+
+                for (int i = 0; i < previousScenes.Count; i++)
+                {
+                    AsyncOperation unloadOp = SceneManager.UnloadSceneAsync(previousScenes[i]);
+                    if (unloadOp == null)
+                    {
+                        continue;
+                    }
+
+                    while (!unloadOp.isDone)
+                    {
+                        await Awaitable.NextFrameAsync(token);
+                    }
+                }
             }
 
-            public void ReleaseOnFailure()
+            public async Awaitable ReleaseOnFailure()
             {
+                if (_op == null)
+                {
+                    return;
+                }
+
+                // 호출부(RunSingleAttemptAsync)가 이 메서드를 반드시 await하고 나서야 다음
+                // 시도를 시작하므로, 정리 도중 "마지막 인덱스"로 씬을 찾는 게 안전합니다 -
+                // 이 메서드가 끝나기 전까지는 다른 BuildSettingsSceneLoadOperation이 동시에
+                // 씬 목록에 씬을 추가할 수 없습니다. 다만 이 정리 자체가(예: 씬의 Awake에서
+                // 무거운 동기 작업 등으로) 끝나지 않으면 재시도/폴백 파이프라인 전체가
+                // 멈춰버리므로, 다른 훅들과 동일하게 타임아웃으로 보호합니다 - 타임아웃이
+                // 나면 정리를 더 기다리지 않고 넘어갑니다(씬 하나가 남을 수 있지만, 파이프라인
+                // 전체가 멈추는 것보다는 낫습니다).
+                await RunWithTimeoutAsync(CleanupAsync, _cleanupTimeoutSeconds, CancellationToken.None,
+                    "실패한 Build Settings 씬 정리", treatTimeoutAsSuccess: true);
+            }
+
+            private async Awaitable CleanupAsync()
+            {
+                // 이미 시작된 로드는 중간에 멈출 수 없으므로, 끝까지 로드되게 둔 뒤(Additive라
+                // 다른 씬에는 영향 없음) 곧바로 언로드해서 정리합니다.
+                _op.allowSceneActivation = true;
+
+                while (!_op.isDone)
+                {
+                    await Awaitable.NextFrameAsync(CancellationToken.None);
+                }
+
+                if (SceneManager.sceneCount == 0)
+                {
+                    return;
+                }
+
+                Scene scene = SceneManager.GetSceneAt(SceneManager.sceneCount - 1);
+                if (!scene.IsValid() || !scene.isLoaded)
+                {
+                    return;
+                }
+
+                AsyncOperation unloadOp = SceneManager.UnloadSceneAsync(scene);
+                if (unloadOp == null)
+                {
+                    return;
+                }
+
+                while (!unloadOp.isDone)
+                {
+                    await Awaitable.NextFrameAsync(CancellationToken.None);
+                }
             }
         }
 
@@ -665,12 +789,18 @@ namespace GameFramework.SceneLoading
 
             public AsyncOperationHandle<SceneInstance>? Handle => _handle.IsValid() ? _handle : (AsyncOperationHandle<SceneInstance>?)null;
 
-            public void ReleaseOnFailure()
+            public Awaitable ReleaseOnFailure()
             {
                 if (_handle.IsValid())
                 {
                     Addressables.Release(_handle);
                 }
+
+                // Addressables.Release는 동기 호출이라 기다릴 게 없지만, 인터페이스
+                // 시그니처를 맞추기 위해 이미 완료된 Awaitable을 반환합니다.
+                AwaitableCompletionSource tcs = new AwaitableCompletionSource();
+                tcs.SetResult();
+                return tcs.Awaitable;
             }
         }
 
@@ -761,11 +891,18 @@ namespace GameFramework.SceneLoading
             throw errors.Count == 1 ? errors[0] : new AggregateException(errors);
         }
 
-        private static async Awaitable RunSceneReadyContributorAsync(ISceneLoadOperation op, LoadContributor contributor, CancellationToken token)
+        private static async Awaitable RunSceneReadyContributorAsync(ISceneLoadOperation op, LoadContributor contributor,
+            float timeoutSeconds, CancellationToken token)
         {
             try
             {
-                await op.WaitUntilReadyAsync(p => contributor.Progress = p, token);
+                // Build Settings에서 비활성화된 씬 이름으로 로드하면 op가 null이 아닌
+                // 진행률이 절대 안 올라가는 AsyncOperation을 반환할 수 있고, Addressables도
+                // 원격 다운로드가 멈추면 마찬가지로 영원히 끝나지 않을 수 있습니다. SceneLoadStep과
+                // 동일하게(성공 처리가 아니라 실패로) 타임아웃 보호합니다 - 씬 오퍼레이션은
+                // "일단 못 끝나면 건너뛰고 계속 진행"할 수 있는 대상이 아니라 항상 필수이므로.
+                await RunWithTimeoutAsync(() => op.WaitUntilReadyAsync(p => contributor.Progress = p, token),
+                    timeoutSeconds, token, $"씬 오퍼레이션(\"{contributor.Label}\") 로드 대기", treatTimeoutAsSuccess: false);
                 contributor.Progress = 1f;
             }
             catch (Exception e)

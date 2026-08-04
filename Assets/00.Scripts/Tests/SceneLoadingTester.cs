@@ -10,7 +10,7 @@ namespace GameFramework.Tests
     {
         [SerializeField] private string _sceneName = "TestScene2";
         [SerializeField] private string _missingSceneName = "이런씬은없음";
-        [SerializeField] private string _addressableSceneAddress = "AddressableTestScene";
+        [SerializeField] private string _addressableSceneAddress = "TestScene2";
         [SerializeField] private string _invalidAddressableAddress = "이런주소는없음";
 
         private string _log = "";

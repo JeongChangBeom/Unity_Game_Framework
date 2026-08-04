@@ -957,6 +957,7 @@ game/time/...
 - 씬 로드와 나란히 진행되는 추가 비동기 작업(에셋 프리로드 등)의 진행률을 가중 합산해 하나의 `Progress`로 보여주는 `SceneLoadStep`
 - 로드 실패 시 자동 재시도(횟수/간격 설정 가능) + 전부 실패하면 이동할 폴백 씬 지정 가능
 - 씬 이름 오타를 컴파일 타임 에러로 잡는 `ESceneKey` 자동 생성 (Build Settings의 씬 목록 기준, Pooling의 `EPoolKey`와 동일한 방식)
+- `Assets/01.Scenes/`에 씬을 넣기만 하면 Build Settings + Addressables 등록, `ESceneKey` 재생성까지 전부 자동
 - 최소 로딩 화면 노출시간 보장 - 빠른 로드에서 화면이 깜빡이고 바로 사라지는 것 방지
 - 진행률(`Progress`, `OnProgressChanged`)과 로드 시작/완료/실패 이벤트(`OnSceneLoadStarted`/`OnSceneLoadCompleted`/`OnSceneLoadFailed`) 제공
 - 예외가 나도(사용자 코드의 `ISceneEntryPoint`/`ISceneExitPoint` 구현 포함) `IsLoading`과 로딩 화면이 항상 정상 상태로 복구됨 - 한 번 실패했다고 이후 씬 전환이 영구히 막히지 않음
@@ -1010,6 +1011,16 @@ Build Settings에 씬을 등록한 뒤, Unity Editor에서 아래 메뉴를 누�
 * 동작: Build Settings에 등록된(활성화된) 모든 씬 이름을 모아 `ESceneKey.cs`를 자동 생성 (유효하지 않은 이름/중복 이름은 Console에 에러를 남기고 건너뜀)
 * 생성 위치: `Packages/com.changbeom.gameframework.sceneloading/Runtime/ESceneKey.cs`
 * 기존 멤버의 선언 순서(=정수 값)는 재생성해도 보존되고, 새로 등록한 씬만 맨 뒤에 추가됩니다.
+
+---
+
+### 씬 폴더 자동 등록
+`Assets/01.Scenes/`에 씬을 새로 추가하기만 하면 별도 조작 없이 자동으로:
+1. Build Settings에 등록 (이미 등록되어 있는데 비활성화 상태라면 다시 활성화 - 이 폴더에 있는 씬은 항상 빌드에 포함되는 게 원칙)
+2. Addressables "Scene" 그룹에 등록되고, 주소가 씬 파일 이름으로 설정됨 (이름이 나중에 바뀌어도 주소가 계속 따라감)
+3. Build Settings가 바뀌었으면 `ESceneKey`도 곧바로 재생성됨
+
+이미 폴더에 있었지만 한 번도 (재)임포트된 적이 없어서 자동 감지를 못한 씬이 있다면, `Game Framework/Scene Loading/Sync Scenes From Folder` 메뉴로 한 번에 정리할 수 있습니다. Pooling 패키지의 폴더 기반 자동 등록과 동일한 방식입니다.
 
 ---
 
@@ -1085,6 +1096,7 @@ SceneLoadingManager.Instance.OnSceneLoadFallback += (original, fallback) =>
 |Minimum Loading Screen Duration|로딩 화면 최소 노출시간(초)|0.5|
 |Fade Duration|로딩 화면 페이드 인/아웃 시간(초)|0.25|
 |Loading Screen Prefab Override|커스텀 로딩 화면 프리팹 (비워두면 내장 기본 화면 사용)|없음|
+|Scene Operation Timeout Seconds|씬 오퍼레이션 자신(Build Settings/Addressables 공통)이 이 시간 안에 준비되지 않으면 실패 처리. Build Settings 경로에서 실패한 로드를 정리(언로드)하는 시간에도 재사용 (0 이하면 무한 대기)|60|
 |Loading Screen Timeout Seconds|로딩 화면의 RequestShow/RequestHide 콜백이 이 시간 안에 안 불리면 성공한 걸로 치고 건너뜀 (0 이하면 무한 대기)|10|
 |Entry Exit Point Timeout Seconds|`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행 (0 이하면 무한 대기)|10|
 |Load Step Timeout Seconds|`SceneLoadStep` 하나가 이 시간 안에 끝나지 않으면 실패 처리 (0 이하면 무한 대기)|30|
