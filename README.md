@@ -42,7 +42,7 @@
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
 - **[Scene Loading](#sceneloading)**  
-  비동기 씬 전환 + 최소 노출시간이 보장되는 로딩 화면
+  비동기 씬 전환(Build Settings + Addressables) + 재시도/폴백 + 최소 노출시간이 보장되는 로딩 화면
 
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
@@ -60,14 +60,14 @@
 |Sound System|Addressables + Sheet 기반 사운드 재생|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sound`|
 |Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
-|Scene Loading|비동기 씬 전환 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
+|Scene Loading|비동기 씬 전환(Build Settings + Addressables) + 재시도/폴백 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
 > * Sound System은 Core, Save / Load, Unity Addressables에 의존하므로 함께 설치해야 합니다.
 >   * 사운드 데이터(`SoundTable`)를 직접 만드는 건 번거로우니, Data Parsing으로 시트에서 생성하는 걸 권장합니다.
 > * UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
-> * Scene Loading은 Core, UI System에 의존하므로 함께 설치해야 합니다.
+> * Scene Loading은 Core, UI System, Unity Addressables에 의존하므로 함께 설치해야 합니다.
 
 ---
 
@@ -953,6 +953,9 @@ game/time/...
 
 ### 기능
 - `UnityEngine.SceneManagement` 기반 비동기 씬 전환 (`LoadSceneMode.Single`)
+- Addressables로 등록된 씬도 동일한 파이프라인으로 로드 (`LoadSceneFromAddressableAsync`)
+- 씬 로드와 나란히 진행되는 추가 비동기 작업(에셋 프리로드 등)의 진행률을 가중 합산해 하나의 `Progress`로 보여주는 `SceneLoadStep`
+- 로드 실패 시 자동 재시도(횟수/간격 설정 가능) + 전부 실패하면 이동할 폴백 씬 지정 가능
 - 씬 이름 오타를 컴파일 타임 에러로 잡는 `ESceneKey` 자동 생성 (Build Settings의 씬 목록 기준, Pooling의 `EPoolKey`와 동일한 방식)
 - 최소 로딩 화면 노출시간 보장 - 빠른 로드에서 화면이 깜빡이고 바로 사라지는 것 방지
 - 진행률(`Progress`, `OnProgressChanged`)과 로드 시작/완료/실패 이벤트(`OnSceneLoadStarted`/`OnSceneLoadCompleted`/`OnSceneLoadFailed`) 제공
@@ -963,7 +966,7 @@ game/time/...
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 - 이미 로딩 중일 때 추가 요청은 대기열에 넣지 않고 경고 로그와 함께 무시 (동시 전환 방지)
 
-> **v1 제한사항**: `LoadSceneMode.Single`만 지원합니다. Additive 씬 로드(부분 로드/언로드)는 아직 지원하지 않습니다.
+> **v1 제한사항**: Build Settings 경로와 Addressables 경로 모두 `LoadSceneMode.Single`만 지원합니다. Additive 씬 로드(부분 로드/언로드)는 아직 지원하지 않습니다.
 
 ---
 
@@ -985,10 +988,16 @@ bool isLoading = SceneLoadingManager.Instance.IsLoading;
 
 - **`LoadSceneAsync(sceneName)`** (`ESceneKey` 또는 `string` 오버로드)
   -> 로딩 화면 표시 -> 씬 비동기 로드 -> 최소 노출시간 대기 -> 씬 활성화 -> 로딩 화면 숨김 순으로 진행. 이미 로딩 중이면 경고 로그만 남기고 무시
+- **`LoadSceneFromAddressableAsync(address)`**
+  -> Addressables 주소로 같은 파이프라인을 그대로 사용. 자세한 내용은 아래 "Addressables로 씬 로딩하기" 참고
+- **`LoadSceneAsync(sceneName, extraSteps)` / `LoadSceneFromAddressableAsync(address, extraSteps)`**
+  -> `extraSteps`(`IReadOnlyList<SceneLoadStep>`)로 전달한 추가 작업을 씬 로드와 동시에 진행하고 진행률을 가중 합산. 자세한 내용은 아래 "가중 합산 progress" 참고
 - **`IsLoading` / `Progress` / `CurrentSceneName`**
   -> 현재 로딩 상태 조회
 - **`OnSceneLoadStarted` / `OnProgressChanged` / `OnSceneLoadCompleted` / `OnSceneLoadFailed`**
-  -> 각각 로드 시작, 진행률 변경(0~1), 로드 성공 완료, 로드 실패(잘못된 씬 이름, 예외 발생 등) 시점에 발행
+  -> 각각 로드 시작, 진행률 변경(0~1), 로드 성공 완료, 최종 실패(재시도/폴백까지 전부 소진된 뒤) 시점에 발행
+- **`OnSceneLoadAttemptFailed` / `OnSceneLoadRetrying` / `OnSceneLoadFallback`**
+  -> 재시도/폴백 관련 이벤트. 자세한 내용은 아래 "로드 실패 시 자동 재시도 / 폴백" 참고
 
 #### `ESceneKey` 생성하기
 Build Settings에 씬을 등록한 뒤, Unity Editor에서 아래 메뉴를 누릅니다.
@@ -1001,10 +1010,76 @@ Build Settings에 씬을 등록한 뒤, Unity Editor에서 아래 메뉴를 누�
 
 ---
 
+### Addressables로 씬 로딩하기
+Build Settings 대신 Addressables로 등록한 씬을 로드하려면 `LoadSceneFromAddressableAsync`를 씁니다. 로딩 화면/최소 노출시간/`ISceneEntryPoint`/`ISceneExitPoint`/재시도/폴백까지 `LoadSceneAsync`와 완전히 동일한 파이프라인을 공유합니다.
+
+```cs
+_ = SceneLoadingManager.Instance.LoadSceneFromAddressableAsync("DungeonScene");
+```
+
+* Addressables 그룹에 씬을 등록하고, 위 예시의 `"DungeonScene"` 자리에 그 주소(Address)를 넣으면 됩니다.
+* 씬을 새로 성공적으로 활성화할 때마다(Addressables든 Build Settings든) 직전에 로드했던 Addressables 씬 핸들을 자동으로 언로드하고, 앱 종료 시에도 남은 핸들을 정리합니다 - 직접 `Addressables.Release`를 호출할 필요가 없습니다.
+* 이 경로는 `com.unity.addressables` 패키지 의존성이 필요하며, 이 패키지를 설치하면 함께 설치됩니다.
+
+> **알려진 v1 한계**: 원격 카탈로그 다운로드가 완전히 멈춰서 끝나지도 실패하지도 않는 극단적인 경우, 씬 자체의 로드 대기에는 `SceneLoadStep`과 달리 타임아웃이 적용되지 않습니다 (`ISceneEntryPoint`/`ISceneExitPoint`/`SceneLoadStep`은 전부 타임아웃으로 보호되지만, 씬 오퍼레이션 자신은 아직 아닙니다). 일반적인 네트워크 실패(오류 응답 등)는 Addressables가 자체적으로 실패로 처리해 정상적으로 재시도/폴백 대상이 되므로, 이 한계는 "응답이 아예 없는" 매우 드문 상황에서만 해당됩니다.
+
+---
+
+### 가중 합산 progress
+씬 로드와 나란히 진행하고 싶은 다른 비동기 작업(다음 씬에 필요한 에셋 프리로드 등)이 있다면, `SceneLoadStep`으로 만들어 `extraSteps`로 넘기세요. 씬 로드 자체(가중치 1)와 각 단계가 전부 동시에 시작되고, 다음 식으로 가중 평균한 값이 `Progress`/`OnProgressChanged`에 반영됩니다.
+
+```
+Progress = Σ(단계 진행률 × 단계 가중치) / Σ(단계 가중치)
+```
+
+```cs
+SceneLoadStep preloadStep = new SceneLoadStep(
+    label: "PlayerSkinPreload",
+    weight: 1f,
+    runAsync: async (reportProgress, cancellationToken) =>
+    {
+        // 0~1 진행률을 reportProgress로 보고하며 원하는 작업 수행
+        AudioClip clip = await LoadPlayerSkinAsync(reportProgress, cancellationToken);
+    });
+
+_ = SceneLoadingManager.Instance.LoadSceneAsync("GameScene", new[] { preloadStep });
+```
+
+* **`Weight`**: 씬 로드 자신의 가중치는 항상 `1`로 고정입니다. 예를 들어 단계 하나에 `Weight = 2`를 주면 씬 로드보다 2배 비중으로 반영됩니다.
+* **`Critical`** (기본값 `true`): 이 단계가 실패하면 씬 로드 전체가 실패로 취급되어 재시도/폴백 대상이 됩니다. `false`면 경고 로그만 남기고 씬 로드는 그대로 계속 진행됩니다.
+* 단계들은 씬 로드와 **동시에** 진행됩니다(직렬이 아님) - 프리로드가 씬 로드 시간과 겹쳐서 전체 대기 시간이 줄어드는 게 목적입니다.
+* `ISceneEntryPoint`/`ISceneExitPoint` 훅과 마찬가지로, 단계 하나가 `SceneLoadingManagerSettings`의 `Load Step Timeout Seconds`(기본 30초) 안에 끝나지 않으면 타임아웃 처리됩니다 - 다만 훅과 달리 "성공한 걸로 치고 넘어가는" 게 아니라 그 단계의 실패로 처리되어 `Critical` 값에 따라 재시도/폴백 대상이 됩니다(사용자 코드의 버그로 프리로드가 영원히 안 끝나서 씬 전환 전체가 멈추는 것을 방지).
+* `new SceneLoadStep(...)` 생성자를 거치지 않은 `default(SceneLoadStep)`을 실수로 넘기면(`RunAsync`가 null) `Critical` 값과 무관하게 항상 실패로 처리됩니다.
+
+---
+
+### 로드 실패 시 자동 재시도 / 폴백
+`SceneLoadingManagerSettings`의 `Max Retry Count`를 1 이상으로 설정하면, 로드가 실패해도 바로 포기하지 않고 `Retry Delay Seconds` 간격으로 자동 재시도합니다. 재시도까지 전부 실패했을 때 `Fallback Scene Name`이 설정되어 있으면 그 씬(Build Settings 기준, 항상)으로 자동 전환합니다 - 원래 요청이 Addressables였어도 폴백은 네트워크에 의존하지 않는 Build Settings 경로만 사용합니다. 폴백 씬 로드 자체가 실패할 경우의 재시도 횟수는 `Fallback Max Retry Count`로 따로 설정합니다 (기본 0=1번만 시도, 폴백의 폴백은 없음 - 무한 루프 방지).
+
+```cs
+SceneLoadingManager.Instance.OnSceneLoadAttemptFailed += (sceneOrAddress, attempt, maxAttempts) =>
+    Debug.Log($"{sceneOrAddress} 로드 시도 {attempt}/{maxAttempts} 실패");
+
+SceneLoadingManager.Instance.OnSceneLoadRetrying += (sceneOrAddress, nextAttempt, maxAttempts) =>
+    Debug.Log($"{sceneOrAddress} 재시도 {nextAttempt}/{maxAttempts} 시작");
+
+SceneLoadingManager.Instance.OnSceneLoadFallback += (original, fallback) =>
+    Debug.Log($"{original} 재시도 소진 - {fallback}으로 전환");
+```
+
+* `OnSceneLoadFailed`는 재시도/폴백까지 전부 소진된 뒤 **최종 실패**했을 때만 발행됩니다. `Max Retry Count`가 기본값 0이면 시도가 1번뿐이라 기존과 동일하게 그 1번의 실패에 바로 발행됩니다.
+* `OnSceneLoadAttemptFailed`는 개별 시도가 실패할 때마다(재시도 예정인 경우 포함) 발행됩니다.
+* 재시도/폴백 전체가 끝날 때까지 `IsLoading`은 계속 `true`로 유지되므로, 그 사이 다른 `LoadSceneAsync` 호출은 기존과 동일하게 무시됩니다.
+* `Fallback Scene Name`이 방금 실패한 요청과 같은 이름이면(자기 자신을 폴백으로 지정한 경우) 무한 루프를 막기 위해 폴백을 건너뛰고 경고 로그만 남긴 뒤 `OnSceneLoadFailed`로 끝납니다.
+
+> **알려진 v1 한계**: 씬이 이미 활성화된 뒤(`ISceneEntryPoint` 실행 도중) 실패해서 재시도가 도는 경우, `ISceneExitPoint`는 원래 씬 기준으로 딱 1번만 실행되고 새로 활성화된 씬의 퇴장 훅은 재시도 시점에 다시 실행되지 않습니다. 재시도의 주 용도(활성화 전 실패 - 다운로드 실패 등)에서는 문제되지 않습니다.
+
+---
+
 ### Scene Loading Manager Settings (선택, 씬 배치 불필요)
 * `Assets/Create/Game Framework/Scene Loading/Scene Loading Manager Settings`로 에셋 생성
 * 반드시 `Assets/Resources/GameFramework/SceneLoadingManagerSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
-* 항목: Minimum Loading Screen Duration(최소 노출시간, 초) / Fade Duration(페이드 인/아웃 시간, 초) / Loading Screen Prefab Override(비워두면 내장 기본 화면 사용) / Entry Exit Point Timeout Seconds(`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행, 0 이하면 무한 대기, 기본 10초)
+* 항목: Minimum Loading Screen Duration(최소 노출시간, 초) / Fade Duration(페이드 인/아웃 시간, 초) / Loading Screen Prefab Override(비워두면 내장 기본 화면 사용) / Loading Screen Timeout Seconds(로딩 화면의 RequestShow/RequestHide 콜백이 이 시간 안에 안 불리면 성공한 걸로 치고 건너뜀, 0 이하면 무한 대기, 기본 10초) / Entry Exit Point Timeout Seconds(`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행, 0 이하면 무한 대기, 기본 10초) / Load Step Timeout Seconds(`SceneLoadStep` 하나가 이 시간 안에 끝나지 않으면 실패 처리, 0 이하면 무한 대기, 기본 30초) / Max Retry Count(로드 실패 시 자동 재시도 횟수, 기본 0=끔) / Retry Delay Seconds(재시도 사이 대기 시간, 초, 기본 1초) / Fallback Scene Name(모든 재시도 소진 시 이동할 Build Settings 씬, 기본 비어있음=폴백 없음) / Fallback Max Retry Count(폴백 씬 로드 자체의 재시도 횟수, 기본 0)
 * 에셋이 없으면 Console에 경고가 남고 기본값으로 동작합니다.
 
 ---
@@ -1034,6 +1109,8 @@ public class MyLoadingScreen : SceneLoadingScreenBase
 
 만든 컴포넌트를 프리팹으로 만들어 `SceneLoadingManagerSettings`의 `Loading Screen Prefab Override`에 연결하면 됩니다.
 
+> `PlayShow()`/`PlayHide()`에서 `CompleteShow()`/`CompleteHide()`를 호출하지 않는 버그가 있어도, `Loading Screen Timeout Seconds`(기본 10초)가 지나면 자동으로 다음 단계로 넘어가 `IsLoading`이 영구 고착되지 않도록 방지합니다. 그래도 실제로는 호출하는 게 정상 동작입니다.
+
 ---
 
 ### 씬 진입/퇴장 훅 (`ISceneEntryPoint` / `ISceneExitPoint`)
@@ -1062,14 +1139,19 @@ public class GameSceneBootstrap : MonoBehaviour, ISceneEntryPoint
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/SceneLoadingTester.cs`를 아무 GameObject에 붙이고 Play하면 다음 5개 버튼을 제공합니다.
+`Assets/00.Scripts/Tests/SceneLoadingTester.cs`를 아무 GameObject에 붙이고 Play하면 다음 10개 버튼을 제공합니다.
 1. 문자열로 씬 전환
 2. `ESceneKey`(`None` 아닌 정상 키)로 씬 전환
 3. `ESceneKey.None`으로 전환 시도해 에러 로그 확인
-4. 존재하지 않는 씬 이름으로 로드해 에러 로그 확인
+4. 존재하지 않는 씬 이름으로 로드해 에러 로그 확인 (재시도/폴백을 확인하려면 `SceneLoadingManagerSettings`에서 `Max Retry Count`/`Retry Delay Seconds`/`Fallback Scene Name`을 먼저 설정)
 5. 연속으로 두 번 빠르게 호출해 중복 요청 방지(`IsLoading` 가드) 확인
+6. Addressables 주소로 씬 전환
+7. 존재하지 않는 Addressables 주소로 로드해 에러 로그 확인
+8. 가중치가 다른 가짜 프리로드 단계 2개와 함께 씬 전환 (progress bar 속도 변화로 가중 합산 확인)
+9. 같은 테스트 + 한 단계가 실패(`Critical=false`) - 씬 로드는 성공해야 함
+10. 같은 테스트 + 한 단계가 실패(`Critical=true` 기본값) - 씬 로드도 실패해야 함
 
-상단에는 `IsLoading`/`Progress`/`CurrentSceneName`과 `OnProgressChanged` 발행 횟수가 실시간으로 표시되고, 로드 시작/완료/실패 이벤트는 로그에 자동으로 찍힙니다. 실제 씬 전환을 확인하려면 Build Settings에 씬이 최소 2개 등록되어 있어야 합니다. `ESceneKey`를 생성하지 않아도(즉 `None`만 있는 상태여도) 컴파일에 문제가 없도록 2번 버튼을 제외하면 문자열 오버로드만 사용합니다.
+상단에는 `IsLoading`/`Progress`/`CurrentSceneName`과 `OnProgressChanged` 발행 횟수가 실시간으로 표시되고, 로드 시작/완료/실패/재시도/폴백 이벤트는 전부 로그에 자동으로 찍힙니다. 실제 씬 전환을 확인하려면 Build Settings에 씬이 최소 2개 등록되어 있어야 합니다. 6~7번 버튼을 테스트하려면 Unity 에디터에서 대상 씬을 Addressable로 표시하고 주소를 인스펙터의 `_addressableSceneAddress` 필드에 맞게 지정해야 합니다. `ESceneKey`를 생성하지 않아도(즉 `None`만 있는 상태여도) 컴파일에 문제가 없도록, 2번 버튼을 제외한 나머지는 문자열 오버로드를 사용하고 3번 버튼은 항상 존재하는 `ESceneKey.None`만 사용합니다.
 
 </details>
 

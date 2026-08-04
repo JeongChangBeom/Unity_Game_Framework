@@ -18,12 +18,12 @@ namespace GameFramework.SceneLoading
             CancellationToken cancellationToken,
             Action onComplete)
         {
-            group.alpha = from;
-
             float t = 0f;
 
             try
             {
+                group.alpha = from;
+
                 while (t < duration)
                 {
                     t += Time.unscaledDeltaTime;

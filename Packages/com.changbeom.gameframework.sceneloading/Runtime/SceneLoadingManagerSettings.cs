@@ -27,7 +27,26 @@ namespace GameFramework.SceneLoading
         public SceneLoadingScreenBase LoadingScreenPrefabOverride;
 
         [Header("Safety")]
+        [Tooltip("로딩 화면의 RequestShow/RequestHide 콜백(CompleteShow/CompleteHide)이 이 시간(초) 안에 호출되지 않으면 성공한 걸로 치고 넘어갑니다. LoadingScreenPrefabOverride로 만든 커스텀 로딩 화면이 CompleteShow()/CompleteHide()를 호출하지 않는 버그가 있어도 IsLoading이 영구 고착되지 않도록 방지합니다(내장 기본 로딩 화면은 이 문제가 없습니다). 0 이하이면 타임아웃 없이 무한 대기합니다.")]
+        [Min(0f)] public float LoadingScreenTimeoutSeconds = 10f;
+
         [Tooltip("ISceneEntryPoint/ISceneExitPoint 훅 하나가 이 시간(초) 안에 끝나지 않으면 경고 로그를 남기고 건너뛴 뒤 다음 단계로 진행합니다. 사용자 코드의 버그로 훅이 영원히 끝나지 않아 씬 전환 전체가 멈추는 것을 방지합니다. 0 이하이면 타임아웃 없이 무한 대기합니다.")]
         [Min(0f)] public float EntryExitPointTimeoutSeconds = 10f;
+
+        [Tooltip("LoadSceneAsync의 extraSteps로 전달한 SceneLoadStep 하나가 이 시간(초) 안에 끝나지 않으면 그 단계를 실패로 처리합니다 - EntryExitPointTimeoutSeconds와 달리 성공한 걸로 치고 넘어가지 않습니다. Critical(기본값)이면 씬 로드 자체도 실패로 처리되어 재시도/폴백 대상이 되고, Critical=false면 경고 로그만 남기고 씬 로드는 계속 진행됩니다. 네트워크 요청 등 오래 걸릴 수 있는 작업을 고려해 기본값을 EntryExitPointTimeoutSeconds보다 길게 잡았습니다. 0 이하이면 타임아웃 없이 무한 대기합니다.")]
+        [Min(0f)] public float LoadStepTimeoutSeconds = 30f;
+
+        [Header("Retry & Fallback")]
+        [Tooltip("로드 실패 시 자동 재시도 횟수. 0이면 재시도하지 않고 기존과 동일하게 즉시 실패 처리합니다.")]
+        [Min(0)] public int MaxRetryCount = 0;
+
+        [Tooltip("재시도 사이 대기 시간(초). 재시도 중에도 로딩 화면은 계속 떠 있습니다.")]
+        [Min(0f)] public float RetryDelaySeconds = 1f;
+
+        [Tooltip("모든 재시도가 실패했을 때 자동으로 이동할 폴백 씬 이름(Build Settings 기준). 비워두면 폴백 없이 실패로 끝냅니다.")]
+        public string FallbackSceneName = "";
+
+        [Tooltip("폴백 씬 로드 자체가 실패할 경우 폴백을 다시 시도할 횟수. 무한 루프 방지를 위해 기본값은 0(추가 재시도 없이 한 번만 시도)입니다. 이마저 실패하면 최종 실패로 끝납니다.")]
+        [Min(0)] public int FallbackMaxRetryCount = 0;
     }
 }

@@ -3,7 +3,9 @@
     "rootNamespace": "GameFramework.SceneLoading",
     "references": [
         "GameFramework.Core",
-        "GameFramework.UISystem"
+        "GameFramework.UISystem",
+        "Unity.Addressables",
+        "Unity.ResourceManager"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
