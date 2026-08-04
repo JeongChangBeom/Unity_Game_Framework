@@ -42,7 +42,7 @@
   UTC 기반 시간 관리, 리셋, 쿨타임, 서버 시간 동기화 시스템
 
 - **[Scene Loading](#sceneloading)**  
-  비동기 씬 전환(Build Settings + Addressables) + 재시도/폴백 + 최소 노출시간이 보장되는 로딩 화면
+  비동기 씬 전환 + 로딩 화면 관리 시스템
 
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
@@ -60,7 +60,7 @@
 |Sound System|Addressables + Sheet 기반 사운드 재생|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sound`|
 |Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
-|Scene Loading|비동기 씬 전환(Build Settings + Addressables) + 재시도/폴백 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
+|Scene Loading|비동기 씬 전환 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -966,7 +966,10 @@ game/time/...
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 - 이미 로딩 중일 때 추가 요청은 대기열에 넣지 않고 경고 로그와 함께 무시 (동시 전환 방지)
 
-> **v1 제한사항**: Build Settings 경로와 Addressables 경로 모두 `LoadSceneMode.Single`만 지원합니다. Additive 씬 로드(부분 로드/언로드)는 아직 지원하지 않습니다.
+---
+
+### 외부 패키지
+Addressables로 등록한 씬을 로드하는 기능(`LoadSceneFromAddressableAsync`)에 **Unity 공식 Addressables 패키지**(`com.unity.addressables`)를 사용합니다. Build Settings 기반 로드(`LoadSceneAsync`)만 쓴다면 이 의존성은 그냥 딸려오는 상태로 두면 되고, 별도 설정 없이도 동작합니다.
 
 ---
 
@@ -1021,8 +1024,6 @@ _ = SceneLoadingManager.Instance.LoadSceneFromAddressableAsync("DungeonScene");
 * 씬을 새로 성공적으로 활성화할 때마다(Addressables든 Build Settings든) 직전에 로드했던 Addressables 씬 핸들을 자동으로 언로드하고, 앱 종료 시에도 남은 핸들을 정리합니다 - 직접 `Addressables.Release`를 호출할 필요가 없습니다.
 * 이 경로는 `com.unity.addressables` 패키지 의존성이 필요하며, 이 패키지를 설치하면 함께 설치됩니다.
 
-> **알려진 v1 한계**: 원격 카탈로그 다운로드가 완전히 멈춰서 끝나지도 실패하지도 않는 극단적인 경우, 씬 자체의 로드 대기에는 `SceneLoadStep`과 달리 타임아웃이 적용되지 않습니다 (`ISceneEntryPoint`/`ISceneExitPoint`/`SceneLoadStep`은 전부 타임아웃으로 보호되지만, 씬 오퍼레이션 자신은 아직 아닙니다). 일반적인 네트워크 실패(오류 응답 등)는 Addressables가 자체적으로 실패로 처리해 정상적으로 재시도/폴백 대상이 되므로, 이 한계는 "응답이 아예 없는" 매우 드문 상황에서만 해당됩니다.
-
 ---
 
 ### 가중 합산 progress
@@ -1072,14 +1073,26 @@ SceneLoadingManager.Instance.OnSceneLoadFallback += (original, fallback) =>
 * 재시도/폴백 전체가 끝날 때까지 `IsLoading`은 계속 `true`로 유지되므로, 그 사이 다른 `LoadSceneAsync` 호출은 기존과 동일하게 무시됩니다.
 * `Fallback Scene Name`이 방금 실패한 요청과 같은 이름이면(자기 자신을 폴백으로 지정한 경우) 무한 루프를 막기 위해 폴백을 건너뛰고 경고 로그만 남긴 뒤 `OnSceneLoadFailed`로 끝납니다.
 
-> **알려진 v1 한계**: 씬이 이미 활성화된 뒤(`ISceneEntryPoint` 실행 도중) 실패해서 재시도가 도는 경우, `ISceneExitPoint`는 원래 씬 기준으로 딱 1번만 실행되고 새로 활성화된 씬의 퇴장 훅은 재시도 시점에 다시 실행되지 않습니다. 재시도의 주 용도(활성화 전 실패 - 다운로드 실패 등)에서는 문제되지 않습니다.
-
 ---
 
 ### Scene Loading Manager Settings (선택, 씬 배치 불필요)
 * `Assets/Create/Game Framework/Scene Loading/Scene Loading Manager Settings`로 에셋 생성
 * 반드시 `Assets/Resources/GameFramework/SceneLoadingManagerSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
-* 항목: Minimum Loading Screen Duration(최소 노출시간, 초) / Fade Duration(페이드 인/아웃 시간, 초) / Loading Screen Prefab Override(비워두면 내장 기본 화면 사용) / Loading Screen Timeout Seconds(로딩 화면의 RequestShow/RequestHide 콜백이 이 시간 안에 안 불리면 성공한 걸로 치고 건너뜀, 0 이하면 무한 대기, 기본 10초) / Entry Exit Point Timeout Seconds(`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행, 0 이하면 무한 대기, 기본 10초) / Load Step Timeout Seconds(`SceneLoadStep` 하나가 이 시간 안에 끝나지 않으면 실패 처리, 0 이하면 무한 대기, 기본 30초) / Max Retry Count(로드 실패 시 자동 재시도 횟수, 기본 0=끔) / Retry Delay Seconds(재시도 사이 대기 시간, 초, 기본 1초) / Fallback Scene Name(모든 재시도 소진 시 이동할 Build Settings 씬, 기본 비어있음=폴백 없음) / Fallback Max Retry Count(폴백 씬 로드 자체의 재시도 횟수, 기본 0)
+* 항목:
+
+|필드|설명|기본값|
+|---|---|---|
+|Minimum Loading Screen Duration|로딩 화면 최소 노출시간(초)|0.5|
+|Fade Duration|로딩 화면 페이드 인/아웃 시간(초)|0.25|
+|Loading Screen Prefab Override|커스텀 로딩 화면 프리팹 (비워두면 내장 기본 화면 사용)|없음|
+|Loading Screen Timeout Seconds|로딩 화면의 RequestShow/RequestHide 콜백이 이 시간 안에 안 불리면 성공한 걸로 치고 건너뜀 (0 이하면 무한 대기)|10|
+|Entry Exit Point Timeout Seconds|`ISceneEntryPoint`/`ISceneExitPoint` 훅 하나가 이 시간 안에 끝나지 않으면 건너뛰고 진행 (0 이하면 무한 대기)|10|
+|Load Step Timeout Seconds|`SceneLoadStep` 하나가 이 시간 안에 끝나지 않으면 실패 처리 (0 이하면 무한 대기)|30|
+|Max Retry Count|로드 실패 시 자동 재시도 횟수 (0이면 재시도 없음)|0|
+|Retry Delay Seconds|재시도 사이 대기 시간(초)|1|
+|Fallback Scene Name|모든 재시도 소진 시 이동할 Build Settings 씬 (비어있으면 폴백 없음)|없음|
+|Fallback Max Retry Count|폴백 씬 로드 자체의 재시도 횟수|0|
+
 * 에셋이 없으면 Console에 경고가 남고 기본값으로 동작합니다.
 
 ---
@@ -1132,8 +1145,6 @@ public class GameSceneBootstrap : MonoBehaviour, ISceneEntryPoint
   -> 다음 씬 로드가 시작되어 로딩 화면이 이미 화면을 덮은 뒤, 지금 씬이 실제로 전환되기 전에 호출됩니다. 여기서 하는 정리 작업은 사용자에게 보이지 않습니다.
 - 비활성화(`SetActive(false)`)된 오브젝트에 붙은 훅은 호출되지 않습니다. 나중에 쓰려고 꺼둔 오브젝트가 있다면 그 위에는 이 인터페이스를 두지 마세요.
 
-> 주의: `ISceneEntryPoint`는 "씬이 뜨는 시점에 1회성으로 할 일"에만 쓰세요. 예를 들어 "메뉴에서 올린 공격력 스텟을 게임 중 소환되는 모든 유닛에 적용"처럼 이후에도 계속 생겨나는 대상에 적용해야 하는 값이라면, EntryPoint에서는 그 값을 `UnitManager` 같은 지속되는 매니저에 세팅만 해두고, 실제 적용은 유닛 자신이 스폰될 때 그 값을 읽어가는 방식으로 구현해야 새로 소환되는 유닛도 빠짐없이 적용됩니다.
->
 > 주의: `OnSceneEnterAsync()`/`OnSceneExitAsync()` 안에서 `SceneLoadingManager.Instance.LoadSceneAsync(...)`를 다시 호출하지 마세요. 그 시점엔 이미 `IsLoading`이 true라 경고 로그와 함께 조용히 무시됩니다. 다른 씬으로 리다이렉트해야 한다면, 현재 로드가 완전히 끝난 뒤(`OnSceneLoadCompleted` 등에서) 호출하세요.
 
 ---
