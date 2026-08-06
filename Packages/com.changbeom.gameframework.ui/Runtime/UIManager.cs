@@ -39,6 +39,9 @@ namespace GameFramework.UISystem
         public bool HasPendingPopups => _pending.Count > 0;
         public bool IsBlockingInput => _current != null;
 
+        /// <summary>현재 열려 있는 팝업이 뒤로가기/취소 입력으로 닫혀도 되는지 여부입니다. 팝업이 없으면 false입니다.</summary>
+        public bool CurrentPopupCloseableByBackButton => _current != null && _current.CloseableByBackButton;
+
         protected override void OnInitialize()
         {
             DontDestroyOnLoad(gameObject);

@@ -1,0 +1,16 @@
+{
+    "name": "com.changbeom.gameframework.input",
+    "version": "0.1.0",
+    "displayName": "Game Framework - Input",
+    "description": "Unity Input System wrapper with typed action-map access, interactive rebinding, and rebind persistence. Automatically suppresses gameplay input while a UIManager popup is modal. Single local player only (no multi-device pairing). Depends on Game Framework Core, Save / Load, UI System, and Unity Input System.",
+    "unity": "6000.0",
+    "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.saveload": "0.1.0",
+        "com.changbeom.gameframework.ui": "0.1.0",
+        "com.unity.inputsystem": "1.11.2"
+    },
+    "author": {
+        "name": "ChangBeom"
+    }
+}

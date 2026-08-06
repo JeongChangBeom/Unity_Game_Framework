@@ -1,0 +1,19 @@
+{
+    "name": "GameFramework.Input",
+    "rootNamespace": "GameFramework.InputSystem",
+    "references": [
+        "GameFramework.Core",
+        "GameFramework.SaveLoad",
+        "GameFramework.UISystem",
+        "Unity.InputSystem"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

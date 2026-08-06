@@ -44,6 +44,9 @@
 - **[Scene Loading](#sceneloading)**  
   비동기 씬 전환 + 로딩 화면 관리 시스템
 
+- **[Input](#input)**  
+  Unity Input System 기반 액션 입력 + 리바인딩 관리 시스템
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -61,6 +64,7 @@
 |Save / Load|Provider 기반 저장/로드|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.saveload`|
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
 |Scene Loading|비동기 씬 전환 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
+|Input|Unity Input System 기반 액션 입력/리바인딩|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.input`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -68,6 +72,7 @@
 >   * 사운드 데이터(`SoundTable`)를 직접 만드는 건 번거로우니, Data Parsing으로 시트에서 생성하는 걸 권장합니다.
 > * UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
 > * Scene Loading은 Core, UI System, Unity Addressables에 의존하므로 함께 설치해야 합니다.
+> * Input은 Core, Save / Load, UI System, Unity Input System에 의존하므로 함께 설치해야 합니다.
 
 ---
 
@@ -1177,6 +1182,125 @@ public class GameSceneBootstrap : MonoBehaviour, ISceneEntryPoint
 10. 같은 테스트 + 한 단계가 실패(`Critical=true` 기본값) - 씬 로드도 실패해야 함
 
 상단에는 `IsLoading`/`Progress`/`CurrentSceneName`과 `OnProgressChanged` 발행 횟수가 실시간으로 표시되고, 로드 시작/완료/실패/재시도/폴백 이벤트는 전부 로그에 자동으로 찍힙니다. 실제 씬 전환을 확인하려면 Build Settings에 씬이 최소 2개 등록되어 있어야 합니다. 6~7번 버튼을 테스트하려면 Unity 에디터에서 대상 씬을 Addressable로 표시하고 주소를 인스펙터의 `_addressableSceneAddress` 필드에 맞게 지정해야 합니다. `ESceneKey`를 생성하지 않아도(즉 `None`만 있는 상태여도) 컴파일에 문제가 없도록, 2번 버튼을 제외한 나머지는 문자열 오버로드를 사용하고 3번 버튼은 항상 존재하는 `ESceneKey.None`만 사용합니다.
+
+</details>
+
+---
+
+<details id="input">
+<summary><h2>8. Input</h2></summary>
+
+### 기능
+- Unity 공식 새 Input System 패키지(`com.unity.inputsystem`) 기반 - 레거시 `UnityEngine.Input`은 사용하지 않음
+- 액션 정의는 시트가 아니라 Unity `.inputactions` 에디터 에셋(`GameFrameworkInputActions`)으로 직접 관리 - Unity 내장 "Generate C# Class" 기능으로 코드 생성
+- PC(키보드/마우스, 게임패드 선택적)와 모바일(Android/iOS 터치)을 함께 고려 - 특정 장르를 가정하는 액션을 프레임워크가 강제하지 않음
+- 기본 제공 액션맵 2개
+  - `Gameplay`: `Move`(Vector2, WASD/왼쪽 스틱), `Interact`(Button, E 키/터치/게임패드 버튼) - 프로젝트에 맞게 지우고 새로 정의하는 걸 전제로 한 최소 예시
+  - `UI`: `Cancel`(Button, Esc 키/게임패드 버튼) 하나만 - PC의 Esc 키와 Android 하드웨어 뒤로가기는 Unity 내부적으로 같은 키 이벤트로 들어와서 바인딩 하나로 두 플랫폼을 함께 처리. Navigate/Submit 등 UGUI 내비게이션은 `InputSystemUIInputModule`을 쓰는 소비 프로젝트 쪽 몫으로 남겨둠(프레임워크가 강제하지 않음)
+- UIManager 연동 - 모달 팝업이 열려 있으면 `Gameplay` 맵을 자동으로 비활성화(`UI` 맵은 항상 유지), `Cancel` 입력이 들어오면 `UIManager.CloseTopPopup()`을 자동 호출(팝업별 `CloseableByBackButton = false` opt-out 존중)
+- 인터랙티브 리바인딩 - 진행 중 취소, 제외 컨트롤 경로, 취소 전용 경로 설정 가능
+- 리바인딩 결과는 SaveManager를 통해 영구 저장/자동 복원
+- 기기 변경(연결/해제) 이벤트 제공
+- 로컬 멀티플레이(여러 기기-플레이어 페어링)는 지원하지 않음 - 단일 로컬 플레이어 전용
+- 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
+
+---
+
+### 외부 패키지
+**Unity 공식 Input System 패키지**(`com.unity.inputsystem`)를 사용합니다. Player Settings의 **Active Input Handling**은 **Both**를 권장합니다 - `UIManager`의 레거시 Esc 키 처리(`Input.GetKeyDown`)가 계속 동작하려면 새 Input System만 단독으로 켜면 안 됩니다.
+
+---
+
+### 사용 방법
+
+#### 액션 읽기
+```cs
+Vector2 move = InputManager.Instance.Actions.Gameplay.Move.ReadValue<Vector2>();
+
+InputManager.Instance.Actions.Gameplay.Interact.performed += ctx =>
+{
+    // 상호작용 처리
+};
+```
+
+- **`InputManager.Instance.Actions`**
+  -> 생성된 `GameFrameworkInputActions` 래퍼(`Gameplay`/`UI` 맵)에 직접 접근
+- **`IsGameplayInputEnabled`**
+  -> 현재 `Gameplay` 맵이 켜져 있는지(모달 팝업이 열려 있으면 자동으로 꺼짐) 조회
+
+---
+
+#### 리바인딩
+```cs
+InputAction interact = InputManager.Instance.Actions.Gameplay.Interact;
+
+InputManager.Instance.StartRebind(interact, bindingIndex: 0, onComplete: path =>
+{
+    Debug.Log($"새 바인딩: {path}");
+});
+
+// 진행 중인 리바인딩 취소
+InputManager.Instance.CancelActiveRebind();
+
+// 바인딩 하나 초기화
+InputManager.Instance.ResetBinding(interact, bindingIndex: 0);
+
+// 전체 초기화
+InputManager.Instance.ResetAllBindings();
+```
+
+- **`StartRebind(action, bindingIndex, onComplete = null)`**
+  -> 인터랙티브 리바인딩 시작. 완료되면 자동으로 `SaveBindings()`까지 호출됨. 이미 진행 중인 리바인딩이 있으면 먼저 취소하고 새로 시작
+- **`OnRebindStarted` / `OnRebindCompleted` / `OnRebindCanceled`**
+  -> 리바인딩 UI 갱신용 이벤트
+- 리바인딩 제외 경로(`RebindExcludePaths`)와 취소 경로(`RebindCancelPath`)는 `InputManagerSettings`에서 설정
+
+---
+
+#### 저장 / 복원
+```cs
+InputManager.Instance.SaveBindings();
+InputManager.Instance.LoadBindings();
+```
+`OnInitialize()` 시점에 자동으로 `LoadBindings()`가 호출되므로, 보통 직접 호출할 일은 리바인딩/초기화 이후의 명시적 저장 정도입니다. SaveManager의 `Domain("settings").Join("input")` 키로 저장됩니다.
+
+---
+
+#### 기기 변경 감지
+```cs
+InputManager.Instance.OnDeviceChange += (device, change) =>
+{
+    if (change == InputDeviceChange.Disconnected) { /* 컨트롤러 연결 해제 안내 등 */ }
+};
+```
+
+---
+
+#### 모바일 터치 UI
+가상 조이스틱/버튼 같은 화면 터치 컨트롤이 필요하면 Unity Input System의 On-Screen Controls 컴포넌트(`OnScreenStick`/`OnScreenButton`)를 그대로 사용하면 됩니다 - 같은 `GameFrameworkInputActions`에 그대로 값이 들어오므로 이 패키지에서 별도 작업이 필요 없습니다.
+
+---
+
+### Input Manager Settings (선택, 씬 배치 불필요)
+* `Assets/Create/Game Framework/Input/Input Manager Settings`로 에셋 생성
+* 반드시 `Assets/Resources/GameFramework/InputManagerSettings.asset` 경로에 저장 (관례 경로로 자동 로드됨)
+
+|필드|설명|기본값|
+|---|---|---|
+|Rebind Exclude Paths|인터랙티브 리바인딩 중 무시할 컨트롤 경로|`<Mouse>/position`, `<Mouse>/delta`|
+|Rebind Cancel Path|리바인딩 도중 이 경로를 누르면 취소|`<Keyboard>/escape`|
+
+* 에셋이 없으면 Console에 경고가 남고 기본값으로 동작합니다.
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/InputTester.cs`를 아무 GameObject에 붙이고 Play하면 다음을 OnGUI 버튼/라벨로 확인할 수 있습니다.
+- `Move`/`Interact` 실시간 값과 `IsGameplayInputEnabled` 상태
+- 테스트 팝업 열기 버튼 - 열려 있는 동안 `Gameplay` 입력이 자동으로 막히고, `Cancel`(Esc)로 닫히는지 확인
+- `Interact` 리바인딩 시작/취소/초기화 버튼과 현재 바인딩 경로 표시
+- 저장/재로드 버튼 - Play 모드를 재시작해도 리바인딩이 유지되는지 확인
+- 기기 연결/해제 로그
 
 </details>
 
