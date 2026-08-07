@@ -69,6 +69,11 @@ namespace GameFramework.InputSystem
         // Enable/Disable을 부르면 낭비이므로 edge에서만 호출).
         private void Update()
         {
+            if (UIManager.Instance == null)
+            {
+                return;
+            }
+
             bool blocked = UIManager.Instance.IsBlockingInput;
 
             if (blocked == _lastGameplayBlocked)
@@ -94,7 +99,7 @@ namespace GameFramework.InputSystem
         // 읽기만 합니다.
         private void HandleCancelPerformed(InputAction.CallbackContext context)
         {
-            if (!UIManager.Instance.CurrentPopupCloseableByBackButton)
+            if (UIManager.Instance == null || !UIManager.Instance.CurrentPopupCloseableByBackButton)
             {
                 return;
             }
