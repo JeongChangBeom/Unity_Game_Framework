@@ -137,6 +137,13 @@ namespace GameFramework.Tests
             Log($"OnDeviceChange: {device.displayName} - {change}");
         }
 
+        private void Log(string msg)
+        {
+            string line = System.DateTime.Now.ToString("HH:mm:ss") + " | " + msg;
+            Debug.Log(line);
+            _log = string.IsNullOrEmpty(_log) ? line : _log + "\n" + line;
+        }
+
         private SimpleTestPopup CreateTestPopup()
         {
             GameObject go = new GameObject("TestPopupTemplate");
