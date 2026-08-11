@@ -1,3 +1,4 @@
+using System;
 using GameFramework.Utility;
 using UnityEngine;
 
@@ -11,6 +12,7 @@ namespace GameFramework.Tests
 
         private int _lastNotifiedValue;
         private bool _subscribed;
+        private bool _buggySubscribed;
 
         private string _log = "";
         private Vector2 _scroll;
@@ -69,6 +71,22 @@ namespace GameFramework.Tests
             }
 
             GUILayout.Space(10);
+            GUILayout.Label("예외를 던지는 구독자 (다른 구독자가 계속 알림을 받는지 확인용)");
+            if (GUILayout.Button(_buggySubscribed ? "5) 버그 구독자 해제" : "5) 버그 구독자 구독"))
+            {
+                if (_buggySubscribed)
+                {
+                    _hp.Unsubscribe(HandleBuggy);
+                }
+                else
+                {
+                    _hp.Subscribe(HandleBuggy, invokeImmediately: false);
+                }
+
+                _buggySubscribed = !_buggySubscribed;
+            }
+
+            GUILayout.Space(10);
             if (GUILayout.Button("Clear Log"))
             {
                 _log = "";
@@ -85,6 +103,12 @@ namespace GameFramework.Tests
         {
             _lastNotifiedValue = value;
             Log($"OnValueChanged: {value}");
+        }
+
+        private void HandleBuggy(int value)
+        {
+            Log("[버그 구독자] 예외를 던집니다 -- 아래에 ReactiveProperty가 남긴 에러 로그가 보이고, OnValueChanged 로그도 정상적으로 남아야 합니다");
+            throw new InvalidOperationException("일부러 던진 테스트 예외");
         }
 
         private void Log(string msg)

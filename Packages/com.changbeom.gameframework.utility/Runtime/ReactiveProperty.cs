@@ -34,7 +34,7 @@ namespace GameFramework.Utility
                 }
 
                 _value = value;
-                OnValueChanged?.Invoke(_value);
+                Notify(_value);
             }
         }
 
@@ -45,7 +45,7 @@ namespace GameFramework.Utility
 
             if (invokeImmediately)
             {
-                handler?.Invoke(_value);
+                InvokeSafely(handler, _value);
             }
         }
 
@@ -58,6 +58,37 @@ namespace GameFramework.Utility
         public void ClearSubscribers()
         {
             OnValueChanged = null;
+        }
+
+        // 구독자 하나가 예외를 던져도 나머지 구독자는 계속 알림을 받도록 각각 try/catch로
+        // 감쌉니다 - 그렇지 않으면 UI 쪽 구독자의 버그가 Value를 세팅한 게임 로직
+        // 코드(예: Health.TakeDamage)까지 예외로 끊어버릴 수 있습니다. EventBus.Publish와
+        // 동일한 원칙입니다.
+        private void Notify(T value)
+        {
+            if (OnValueChanged == null)
+            {
+                return;
+            }
+
+            Delegate[] invocationList = OnValueChanged.GetInvocationList();
+
+            for (int i = 0; i < invocationList.Length; i++)
+            {
+                InvokeSafely((Action<T>)invocationList[i], value);
+            }
+        }
+
+        private static void InvokeSafely(Action<T> handler, T value)
+        {
+            try
+            {
+                handler?.Invoke(value);
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ReactiveProperty] 구독자 콜백에서 예외가 발생했습니다: {e}");
+            }
         }
     }
 }
