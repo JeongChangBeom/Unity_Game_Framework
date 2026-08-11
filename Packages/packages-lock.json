@@ -80,6 +80,12 @@
         "com.changbeom.gameframework.pooling": "0.1.0"
       }
     },
+    "com.changbeom.gameframework.utility": {
+      "version": "file:com.changbeom.gameframework.utility",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.unity.2d.animation": {
       "version": "10.2.2",
       "depth": 1,

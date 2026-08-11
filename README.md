@@ -47,6 +47,9 @@
 - **[Input](#input)**  
   Unity Input System 기반 액션 입력 + 리바인딩 관리 시스템
 
+- **[Utility](#utility)**  
+  의존성 없는 범용 C# 유틸리티 모음 (`ReactiveProperty<T>` 등)
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -65,6 +68,7 @@
 |Time System|UTC 기반 시간/쿨타임/리셋 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.time`|
 |Scene Loading|비동기 씬 전환 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
 |Input|Unity Input System 기반 액션 입력/리바인딩|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.input`|
+|Utility|의존성 없는 범용 C# 유틸리티|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.utility`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -1301,6 +1305,59 @@ InputManager.Instance.OnDeviceChange += (device, change) =>
 - `Interact` 리바인딩 시작/취소/초기화 버튼과 현재 바인딩 경로 표시
 - 저장/재로드 버튼 - Play 모드를 재시작해도 리바인딩이 유지되는지 확인
 - 기기 연결/해제 로그
+
+</details>
+
+---
+
+<details id="utility">
+<summary><h2>9. Utility</h2></summary>
+
+### 기능
+- 다른 Game Framework 패키지에 의존하지 않는 순수 C# 유틸리티 모음 (Core에도 의존하지 않음)
+- `ReactiveProperty<T>` - 값이 바뀔 때 구독자에게 자동으로 알리는 반응형 프로퍼티. 캐릭터 체력처럼 "이 오브젝트의 상태 하나 ↔ 이 오브젝트를 보여주는 UI" 같은 1:1 바인딩에 사용 (여러 발행자/구독자가 서로 몰라도 되는 전역 이벤트가 필요하면 Event Bus 프레임워크를 사용하세요 - 용도가 다릅니다)
+- 앞으로 확장 메소드 등 범용 유틸리티가 여기에 계속 추가될 예정
+
+---
+
+### 사용 방법
+
+```cs
+using GameFramework.Utility;
+
+public class Health : MonoBehaviour
+{
+    public readonly ReactiveProperty<int> CurrentHp = new ReactiveProperty<int>(100);
+
+    public void TakeDamage(int amount) => CurrentHp.Value = Mathf.Max(0, CurrentHp.Value - amount);
+}
+```
+
+```cs
+public class HpBarUI : MonoBehaviour
+{
+    [SerializeField] private Health _target; // 인스펙터에서 이 캐릭터를 직접 연결
+    [SerializeField] private Slider _slider;
+
+    private void OnEnable() => _target.CurrentHp.Subscribe(UpdateSlider);
+    private void OnDisable() => _target.CurrentHp.Unsubscribe(UpdateSlider);
+
+    private void UpdateSlider(int current) => _slider.value = current / 100f;
+}
+```
+
+- **`Value`** - 읽고 쓸 수 있는 현재 값. 실제로 값이 달라질 때만(`EqualityComparer<T>.Default` 비교) `OnValueChanged`가 발행됩니다 - 같은 값을 다시 대입해도 알림은 오지 않습니다
+- **`OnValueChanged`** - `public event Action<T>`. 이 프레임워크의 다른 이벤트들과 동일하게 `+=`/`-=`로 직접 구독해도 됩니다
+- **`Subscribe(handler, invokeImmediately = true)`** - 구독과 동시에 현재 값을 즉시 한 번 받고 싶을 때 사용 (UI가 생성 직후 최신 값으로 초기화되도록). `invokeImmediately: false`로 넘기면 `OnValueChanged +=`와 동일하게 동작
+- **`Unsubscribe(handler)`** / **`ClearSubscribers()`** - 개별/전체 구독 해제
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/ReactiveTester.cs`를 아무 GameObject에 붙이고 Play하면:
+- 데미지(-10)/힐(+10) 버튼으로 `ReactiveProperty<int>` 값을 바꾸면서 `OnValueChanged` 알림이 오는지 실시간 로그로 확인
+- 같은 값을 다시 대입하는 버튼으로, 값이 안 바뀌면 알림이 안 오는 것도 확인 가능
+- 구독 해제 버튼으로 구독 해제 후에는 값이 바뀌어도 알림이 안 오다가, 다시 구독하면 현재 값을 즉시 받는지(`invokeImmediately`) 확인
 
 </details>
 

@@ -1,0 +1,10 @@
+{
+    "name": "com.changbeom.gameframework.utility",
+    "version": "0.1.0",
+    "displayName": "Game Framework - Utility",
+    "description": "General-purpose, dependency-free C# utilities for ChangBeom's Unity Game Framework packages (ReactiveProperty<T> etc.). No dependencies on other Game Framework packages.",
+    "unity": "6000.0",
+    "author": {
+        "name": "ChangBeom"
+    }
+}
