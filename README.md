@@ -50,6 +50,9 @@
 - **[Utility](#utility)**  
   의존성 없는 범용 C# 유틸리티 모음 (`ReactiveProperty<T>` 등)
 
+- **[Event Bus](#eventbus)**  
+  타입 기반 전역 발행/구독 메시징 시스템
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -69,6 +72,7 @@
 |Scene Loading|비동기 씬 전환 + 로딩 화면|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.sceneloading`|
 |Input|Unity Input System 기반 액션 입력/리바인딩|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.input`|
 |Utility|의존성 없는 범용 C# 유틸리티|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.utility`|
+|Event Bus|타입 기반 전역 발행/구독 메시징|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.eventbus`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -1358,6 +1362,71 @@ public class HpBarUI : MonoBehaviour
 - 데미지(-10)/힐(+10) 버튼으로 `ReactiveProperty<int>` 값을 바꾸면서 `OnValueChanged` 알림이 오는지 실시간 로그로 확인
 - 같은 값을 다시 대입하는 버튼으로, 값이 안 바뀌면 알림이 안 오는 것도 확인 가능
 - 구독 해제 버튼으로 구독 해제 후에는 값이 바뀌어도 알림이 안 오다가, 다시 구독하면 현재 값을 즉시 받는지(`invokeImmediately`) 확인
+
+</details>
+
+---
+
+<details id="eventbus">
+<summary><h2>10. Event Bus</h2></summary>
+
+### 기능
+- C# 타입을 키로 하는 전역 발행/구독 메시징 (`EventBus<TEvent>`) - 이벤트 이름을 문자열/enum으로 관리하지 않고, 이벤트 struct/class 타입 자체가 키입니다
+- 발행자와 구독자가 서로 직접 참조할 필요 없음 - 보스 처치 -> 업적/사운드/로그 시스템이 각자 반응하되 서로의 존재를 몰라도 됨
+- 즉시 동기 발행 - `Publish()` 호출 시점에 구독자가 바로 실행됨 (다음 프레임으로 미루는 큐잉 없음)
+- 구독자 하나가 예외를 던져도 나머지 구독자는 계속 실행되고, 에러는 로그로 남음
+- `SubscribeOnce` - 한 번만 받고 자동으로 구독 해제
+- Domain Reload 비활성화(Enter Play Mode Settings) 환경에서도 안전 - Play 진입마다 모든 이벤트 타입의 구독자 목록이 자동으로 초기화됨
+- 의존성 없음 (Core에도 의존하지 않는 순수 정적 클래스라 씬 배치/초기화 절차 자체가 없음)
+
+> **주의**: 특정 오브젝트 하나의 상태를 그 오브젝트를 보여주는 UI 하나에만 묶는 1:1 바인딩(체력바 등)에는 Event Bus 대신 [Utility](#utility)의 `ReactiveProperty<T>`를 사용하세요. Event Bus는 발행자·구독자가 서로 몰라도 되는 N:M 전역 이벤트 전용입니다.
+
+---
+
+### 사용 방법
+
+```cs
+using GameFramework.EventBus;
+
+public readonly struct EnemyDefeatedEvent
+{
+    public readonly string EnemyName;
+    public readonly int Reward;
+
+    public EnemyDefeatedEvent(string enemyName, int reward)
+    {
+        EnemyName = enemyName;
+        Reward = reward;
+    }
+}
+```
+
+```cs
+// 구독 (예: 업적 시스템)
+EventBus<EnemyDefeatedEvent>.Subscribe(OnEnemyDefeated);
+
+// 발행 (예: 몬스터 처치 처리 코드)
+EventBus<EnemyDefeatedEvent>.Publish(new EnemyDefeatedEvent("Goblin", 10));
+
+// 구독 해제
+EventBus<EnemyDefeatedEvent>.Unsubscribe(OnEnemyDefeated);
+```
+
+- **`Subscribe(handler)` / `Unsubscribe(handler)`** - 이벤트 타입별로 독립된 구독자 목록에 등록/해제. 다른 매니저 이벤트와 마찬가지로 `OnEnable`/`OnDisable`에서 짝을 맞춰 호출하세요
+- **`SubscribeOnce(handler)`** - 다음 발행 한 번만 받고 자동으로 구독 해제됩니다 (예: 첫 처치 시 튜토리얼 팝업을 한 번만 띄우기)
+- **`Publish(evt)`** - 구독자를 즉시 동기 호출합니다. 구독자 하나가 예외를 던져도 `Debug.LogError`로 남기고 나머지 구독자는 계속 실행됩니다
+- **`ClearSubscribers()`** - 해당 이벤트 타입의 구독자를 전부 해제
+
+이벤트는 struct로 선언하는 걸 권장합니다 - class로 선언하면 `Publish`마다 힙 할당이 생겨, PC/모바일을 함께 고려하는 이 프레임워크의 방향과 맞지 않습니다.
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/EventBusTester.cs`를 아무 GameObject에 붙이고 Play하면:
+- `EnemyDefeatedEvent` 발행 버튼과 구독(사운드 재생 흉내) 토글 버튼으로 발행/구독 확인
+- `SubscribeOnce` 버튼으로 구독한 뒤, 발행을 두 번 해서 첫 번째만 반응하고 두 번째는 반응 없는지 확인
+- 예외를 던지는 구독자를 같이 구독해두고 발행하면, 에러 로그가 남으면서도 다른(사운드) 구독자는 정상 실행되는지 확인
+- 전체 구독 해제 버튼으로 `ClearSubscribers()` 확인
 
 </details>
 

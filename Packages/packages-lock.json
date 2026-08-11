@@ -15,6 +15,12 @@
         "com.unity.editorcoroutines": "1.0.0"
       }
     },
+    "com.changbeom.gameframework.eventbus": {
+      "version": "file:com.changbeom.gameframework.eventbus",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.changbeom.gameframework.input": {
       "version": "file:com.changbeom.gameframework.input",
       "depth": 0,

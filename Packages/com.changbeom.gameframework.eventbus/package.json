@@ -1,0 +1,10 @@
+{
+    "name": "com.changbeom.gameframework.eventbus",
+    "version": "0.1.0",
+    "displayName": "Game Framework - Event Bus",
+    "description": "Global, decoupled publish/subscribe messaging keyed by C# type (EventBus<TEvent>). For 1:1 state-to-UI bindings, use the Utility package's ReactiveProperty<T> instead. No dependencies on other Game Framework packages.",
+    "unity": "6000.0",
+    "author": {
+        "name": "ChangBeom"
+    }
+}
