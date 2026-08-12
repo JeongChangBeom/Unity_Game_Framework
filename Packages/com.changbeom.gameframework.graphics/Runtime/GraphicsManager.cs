@@ -71,6 +71,12 @@ namespace GameFramework.Graphics
 
         private void ApplyAll()
         {
+            // 저장된 QualityLevel이 지금 프로젝트의 Quality Settings 단계 수보다 클
+            // 수 있습니다 (예: 예전엔 6단계였다가 프로젝트에서 3단계로 줄인 경우).
+            // Unity가 알아서 클램프해줄 수도 있지만, 우리가 노출하는 QualityLevel
+            // getter가 실제 적용된 값과 어긋나지 않도록 여기서 직접 보정합니다.
+            _data.QualityLevel = Mathf.Clamp(_data.QualityLevel, 0, QualitySettings.names.Length - 1);
+
             QualitySettings.SetQualityLevel(_data.QualityLevel, true);
             Application.targetFrameRate = _data.TargetFrameRate;
             QualitySettings.vSyncCount = _data.VSyncEnabled ? 1 : 0;
@@ -85,6 +91,8 @@ namespace GameFramework.Graphics
 
         public void SetQualityLevel(int level)
         {
+            level = Mathf.Clamp(level, 0, QualitySettings.names.Length - 1);
+
             _data.QualityLevel = level;
             QualitySettings.SetQualityLevel(level, true);
 
