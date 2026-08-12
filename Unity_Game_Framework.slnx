@@ -10,10 +10,12 @@
   <Project Path="GameFramework.Core.csproj" />
   <Project Path="GameFramework.Pooling.Editor.csproj" />
   <Project Path="GameFramework.Pooling.csproj" />
+  <Project Path="GameFramework.Localization.Editor.csproj" />
   <Project Path="GameFramework.SceneLoading.Editor.csproj" />
   <Project Path="GameFramework.SceneLoading.csproj" />
   <Project Path="GameFramework.Input.csproj" />
   <Project Path="GameFramework.DataParsing.csproj" />
+  <Project Path="GameFramework.Localization.csproj" />
   <Project Path="GameFramework.SoundSystem.Editor.csproj" />
   <Project Path="GameFramework.EventBus.csproj" />
 </Solution>

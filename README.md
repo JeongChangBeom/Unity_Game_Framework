@@ -56,6 +56,9 @@
 - **[FSM](#fsm)**  
   CanExit 가드 기반의 단순 동기 상태 머신
 
+- **[Localization](#localization)**  
+  Data Parsing 연동 텍스트 로컬라이제이션
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -77,6 +80,7 @@
 |Utility|의존성 없는 범용 C# 유틸리티|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.utility`|
 |Event Bus|타입 기반 전역 발행/구독 메시징|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.eventbus`|
 |FSM|CanExit 가드 기반 단순 동기 상태 머신|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.fsm`|
+|Localization|Data Parsing 연동 텍스트 로컬라이제이션|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.localization`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -85,6 +89,8 @@
 > * UI System은 Core, Pooling에 의존하므로 함께 설치해야 합니다.
 > * Scene Loading은 Core, UI System, Unity Addressables에 의존하므로 함께 설치해야 합니다.
 > * Input은 Core, Save / Load, UI System, Unity Input System에 의존하므로 함께 설치해야 합니다.
+> * Localization은 Core, Save / Load에 의존하므로 함께 설치해야 합니다.
+>   * Localization 데이터(`LocalizationTable`)를 직접 만드는 건 번거로우니, Data Parsing으로 시트에서 생성하는 걸 권장합니다.
 
 ---
 
@@ -1508,6 +1514,94 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 - 등록 안 된 상태로 전환을 시도해 에러 로그 확인
 - 재진입 테스트 버튼으로, `OnEnter` 안에서 스스로 `ChangeState(Idle)`을 호출하는 상태에 진입시켜 경고 로그가 남으면서도 `CurrentKey`가 `Redirect`로 정상 유지되는지(Idle로 안 새는지) 확인
 - `OnStateChanged` 로그로 전환 이력 확인
+
+</details>
+
+---
+
+<details id="localization">
+<summary><h2>12. Localization</h2></summary>
+
+### 기능
+- Data Parsing의 "Localization" 시트 탭으로 텍스트를 관리 (`RowKey`, `KeyName`, 언어별 컬럼)
+- `ELocKey`/`ELanguage` 자동 생성 - `LocalizationTable`이 (재)생성되는 순간 버튼 조작 없이 자동으로 동기화 (Sound의 `ESound`와 동일한 방식)
+- **언어 컬럼도 완전 자동 인식** - 시트에 새 언어 컬럼(`RowKey`/`KeyName`을 제외한 나머지 전부)을 추가하고 재생성하면 `ELanguage`에 코드 수정 없이 새 멤버가 생깁니다
+- `GetText(ELocKey)` - 현재 언어에 번역이 없으면 Fallback Language로 대체, 그마저 없으면 `"[MISSING:key]"` + 에러 로그로 누락을 눈에 띄게 표시
+- `OnLanguageChanged` 이벤트 - 언어가 바뀌면 발행되며, `LocalizedText`가 이 이벤트만으로 동작합니다. 나중에 음성 더빙/언어별 이미지가 필요해져도 이 이벤트만 구독하는 새 컴포넌트를 추가하면 되고, `LocalizationManager` 자체는 손댈 필요가 없습니다
+- `SetLanguageAsync(ELanguage)` - v1은 내부적으로 동기 테이블 룩업이라 사실상 즉시 끝나지만, 나중에 언어 전환이 실제 비동기 작업(리소스 로드 등)이 되어도 호출부가 안 바뀌도록 처음부터 `Awaitable`을 반환합니다
+- **첫 실행 시 언어 결정 순서**: 저장된 언어(SaveManager) → `Application.systemLanguage` 매핑(설정으로 끄기 가능) → Settings의 Default Language
+- `LocalizedText` - `ELocKey` + 레거시 `Text`를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트
+- 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
+
+> **주의**: 음성 더빙이나 언어별 이미지는 이 패키지가 직접 다루지 않습니다. 서버 없이는 지원 언어 데이터를 전부 빌드에 포함할 수밖에 없는데, 텍스트는 용량이 작아 문제되지 않지만 음성/이미지는 다릅니다 - 그런 요구가 실제로 생기면(그리고 서버가 생기면) `OnLanguageChanged`를 구독하는 별도 컴포넌트(예: 오디오는 Sound 패키지 확장, 이미지는 Addressables 원격 카탈로그)로 그때 가서 설계하는 걸 권장합니다.
+
+---
+
+### 외부 패키지
+없음. Data Parsing이 생성한 `LocalizationTable`은 Sound가 `SoundTable`을 다루는 것과 동일하게 리플렉션으로 읽기 때문에, 이 패키지가 Data Parsing에 직접 의존하지 않습니다.
+
+---
+
+### 사용 방법
+
+#### 1) 시트 작성 (Data Parsing)
+"Localization" 탭에 아래처럼 작성합니다. 언어 컬럼 이름(`KO`/`EN`/`JP` 등)이 그대로 `ELanguage` 멤버 이름이 되므로, 영문/숫자/밑줄로만 짓는 걸 권장합니다.
+
+|RowKey|KeyName|KO|EN|JP|
+|-|-|-|-|-|
+|1|UI_Button_Start|시작|Start|スタート|
+
+`Game Framework/Data Parsing/DataTable Importer`에서 다른 테이블과 완전히 같은 방식으로 "선택 시트 생성"/"선택 시트 갱신"합니다.
+
+`LocalizationTable`이 (재)생성되는 순간 **버튼 조작 없이 자동으로**:
+1. `ELocKey.cs` 재생성 (`KeyName` 기반)
+2. `ELanguage.cs` 재생성 (`RowKey`/`KeyName`을 제외한 나머지 컬럼 기반)
+
+두 enum 모두 패키지 어셈블리 내부(`Packages/com.changbeom.gameframework.localization/Runtime/`)에 생성됩니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, 시트를 처음 생성하는 순간 실제 키/언어들로 덮어써집니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
+
+수동으로 다시 실행하고 싶을 때를 위한 메뉴도 있습니다: `Game Framework/Localization/Generate ELocKey + ELanguage From Localization Table`.
+
+---
+
+#### 2) 코드에서 텍스트 가져오기
+```cs
+string text = LocalizationManager.Instance.GetText(ELocKey.UI_Button_Start);
+```
+
+#### 3) UI에 자동 반영하기
+```cs
+// Text 컴포넌트가 있는 GameObject에 LocalizedText를 붙이고 Key를 지정하면 끝
+```
+인스펙터에서 `ELocKey`만 지정하면, 이후 언어가 바뀔 때마다 알아서 갱신됩니다.
+
+#### 4) 언어 전환
+```cs
+await LocalizationManager.Instance.SetLanguageAsync(ELanguage.EN);
+
+// 상태 조회
+ELanguage current = LocalizationManager.Instance.CurrentLanguage;
+
+// 언어 변경 구독 (음성/이미지 등 텍스트 이외의 것을 나중에 추가할 때도 이 이벤트만 쓰면 됨)
+LocalizationManager.Instance.OnLanguageChanged += lang => Debug.Log($"언어 변경: {lang}");
+```
+언어 선택은 `SetLanguageAsync` 호출 시 자동으로 저장되어, 다음 실행 때도 유지됩니다.
+
+---
+
+### Localization Manager Settings (선택, 씬 배치 불필요)
+`Assets/Create/Game Framework/Localization/Localization Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
+
+`Assets/Resources/GameFramework/LocalizationManagerSettings.asset`
+
+설정 가능한 항목:
+* Table Resource Path (기본: `GeneratedTables/LocalizationTable`) - 시트 탭 이름을 다르게 지어서 생성된 클래스명이 다르면 여기를 맞춰주세요
+* Default Language / Fallback Language
+* Use System Language On First Launch (기본 켜짐)
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/LocalizationTester.cs`를 아무 GameObject에 붙이고 Play하면 `CurrentLanguage`와 `GetText` 결과가 실시간으로 표시되고, `ELanguage`에 등록된 언어마다 전환 버튼이 자동으로 생깁니다. 패키지를 막 설치한 상태(시트를 아직 안 만든 상태)에서는 `ELanguage`에 `None`만 있어서 전환 버튼도 하나뿐입니다 - 실제 테스트는 Data Parsing으로 Localization 시트를 생성한 뒤에 의미가 있습니다.
 
 </details>
 

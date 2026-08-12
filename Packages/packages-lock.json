@@ -38,6 +38,12 @@
         "com.unity.inputsystem": "1.11.2"
       }
     },
+    "com.changbeom.gameframework.localization": {
+      "version": "file:com.changbeom.gameframework.localization",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.changbeom.gameframework.pooling": {
       "version": "file:com.changbeom.gameframework.pooling",
       "depth": 0,
