@@ -109,16 +109,27 @@ namespace GameFramework.Localization.Editor
         private static List<string> ExtractKeyNames(SerializedProperty tableProp)
         {
             List<string> list = new List<string>();
+            HashSet<string> seen = new HashSet<string>();
 
             for (int i = 0; i < tableProp.arraySize; i++)
             {
                 SerializedProperty item = tableProp.GetArrayElementAtIndex(i);
                 string keyName = GetString(item, "KeyName");
 
-                if (!string.IsNullOrEmpty(keyName))
+                if (string.IsNullOrEmpty(keyName))
                 {
-                    list.Add(keyName);
+                    continue;
                 }
+
+                // 같은 KeyName이 시트에 두 번 이상 있으면, 나중에 LocalizationManager가
+                // 마지막 행의 번역으로 앞의 행을 조용히 덮어씁니다 - 알아채기 어려운
+                // 데이터 유실이라 여기서 미리 경고합니다.
+                if (!seen.Add(keyName))
+                {
+                    Debug.LogWarning($"[LocalizationGenerator] KeyName \"{keyName}\"이(가) 시트에 중복으로 있습니다. 마지막 행의 번역만 사용되고 나머지는 무시됩니다.");
+                }
+
+                list.Add(keyName);
             }
 
             return list;
@@ -187,6 +198,15 @@ namespace GameFramework.Localization.Editor
 
                 if (string.IsNullOrEmpty(safe))
                 {
+                    continue;
+                }
+
+                if (safe == "None")
+                {
+                    // "None"은 항상 0번 값으로 미리 예약되어 있어서(비어있는/미설정
+                    // 상태를 나타냄), 시트에 "None"이라는 이름의 KeyName이나 언어
+                    // 컬럼이 있으면 이 예약된 값과 조용히 합쳐져 버립니다.
+                    Debug.LogWarning($"[LocalizationGenerator] \"{raw}\"은(는) 예약된 이름 \"None\"과 겹쳐서 별도 멤버로 생성되지 않고 기존 None(0)과 합쳐집니다. 시트의 이름을 바꿔주세요.");
                     continue;
                 }
 

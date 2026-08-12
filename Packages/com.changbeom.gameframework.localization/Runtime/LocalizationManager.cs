@@ -202,6 +202,11 @@ namespace GameFramework.Localization
                     perLanguage[language] = text;
                 }
 
+                if (data.ContainsKey(locKey))
+                {
+                    Debug.LogWarning($"[LocalizationManager] KeyName \"{keyName}\"이(가) 테이블에 중복으로 있어 나중 행으로 덮어씁니다.");
+                }
+
                 data[locKey] = perLanguage;
             }
 
