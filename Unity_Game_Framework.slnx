@@ -17,5 +17,6 @@
   <Project Path="GameFramework.DataParsing.csproj" />
   <Project Path="GameFramework.Localization.csproj" />
   <Project Path="GameFramework.SoundSystem.Editor.csproj" />
+  <Project Path="GameFramework.Graphics.csproj" />
   <Project Path="GameFramework.EventBus.csproj" />
 </Solution>

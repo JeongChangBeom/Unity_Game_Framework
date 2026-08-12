@@ -1,0 +1,17 @@
+{
+    "name": "GameFramework.Graphics",
+    "rootNamespace": "GameFramework.Graphics",
+    "references": [
+        "GameFramework.Core",
+        "GameFramework.SaveLoad"
+    ],
+    "includePlatforms": [],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

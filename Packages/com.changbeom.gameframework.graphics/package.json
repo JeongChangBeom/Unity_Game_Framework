@@ -1,0 +1,10 @@
+{
+    "name": "com.changbeom.gameframework.graphics",
+    "version": "0.1.0",
+    "displayName": "Game Framework - Graphics",
+    "description": "Display/quality settings management (quality level, target frame rate universally; resolution, fullscreen, VSync are PC-only). Persists via Save / Load. Depends on Core and Save / Load.",
+    "unity": "6000.0",
+    "author": {
+        "name": "ChangBeom"
+    }
+}

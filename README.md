@@ -59,6 +59,9 @@
 - **[Localization](#localization)**  
   Data Parsing 연동 텍스트 로컬라이제이션
 
+- **[Graphics](#graphics)**  
+  화질/디스플레이 설정 관리 (품질/프레임은 공통, 해상도/전체화면/VSync는 PC 전용)
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -81,6 +84,7 @@
 |Event Bus|타입 기반 전역 발행/구독 메시징|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.eventbus`|
 |FSM|CanExit 가드 기반 단순 동기 상태 머신|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.fsm`|
 |Localization|Data Parsing 연동 텍스트 로컬라이제이션|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.localization`|
+|Graphics|화질/디스플레이 설정 관리|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.graphics`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -91,6 +95,7 @@
 > * Input은 Core, Save / Load, UI System, Unity Input System에 의존하므로 함께 설치해야 합니다.
 > * Localization은 Core, Save / Load에 의존하므로 함께 설치해야 합니다.
 >   * Localization 데이터(`LocalizationTable`)를 직접 만드는 건 번거로우니, Data Parsing으로 시트에서 생성하는 걸 권장합니다.
+> * Graphics는 Core, Save / Load에 의존하므로 함께 설치해야 합니다.
 
 ---
 
@@ -1602,6 +1607,76 @@ LocalizationManager.Instance.OnLanguageChanged += lang => Debug.Log($"언어 변
 
 ### 테스트 방법
 `Assets/00.Scripts/Tests/LocalizationTester.cs`를 아무 GameObject에 붙이고 Play하면 `CurrentLanguage`와 `GetText` 결과가 실시간으로 표시되고, `ELanguage`에 등록된 언어마다 전환 버튼이 자동으로 생깁니다. 패키지를 막 설치한 상태(시트를 아직 안 만든 상태)에서는 `ELanguage`에 `None`만 있어서 전환 버튼도 하나뿐입니다 - 실제 테스트는 Data Parsing으로 Localization 시트를 생성한 뒤에 의미가 있습니다.
+
+</details>
+
+---
+
+<details id="graphics">
+<summary><h2>13. Graphics</h2></summary>
+
+### 기능
+- `QualityLevel`(Unity Quality Settings 단계) / `TargetFrameRate`(프레임 상한) - PC와 모바일 모두에 의미 있는 공통 설정. 특히 `TargetFrameRate`는 모바일에서 배터리/발열 관리에 중요합니다
+- `Resolution` / `Fullscreen` / `VSync` - **PC 전용**입니다. 모바일은 항상 전체화면에 해상도가 고정이라 호출해도 실질적인 효과가 없습니다 (Unity API 자체가 안전하게 무시하므로 예외는 안 남 - 다만 Options UI에 어떤 항목을 보여줄지는 게임이 플랫폼에 맞게 직접 판단해야 합니다)
+- 값이 바뀌면 SaveManager로 자동 저장, 부팅 시 저장된 값으로 자동 복원 (없으면 Settings의 기본값 + 현재 화면 해상도)
+- 부팅 시 이미 저장된 해상도/모드로 떠 있으면 다시 적용하지 않음 - 불필요한 창 깜빡임 방지
+- 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
+
+> **주의**: `GraphicsManager`의 각 `SetXxx`는 호출하는 즉시 적용 + 저장됩니다. 슬라이더처럼 값이 연속으로 빠르게 바뀌는 UI에 직접 연결하면 그만큼 자주 저장이 발생합니다 - Options 화면에서 "확인" 버튼을 누를 때만 반영하고 싶다면, 화면이 열려있는 동안은 Utility의 `ReactiveProperty<T>`로 임시 값만 들고 있다가, 확인 시점에 한 번만 `GraphicsManager`의 `SetXxx`를 호출하는 걸 권장합니다.
+
+---
+
+### 사용 방법
+
+```cs
+using GameFramework.Graphics;
+
+// 공통 (PC + 모바일)
+GraphicsManager.Instance.SetQualityLevel(2);
+GraphicsManager.Instance.SetTargetFrameRate(60);
+
+// PC 전용
+GraphicsManager.Instance.SetFullscreen(false);
+GraphicsManager.Instance.SetVSync(true);
+GraphicsManager.Instance.SetResolution(1920, 1080);
+
+// 상태 조회
+int quality = GraphicsManager.Instance.QualityLevel;
+bool fullscreen = GraphicsManager.Instance.IsFullscreen;
+
+// 변경 이벤트 구독
+GraphicsManager.Instance.OnQualityLevelChanged += level => Debug.Log($"품질 변경: {level}");
+```
+
+- **`SetQualityLevel(level)` / `QualityLevel`** - `QualitySettings`의 품질 단계 인덱스
+- **`SetTargetFrameRate(fps)` / `TargetFrameRate`** - `-1`이면 무제한(플랫폼 기본값)
+- **`SetFullscreen(bool)` / `IsFullscreen`**, **`SetVSync(bool)` / `VSyncEnabled`**, **`SetResolution(width, height)` / `ResolutionWidth`/`ResolutionHeight`** - PC 전용
+- **`OnQualityLevelChanged` / `OnTargetFrameRateChanged` / `OnFullscreenChanged` / `OnVSyncChanged` / `OnResolutionChanged`** - 각각 대응하는 값이 바뀔 때 발행
+
+---
+
+### Graphics Manager Settings (선택, 씬 배치 불필요)
+`Assets/Create/Game Framework/Graphics/Graphics Manager Settings`로 에셋을 만들고 아래 경로에 저장합니다.
+
+`Assets/Resources/GameFramework/GraphicsManagerSettings.asset`
+
+설정 가능한 항목 (전부 "저장된 값이 없는 첫 실행"에만 사용되는 기본값):
+
+|필드|설명|기본값|
+|---|---|---|
+|Default Quality Level|기본 품질 단계|2|
+|Default Target Frame Rate|기본 프레임 상한|60|
+|Default Fullscreen|기본 전체화면 여부 (PC 전용)|true|
+|Default VSync|기본 VSync 여부 (PC 전용)|true|
+
+해상도는 별도 기본값 필드가 없고, 첫 실행 시 현재 화면 해상도(`Screen.currentResolution`)를 그대로 씁니다.
+
+* 에셋이 없으면 Console에 경고가 남고 기본값으로 동작합니다.
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/GraphicsTester.cs`를 아무 GameObject에 붙이고 Play하면 현재 품질/프레임/전체화면/VSync/해상도가 실시간으로 표시되고, 버튼으로 각각 바꿔가며 변경 이벤트 로그를 확인할 수 있습니다. Editor/PC 빌드가 아니면 전체화면·해상도 버튼을 눌러도 로그만 남고 화면상 변화는 없는 게 정상입니다.
 
 </details>
 

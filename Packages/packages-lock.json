@@ -27,6 +27,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.changbeom.gameframework.graphics": {
+      "version": "file:com.changbeom.gameframework.graphics",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.changbeom.gameframework.input": {
       "version": "file:com.changbeom.gameframework.input",
       "depth": 0,
