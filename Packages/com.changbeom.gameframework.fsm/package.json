@@ -1,0 +1,10 @@
+{
+    "name": "com.changbeom.gameframework.fsm",
+    "version": "0.1.0",
+    "displayName": "Game Framework - FSM",
+    "description": "Minimal, synchronous finite state machine (StateMachine<TStateKey>) for per-entity state (character actions, AI, game flow). Uses a CanExit guard for non-interruptible states instead of a forced transition graph. No dependencies on other Game Framework packages.",
+    "unity": "6000.0",
+    "author": {
+        "name": "ChangBeom"
+    }
+}

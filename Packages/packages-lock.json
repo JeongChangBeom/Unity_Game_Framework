@@ -21,6 +21,12 @@
       "source": "embedded",
       "dependencies": {}
     },
+    "com.changbeom.gameframework.fsm": {
+      "version": "file:com.changbeom.gameframework.fsm",
+      "depth": 0,
+      "source": "embedded",
+      "dependencies": {}
+    },
     "com.changbeom.gameframework.input": {
       "version": "file:com.changbeom.gameframework.input",
       "depth": 0,

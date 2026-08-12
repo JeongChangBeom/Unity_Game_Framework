@@ -53,6 +53,9 @@
 - **[Event Bus](#eventbus)**  
   타입 기반 전역 발행/구독 메시징 시스템
 
+- **[FSM](#fsm)**  
+  CanExit 가드 기반의 단순 동기 상태 머신
+
 > 프레임워크는 지속적으로 추가될 예정입니다.
 
 ---
@@ -73,6 +76,7 @@
 |Input|Unity Input System 기반 액션 입력/리바인딩|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.input`|
 |Utility|의존성 없는 범용 C# 유틸리티|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.utility`|
 |Event Bus|타입 기반 전역 발행/구독 메시징|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.eventbus`|
+|FSM|CanExit 가드 기반 단순 동기 상태 머신|`https://github.com/JeongChangBeom/Unity_Game_Framework.git?path=/Packages/com.changbeom.gameframework.fsm`|
 
 > * Save / Load는 Core에 의존하므로 Core도 함께 설치해야 합니다.
 > * Data Parsing은 Core에 의존하므로 Core도 함께 설치해야 합니다(`DataManager`가 `MonoSingleton<T>` 사용). 다만 테이블 로드 자체는 관례 경로(`Resources/GeneratedTables/{타입명}`)와 리플렉션 기반이라, 이름/구조만 맞으면 Data Parsing으로 생성하지 않고 직접 만든 SO도 그대로 동작합니다.
@@ -1428,6 +1432,82 @@ EventBus<EnemyDefeatedEvent>.Unsubscribe(OnEnemyDefeated);
 - `SubscribeOnce` 버튼으로 구독한 뒤, 발행을 두 번 해서 첫 번째만 반응하고 두 번째는 반응 없는지 확인
 - 예외를 던지는 구독자를 같이 구독해두고 발행하면, 에러 로그가 남으면서도 다른(사운드) 구독자는 정상 실행되는지 확인
 - 전체 구독 해제 버튼으로 `ClearSubscribers()` 확인
+
+</details>
+
+---
+
+<details id="fsm">
+<summary><h2>11. FSM</h2></summary>
+
+### 기능
+- `StateMachine<TStateKey>` - MonoSingleton이 아니라 직접 인스턴스를 만들어 쓰는 순수 C# 상태 머신입니다. 몬스터 AI, 캐릭터 행동, 게임 전체 흐름처럼 여러 개를 동시에 각자 따로 써야 하는 용도라서 전역 매니저로 만들지 않았습니다
+- 완전히 동기로 동작 (`Awaitable` 없음) - 애니메이션이 끝나길 기다려야 하는 상태는 Animation Event로 콜백을 걸어서 처리하는 걸 권장합니다 (아래 사용 방법 참고)
+- 전이 규칙을 강제하지 않음 - `ChangeState(key)`를 부르면 등록된 어떤 상태로든 자유롭게 전환됩니다
+- `CanExit` 가드 - 공격/구르기의 캔슬 불가 구간, 점프 중 착지 전처럼 "지금은 이 상태를 벗어나면 안 됨"을 상태가 스스로 표현. `false`인 동안의 `ChangeState` 요청은 경고 로그와 함께 무시됩니다
+- `StateBase` - `IState`의 기본 구현체. 대부분의 상태는 이걸 상속해서 필요한 메서드만 override하면 됩니다
+- `Update(deltaTime)`는 상태 머신이 스스로 매 프레임 돌지 않고, 호출자가 자기 `Update()`/`FixedUpdate()`에서 직접 넘겨주는 방식
+- 의존성 없음
+
+> **주의**: 상태 전이 순서/콤보 판정/입력 선입력 버퍼링 같은 게임 고유 규칙은 이 패키지가 강제하지 않습니다. `StateMachine`은 "지금 상태가 뭔지, 벗어나도 되는지, 어떻게 바뀌는지"만 관리하고, 언제 어떤 상태로 바꿀지는 전부 호출하는 쪽(캐릭터 컨트롤러 등)의 판단입니다.
+
+---
+
+### 사용 방법
+
+#### 상태 정의 + 등록
+```cs
+using GameFramework.FSM;
+
+public enum EPlayerState { Idle, Attack }
+
+public class AttackState : StateBase
+{
+    private bool _canExit;
+    public override bool CanExit => _canExit;
+
+    public override void OnEnter() => _canExit = false; // 공격 시작 - 캔슬 불가
+
+    // 공격 애니메이션의 캔슬 가능 프레임에 걸어둔 Animation Event가 호출
+    public void OnCancelableFrame() => _canExit = true;
+}
+```
+```cs
+private readonly StateMachine<EPlayerState> _fsm = new StateMachine<EPlayerState>();
+private readonly AttackState _attackState = new AttackState();
+
+private void Awake()
+{
+    _fsm.AddState(EPlayerState.Idle, new StateBase()); // 별다른 동작이 없으면 StateBase 그대로 사용
+    _fsm.AddState(EPlayerState.Attack, _attackState);
+    _fsm.ChangeState(EPlayerState.Idle);
+}
+
+private void Update() => _fsm.Update(Time.deltaTime);
+
+// Attack 애니메이션 클립의 캔슬 가능 프레임에 Animation Event로 등록해두는 메서드
+public void OnAttackCancelable() => _attackState.OnCancelableFrame();
+```
+
+- **`AddState(key, state)`** - 상태 등록. 이미 등록된 key면 경고 로그를 남기고 덮어씁니다
+- **`ChangeState(key)`** - 등록된 상태로 전환. 등록 안 된 key면 에러 로그, 현재 상태의 `CanExit`이 `false`면 경고 로그와 함께 무시됩니다. 이미 있는 상태로 다시 전환해도(자기 자신으로) 특별 취급 없이 `OnExit → OnEnter`가 다시 실행됩니다 - 공격 연타처럼 같은 동작을 처음부터 재생해야 하는 경우를 위한 의도된 동작입니다
+  - **재진입 방지**: `OnEnter`/`OnExit` 안에서 `ChangeState`를 다시 호출하면 경고 로그와 함께 무시됩니다 (상태 진입 도중 상태가 또 바뀌면서 내부 정보가 꼬이는 걸 방지). 상태 진입 조건에 따라 즉시 다른 상태로 리다이렉트하고 싶다면 `OnEnter`가 아니라 `Update`에서 조건을 확인해 호출하세요
+  - 아직 한 번도 상태가 없었던 첫 `ChangeState` 호출에서는 `OnStateChanged`가 발행되지 않습니다 - 진짜 "이전 상태"가 없기 때문입니다
+- **`CurrentKey`** / **`CanChangeState`** - 현재 상태 키 / 지금 전환 가능한지(현재 상태의 `CanExit`) 조회
+- **`OnStateChanged`** - `public event Action<TStateKey, TStateKey>`(이전, 다음). 다른 매니저 이벤트와 동일하게 `+=`/`-=`로 구독
+
+#### 왜 애니메이션 대기에 async 대신 Animation Event를 쓰나
+"몇 초 기다리기" 같은 임의의 타이머보다, 애니메이션 클립의 정확한 프레임에 이벤트를 걸어 콜백을 받는 게 더 정확합니다 - 클립 길이가 나중에 바뀌어도 코드를 안 고쳐도 되고, 캔슬 가능 시점처럼 애니메이션 중간 프레임에도 자유롭게 걸 수 있습니다. 정말 비동기 대기가 필요한 경우(다음 씬 로드를 기다려야 하는 게임 흐름 상태 등, 이미 async인 작업을 기다릴 때)는 그 상태의 `OnEnter()` 안에서 직접 `Awaitable`을 fire-and-forget으로 돌리면 됩니다 - `StateMachine` 자체가 이걸 지원할 필요는 없습니다.
+
+---
+
+### 테스트 방법
+`Assets/00.Scripts/Tests/FSMTester.cs`를 아무 GameObject에 붙이고 Play하면:
+- Idle ↔ Attack 전환, `Attack` 진입 직후에는 `CanChangeState=false`라 Idle 전환이 막히는지 확인
+- "애니메이션 이벤트 흉내" 버튼으로 `CanExit`을 true로 바꾼 뒤에는 Idle로 정상 전환되는지 확인
+- 등록 안 된 상태로 전환을 시도해 에러 로그 확인
+- 재진입 테스트 버튼으로, `OnEnter` 안에서 스스로 `ChangeState(Idle)`을 호출하는 상태에 진입시켜 경고 로그가 남으면서도 `CurrentKey`가 `Redirect`로 정상 유지되는지(Idle로 안 새는지) 확인
+- `OnStateChanged` 로그로 전환 이력 확인
 
 </details>
 
