@@ -146,8 +146,13 @@ namespace GameFramework.SceneLoading
                 SetProgress(0f);
                 OnSceneLoadStarted?.Invoke(request.Label);
 
-                // 씬 전환 전 팝업/토스트 대기열까지 정리 (UIManager.CloseAll이 이미 이 용도로 문서화되어 있음)
-                UIManager.Instance.CloseAll();
+                // 씬 전환 전 팝업/토스트 대기열까지 정리 (UIManager.CloseAll이 이미 이 용도로 문서화되어 있음).
+                // 앱 종료 중 매니저 종료 순서는 보장되지 않으므로(UIManager가 먼저 quit 처리될 수
+                // 있음), null 체크 후 호출합니다.
+                if (UIManager.Instance != null)
+                {
+                    UIManager.Instance.CloseAll();
+                }
 
                 await RunWithTimeoutAsync(ShowLoadingScreenAsync, _settings.LoadingScreenTimeoutSeconds,
                     destroyCancellationToken, "로딩 화면 표시(RequestShow)", treatTimeoutAsSuccess: true);

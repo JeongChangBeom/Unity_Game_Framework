@@ -22,6 +22,10 @@ namespace GameFramework.UISystem
         private readonly List<PopupRequest> _pending = new();
         private readonly HashSet<UIToastBase> _activeToasts = new();
 
+        /// <summary>EPopupPolicy.ReplaceCurrent로 예약된, 우선순위 정렬과 무관하게 다음
+        /// 차례에 반드시 열려야 하는 요청입니다. _pending과 별도로 관리합니다.</summary>
+        private PopupRequest _forcedNext;
+
         private UIPopupBase _current;
         private Action<object> _currentResultCallback;
         private bool _isClosingCurrent;
@@ -114,6 +118,11 @@ namespace GameFramework.UISystem
 
             if (unique == true)
             {
+                if (IsAlreadyForcedNextType(t) == true)
+                {
+                    return;
+                }
+
                 if (IsAlreadyQueuedType(t) == true)
                 {
                     return;
@@ -145,15 +154,35 @@ namespace GameFramework.UISystem
                 if (policy == EPopupPolicy.PreemptIfHigher &&
                     priority > (EPopupPriority)_current.OpenPriority)
                 {
+                    // req를 바로 OpenRequestNow로 열어버리면, 이미 _pending에 req보다도
+                    // 더 우선순위가 높은 요청이 대기 중이더라도 무시하고 req가 먼저
+                    // 열려버립니다. 대신 대기열에 넣고 ProcessPending이 정렬된 순서로
+                    // 고르게 합니다.
                     SuspendCurrentToPending();
-                    OpenRequestNow(req);
+                    _pending.Add(req);
+                    _processScheduled = true;
                     return;
                 }
 
                 if (policy == EPopupPolicy.ReplaceCurrent)
                 {
                     ClosePopup(_current);
-                    _pending.Insert(0, req);
+
+                    // ProcessPending은 항상 SortPending으로 우선순위 정렬을 하기 때문에,
+                    // _pending.Insert(0, ...)로 앞쪽에 끼워 넣어도 정렬 후에는 위치가
+                    // 의미 없어집니다(우선순위가 낮으면 다른 대기 요청에 밀림) - "교체"라는
+                    // 이름과 다르게 동작했습니다. 정렬 대상이 아닌 별도의 "다음에 반드시
+                    // 열릴 요청" 슬롯에 넣어서, 우선순위와 무관하게 다음 차례에 확실히
+                    // 열리도록 합니다.
+                    if (_forcedNext != null)
+                    {
+                        // 아직 처리 안 된 이전 ReplaceCurrent 요청이 있다면 덮어씁니다.
+                        // onResult를 그냥 버리면 결과를 기다리던 호출부가 영원히 안
+                        // 풀릴 수 있으니 null로라도 반드시 한 번 불러줍니다.
+                        _forcedNext.onResult?.Invoke(null);
+                    }
+
+                    _forcedNext = req;
                     return;
                 }
             }
@@ -221,6 +250,13 @@ namespace GameFramework.UISystem
                 return null;
             }
 
+            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
+            // 이미 null일 수 있습니다.
+            if (PoolManager.Instance == null)
+            {
+                return null;
+            }
+
             if (!PoolManager.Instance.TryGetPrefab(key.ToString(), out GameObject prefabGo))
             {
                 Debug.LogError($"[UIManager] PoolSettings에 등록되지 않은 key입니다: {key}");
@@ -264,14 +300,23 @@ namespace GameFramework.UISystem
             }
 
             _isClosingCurrent = true;
-            _modalBlocker.SetActive(false);
 
             Action<object> onResult = _currentResultCallback;
             _currentResultCallback = null;
 
             target.RequestClose(() =>
             {
-                PoolManager.Instance.Despawn(target.gameObject);
+                // 닫기 애니메이션이 끝나기 전까지는 모달 블로커를 켜둔 채로 둡니다 -
+                // 미리 꺼버리면 팝업이 화면에서 아직 사라지는 중인데도 그 뒤의 UI가
+                // 클릭을 받아버리는 입력 누수가 있었습니다.
+                _modalBlocker.SetActive(false);
+
+                // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
+                // 이미 null일 수 있습니다.
+                if (PoolManager.Instance != null)
+                {
+                    PoolManager.Instance.Despawn(target.gameObject);
+                }
 
                 // _current가 그 사이 다른 팝업으로 바뀌어 있다면(정상 흐름에서는 위의
                 // RequestPopup 가드 때문에 일어나지 않아야 하지만) 덮어쓰지 않습니다.
@@ -295,13 +340,41 @@ namespace GameFramework.UISystem
             for (int i = 0; i < _pending.Count; i++)
             {
                 UIPopupBase suspended = _pending[i].instance;
-                if (suspended != null)
+                if (suspended != null && PoolManager.Instance != null)
                 {
                     PoolManager.Instance.Despawn(suspended.gameObject);
                 }
             }
 
             _pending.Clear();
+
+            // 토스트는 비모달이라 팝업과 독립적으로 여러 개 동시에 떠 있을 수 있습니다.
+            // 여기서 비워주지 않으면 씬 전환 등으로 CloseAll이 호출돼도 이미 떠 있던
+            // 토스트 인스턴스가 디스폰되지 않고 남거나, _activeToasts에 계속 남아있는
+            // 항목 때문에 나중에 파괴된 인스턴스를 대상으로 HideToast/자동 숨김 타이머가
+            // 동작하려 드는 누수로 이어집니다. 숨김 연출을 기다리지 않고 즉시 디스폰합니다.
+            if (_activeToasts.Count > 0)
+            {
+                foreach (UIToastBase toast in _activeToasts)
+                {
+                    if (toast != null && PoolManager.Instance != null)
+                    {
+                        PoolManager.Instance.Despawn(toast.gameObject);
+                    }
+                }
+
+                _activeToasts.Clear();
+            }
+
+            // _pending과 마찬가지로 아직 처리 안 된 ReplaceCurrent 예약도 정리 대상입니다.
+            // onResult를 그냥 버리면 결과를 기다리던 호출부가 영원히 안 풀릴 수 있으니
+            // null로라도 반드시 한 번 불러줍니다.
+            if (_forcedNext != null)
+            {
+                PopupRequest forced = _forcedNext;
+                _forcedNext = null;
+                forced.onResult?.Invoke(null);
+            }
 
             if (_current == null || _isClosingCurrent)
             {
@@ -315,11 +388,15 @@ namespace GameFramework.UISystem
             _isClosingCurrent = true;
             UIPopupBase target = _current;
             _currentResultCallback = null;
-            _modalBlocker.SetActive(false);
 
             target.RequestClose(() =>
             {
-                PoolManager.Instance.Despawn(target.gameObject);
+                _modalBlocker.SetActive(false);
+
+                if (PoolManager.Instance != null)
+                {
+                    PoolManager.Instance.Despawn(target.gameObject);
+                }
 
                 if (_current == target)
                 {
@@ -335,6 +412,14 @@ namespace GameFramework.UISystem
         {
             if (_current != null)
             {
+                return;
+            }
+
+            if (_forcedNext != null)
+            {
+                PopupRequest forced = _forcedNext;
+                _forcedNext = null;
+                OpenRequestNow(forced);
                 return;
             }
 
@@ -387,16 +472,32 @@ namespace GameFramework.UISystem
                 );
 
                 _currentResultCallback = req.onResult;
+
+                // OnResume 안에서 재진입 호출(예: CloseAll, RequestPopup)이 있을 경우
+                // _current가 이미 이 인스턴스를 가리키고 있어야 그 호출들이 정확한
+                // 상태를 보고 판단합니다 - 그래서 OnResume을 부르기 전에 대입합니다.
+                _current = instance;
                 instance.OnResume(req.payload);
             }
             else
             {
+                // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
+                // 이미 null일 수 있습니다. 스폰 실패와 동일하게 취급해 요청을 흘려보냅니다.
+                if (PoolManager.Instance == null)
+                {
+                    req.onResult?.Invoke(null);
+                    return;
+                }
+
                 instance = PoolManager.Instance.Spawn(req.prefab, Vector3.zero, Quaternion.identity, _popupRoot);
                 if (instance == null)
                 {
                     // 스폰 실패(풀이 가득 찼을 가능성)로 이 요청은 버리지만, 대기열에 남은
                     // 다른 요청까지 같이 멈추면 안 되므로 다음 LateUpdate에 처리를 재예약합니다.
+                    // onResult를 그냥 버리면 결과를 기다리던 호출부가 영원히 콜백을 못 받고
+                    // 멈출 수 있으므로, null로라도 반드시 한 번 호출해서 풀어줍니다.
                     Debug.LogWarning($"[UIManager] {req.prefab.GetType().Name} 팝업을 스폰하지 못했습니다 (풀이 가득 찼을 수 있습니다). 이 요청은 건너뜁니다.");
+                    req.onResult?.Invoke(null);
                     _processScheduled = true;
                     return;
                 }
@@ -410,14 +511,15 @@ namespace GameFramework.UISystem
                 );
 
                 _currentResultCallback = req.onResult;
+
+                // 위와 동일한 이유로 OnOpen 호출 전에 _current를 먼저 대입합니다.
+                _current = instance;
                 instance.OnOpen(req.payload);
             }
 
             _modalBlocker.SetActive(true);
             _modalBlocker.transform.SetAsLastSibling();
             instance.transform.SetAsLastSibling();
-
-            _current = instance;
         }
 
         // ---- 토스트 ----
@@ -426,6 +528,13 @@ namespace GameFramework.UISystem
         public void ShowToast(UIToastBase prefab, object payload = null, float duration = -1f)
         {
             if (prefab == null)
+            {
+                return;
+            }
+
+            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
+            // 이미 null일 수 있습니다.
+            if (PoolManager.Instance == null)
             {
                 return;
             }
@@ -465,7 +574,13 @@ namespace GameFramework.UISystem
                 return;
             }
 
-            toast.RequestHide(() => PoolManager.Instance.Despawn(toast.gameObject));
+            toast.RequestHide(() =>
+            {
+                if (PoolManager.Instance != null)
+                {
+                    PoolManager.Instance.Despawn(toast.gameObject);
+                }
+            });
         }
 
         private async Awaitable AutoHideToastAfterDelay(UIToastBase toast, float delay, CancellationToken despawnToken)
@@ -585,6 +700,14 @@ namespace GameFramework.UISystem
 
                 return a.sequence.CompareTo(b.sequence);
             });
+        }
+
+        // _forcedNext는 아직 애니메이션 대기 중일 뿐 _pending에 들어있지 않으므로,
+        // 이 체크가 없으면 unique=true 요청도 여기 걸리지 않고 통과해 같은 타입이
+        // 중복으로 열리게 됩니다.
+        private bool IsAlreadyForcedNextType(Type t)
+        {
+            return _forcedNext != null && _forcedNext.PopupType == t;
         }
 
         private bool IsAlreadyQueuedType(Type t)

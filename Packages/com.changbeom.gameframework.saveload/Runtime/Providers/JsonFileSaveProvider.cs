@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Text;
 using UnityEngine;
 
 namespace GameFramework.SaveLoad
@@ -9,7 +10,10 @@ namespace GameFramework.SaveLoad
     /// 모든 키를 Application.persistentDataPath 아래 JSON 파일 하나에 저장하며,
     /// 외부 JSON 라이브러리 없이 UnityEngine.JsonUtility만 사용합니다. 쓰기는 원자적으로
     /// (임시 파일 + File.Replace) 처리되고, 이전 정상 파일을 ".bak"으로 자동 보관하므로
-    /// 쓰는 도중 크래시가 나도 두 사본이 동시에 손상되지 않습니다.
+    /// 쓰는 도중 크래시가 나도 두 사본이 동시에 손상되지 않습니다. 다만 File.Replace의
+    /// 원자성은 Windows(Win32 ReplaceFile)에서 문서화된 보장이고, 모바일(Android/iOS,
+    /// Mono/IL2CPP 런타임)에서는 .NET이 동일한 보장을 명시적으로 문서화하지 않습니다 -
+    /// 실제 정전 등 최악의 상황에서의 내구성은 플랫폼마다 다를 수 있습니다.
     /// ".bak"(자동 롤링 백업)과 ".manual.bak"(BackupNow로 만드는 수동 체크포인트)은
     /// 서로 다른 파일입니다. 매 Flush마다 갱신되는 ".bak"과 같은 경로를 썼다면,
     /// 이후의 평범한 자동 저장 한 번만으로 사용자가 의도적으로 남긴 체크포인트가
@@ -122,7 +126,7 @@ namespace GameFramework.SaveLoad
 
             try
             {
-                File.Copy(_filePath, _manualBackupPath, true);
+                CopyFileDurable(_filePath, _manualBackupPath);
                 return true;
             }
             catch (Exception e)
@@ -148,7 +152,7 @@ namespace GameFramework.SaveLoad
 
             try
             {
-                File.Copy(_manualBackupPath, _filePath, true);
+                CopyFileDurable(_manualBackupPath, _filePath);
             }
             catch (Exception e)
             {
@@ -163,7 +167,11 @@ namespace GameFramework.SaveLoad
 
         private void Load()
         {
-            Dictionary<string, string> loaded = Deserialize(SafeReadAllText(_filePath));
+            // 파일이 아예 없는 것(첫 실행)과 파일은 있는데 파싱에 실패하는 것(진짜 손상)을
+            // 구분합니다. 구분하지 않으면 모든 신규 설치 첫 실행마다 "손상되었습니다"
+            // 경고/에러가 찍혀서, 진짜 손상 신호가 이 잡음 속에 묻힙니다.
+            bool fileExists = File.Exists(_filePath);
+            Dictionary<string, string> loaded = fileExists ? Deserialize(SafeReadAllText(_filePath)) : null;
 
             if (loaded != null)
             {
@@ -171,14 +179,20 @@ namespace GameFramework.SaveLoad
                 return;
             }
 
-            if (!_autoRestoreOnInit)
+            if (!fileExists)
             {
-                Debug.LogError($"[JsonFileSaveProvider] 저장 파일이 없거나 손상되었습니다 ({_filePath}). 자동 복구가 꺼져 있어 빈 저장 데이터로 시작합니다.");
                 _data = new Dictionary<string, string>();
                 return;
             }
 
-            Debug.LogWarning($"[JsonFileSaveProvider] 저장 파일이 없거나 손상되었습니다 ({_filePath}). 백업 파일을 시도합니다 ({_backupPath}).");
+            if (!_autoRestoreOnInit)
+            {
+                Debug.LogError($"[JsonFileSaveProvider] 저장 파일이 손상되었습니다 ({_filePath}). 자동 복구가 꺼져 있어 빈 저장 데이터로 시작합니다.");
+                _data = new Dictionary<string, string>();
+                return;
+            }
+
+            Debug.LogWarning($"[JsonFileSaveProvider] 저장 파일이 손상되었습니다 ({_filePath}). 백업 파일을 시도합니다 ({_backupPath}).");
             Dictionary<string, string> restored = Deserialize(SafeReadAllText(_backupPath));
 
             if (restored != null)
@@ -267,13 +281,34 @@ namespace GameFramework.SaveLoad
                 }
 
                 string tempPath = _filePath + ".tmp";
-                File.WriteAllText(tempPath, json);
+
+                // File.WriteAllText는 OS 쓰기 버퍼까지만 보장하고 실제 디스크에 내려갔다는
+                // 보장은 없습니다 - Flush(true)로 OS 버퍼까지 강제로 디스크에 내려써야,
+                // 이 시점 직후 정전/크래시가 나도 지금 막 쓴 내용이 살아남습니다.
+                using (FileStream fs = new FileStream(tempPath, FileMode.Create, FileAccess.Write, FileShare.None))
+                using (StreamWriter writer = new StreamWriter(fs, new UTF8Encoding(false)))
+                {
+                    writer.Write(json);
+                    writer.Flush();
+                    fs.Flush(true);
+                }
 
                 if (File.Exists(_filePath))
                 {
-                    // tempPath를 새 파일로 원자적으로 교체하면서, 동시에 이전 정상 파일을
-                    // _backupPath로 옮깁니다 (크래시가 나도 스스로 복구 가능).
-                    File.Replace(tempPath, _filePath, _backupPath);
+                    try
+                    {
+                        // tempPath를 새 파일로 원자적으로 교체하면서, 동시에 이전 정상 파일을
+                        // _backupPath로 옮깁니다 (크래시가 나도 스스로 복구 가능).
+                        File.Replace(tempPath, _filePath, _backupPath);
+                    }
+                    catch (Exception replaceEx)
+                    {
+                        // .bak 파일이 다른 프로세스(백신 검사, 동기화 클라이언트 등)에
+                        // 잠겨 있으면 File.Replace 전체가 실패합니다. 백업 하나 때문에
+                        // 저장 자체가 막히면 안 되므로, 백업 없이 교체만이라도 재시도합니다.
+                        Debug.LogWarning($"[JsonFileSaveProvider] 이전 백업({_backupPath}) 생성에 실패해 백업 없이 저장을 재시도합니다: {replaceEx.Message}");
+                        File.Replace(tempPath, _filePath, null);
+                    }
                 }
                 else
                 {
@@ -288,6 +323,21 @@ namespace GameFramework.SaveLoad
                 // 호출부(Flush)에 실패를 알립니다. 여기서 삼키면 데이터가 조용히 유실됩니다.
                 Debug.LogError($"[JsonFileSaveProvider] 저장 실패: {e}");
                 return false;
+            }
+        }
+
+        // File.Copy는 OS 쓰기 버퍼까지만 보장하고 실제 디스크에 내려갔다는 보장이 없습니다 -
+        // WriteAtomic과 동일하게 Flush(true)로 강제 fsync해야 합니다. BackupOnPause/
+        // BackupOnQuit 기본값이 true라서 이 메서드가 실제로 가장 많이 불리는 시점(백그라운드
+        // 전환/종료 직후)이 바로 크래시/정전 위험이 가장 큰 시점이기도 하므로, 방금 만든
+        // 백업이 이 durability 보장 없이 유실되면 정작 필요할 때 쓸모없는 백업이 됩니다.
+        private static void CopyFileDurable(string sourcePath, string destPath)
+        {
+            using (FileStream src = new FileStream(sourcePath, FileMode.Open, FileAccess.Read, FileShare.Read))
+            using (FileStream dst = new FileStream(destPath, FileMode.Create, FileAccess.Write, FileShare.None))
+            {
+                src.CopyTo(dst);
+                dst.Flush(true);
             }
         }
     }

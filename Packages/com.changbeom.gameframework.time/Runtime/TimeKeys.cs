@@ -7,6 +7,8 @@ namespace GameFramework.TimeSystem
         public const string ServerSyncServerUtcTicks = "Server.ServerUtcAtSyncTicks";
         public const string ServerSyncMonotonicSeconds = "Server.MonotonicSecondsAtSync";
         public const string ServerSyncDeviceUtcTicks = "Server.DeviceUtcAtSyncTicks";
+        public const string ServerSyncMaxObservedMonotonicSeconds = "Server.MaxObservedMonotonicSeconds";
+        public const string ServerSyncMaxObservedWallClockUtcTicks = "Server.MaxObservedWallClockUtcTicks";
 
         public const string LastSeenUtcTicks = "Guard.LastSeenUtcTicks";
         public const string CheatDetected = "Guard.CheatDetected";

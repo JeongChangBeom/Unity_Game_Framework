@@ -85,6 +85,11 @@ namespace GameFramework.Pooling
 
             if (_pools.ContainsKey(prefab) == true)
             {
+                // 이미 이 프리팹의 풀이 있으면 새로 넘어온 prewarm/max/autoExpand 값은
+                // 조용히 무시됩니다 - BuildFromSettings를 런타임에 다시 호출하거나(설정
+                // 에셋을 갈아끼우는 등) PoolSettings를 편집한 뒤 재적용하는 경우 이 값이
+                // 왜 안 바뀌었는지 헷갈릴 수 있어 경고를 남깁니다.
+                Debug.LogWarning($"[PoolManager] {prefab.name}의 풀이 이미 있어 새 설정(prewarm={prewarmCount}, max={maxCount}, autoExpand={autoExpand})을 무시합니다. 풀은 처음 만들어질 때의 설정을 계속 사용합니다.");
                 return;
             }
 
@@ -225,6 +230,24 @@ namespace GameFramework.Pooling
             }
 
             pool.Despawn(instance);
+        }
+
+        /// <summary>Despawn을 거치지 않고 인스턴스가 파괴됐을 때(씬 언로드에 딸려가는 경우 등)
+        /// PooledObject.OnDestroy가 호출합니다. 소유 Pool의 생성 카운트를 되돌려서
+        /// maxCount 풀이 영구히 고갈되는 것을 막습니다.</summary>
+        internal void NotifyInstanceDestroyed(GameObject instance, GameObject prefab)
+        {
+            _instanceToPrefab.Remove(instance);
+
+            if (prefab == null)
+            {
+                return;
+            }
+
+            if (_pools.TryGetValue(prefab, out Pool pool))
+            {
+                pool.NotifyInstanceDestroyed(instance);
+            }
         }
     }
 }

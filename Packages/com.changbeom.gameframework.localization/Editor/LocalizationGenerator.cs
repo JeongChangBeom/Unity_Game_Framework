@@ -135,9 +135,24 @@ namespace GameFramework.Localization.Editor
             return list;
         }
 
+        // 언어 코드처럼 보이는지에 대한 느슨한 판별입니다(대문자 2~3자, 예: KO/EN/ZH).
+        // 엄격한 화이트리스트는 아닙니다 - 프로젝트마다 쓰는 코드가 다를 수 있어서
+        // (LocalizationManager의 SystemLanguageToCode는 시스템 언어 자동 감지용일
+        // 뿐, 시트에서 실제로 쓸 수 있는 코드를 제한하는 목록이 아닙니다) 여기 안
+        // 맞아도 컬럼을 빼지는 않고 경고만 남깁니다.
+        private static readonly System.Text.RegularExpressions.Regex LanguageCodePattern =
+            new System.Text.RegularExpressions.Regex("^[A-Za-z]{2,3}$");
+
         // 언어 컬럼은 첫 번째 행 하나만 봐도 됩니다 - Data Parsing이 생성하는 Data
         // 클래스는 모든 행이 같은 필드 구조를 공유하기 때문입니다. RowKey(int)는
         // string이 아니라서 자동으로 제외되고, KeyName은 이름으로 명시적으로 제외합니다.
+        //
+        // RowKey/KeyName을 제외한 string 타입 컬럼은 전부 "언어 컬럼"으로 간주합니다.
+        // Data Parsing 시트는 임의의 string 컬럼(예: 작업자용 "Notes"/"Comment")을
+        // 자유롭게 추가할 수 있는데, Localization 탭에 그런 컬럼이 섞이면 여기서
+        // 그대로 가짜 ELanguage 멤버로 생성되고 런타임에 그 텍스트가 "번역"처럼
+        // 취급돼버립니다. 완전히 막을 방법은(시트 작성자의 의도를 알 수 없어) 없지만,
+        // 언어 코드처럼 안 보이는 컬럼이 감지되면 최소한 눈에 띄게 경고합니다.
         private static List<string> ExtractLanguageColumns(SerializedProperty firstItem)
         {
             List<string> list = new List<string>();
@@ -152,6 +167,11 @@ namespace GameFramework.Localization.Editor
 
                 if (iterator.propertyType == SerializedPropertyType.String && iterator.name != "KeyName")
                 {
+                    if (!LanguageCodePattern.IsMatch(iterator.name))
+                    {
+                        Debug.LogWarning($"[LocalizationGenerator] 컬럼 \"{iterator.name}\"이(가) 언어 코드처럼 보이지 않습니다(대문자 2~3자 코드 권장, 예: KO/EN/JP). 실제 언어 컬럼이 맞는지, 혹시 메모용 string 컬럼을 Localization 시트에 잘못 추가한 건 아닌지 확인하세요. 언어 컬럼이 맞다면 이 경고는 무시해도 됩니다.");
+                    }
+
                     list.Add(iterator.name);
                 }
             }

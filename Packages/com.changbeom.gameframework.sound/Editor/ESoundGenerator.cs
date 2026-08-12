@@ -43,7 +43,10 @@ namespace GameFramework.SoundSystem.Editor
             }
 
             GenerateESound(rawNames);
-            RegisterAddressables(rawNames);
+
+            // RegisterAddressables도 AssetDatabase/AddressableAssetSettings를 건드리므로
+            // GenerateESound와 같은 이유로 다음 프레임으로 미룹니다.
+            EditorApplication.delayCall += () => RegisterAddressables(rawNames);
         }
 
         private static void GenerateESound(List<string> rawNames)
@@ -82,10 +85,17 @@ namespace GameFramework.SoundSystem.Editor
             string code = BuildCode(ordered);
             WriteFile(OutputPath, code);
 
-            AssetDatabase.ImportAsset(OutputPath);
-            AssetDatabase.Refresh();
+            // OnPostprocessAllAssets 콜백(SoundTableSync) 도중에 AssetDatabase.ImportAsset/
+            // Refresh를 바로 부르면 지금 진행 중인 임포트 배치와 겹쳐 에디터가 멈출 수
+            // 있으므로(Pooling/Localization과 동일한 이유), 콜백이 완전히 끝난 다음
+            // 프레임으로 미룹니다.
+            EditorApplication.delayCall += () =>
+            {
+                AssetDatabase.ImportAsset(OutputPath);
+                AssetDatabase.Refresh();
 
-            Debug.Log("[ESoundGenerator] 생성됨: " + OutputPath + " (개수: " + ordered.Count + ")");
+                Debug.Log("[ESoundGenerator] 생성됨: " + OutputPath + " (개수: " + ordered.Count + ")");
+            };
         }
 
         // 새로 생성할 때 이름을 알파벳순으로 정렬하면, enum은 값을 안 주면 선언 순서대로

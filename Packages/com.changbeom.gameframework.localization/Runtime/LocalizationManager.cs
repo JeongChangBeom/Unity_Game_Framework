@@ -94,12 +94,47 @@ namespace GameFramework.Localization
         {
             CurrentLanguage = language;
             SaveLanguage(language);
-            OnLanguageChanged?.Invoke(language);
+            SafeInvokeLanguageChanged(language);
             return Awaitable.NextFrameAsync();
+        }
+
+        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나(예: 파괴된 컴포넌트를 참조하는
+        // 핸들러)가 예외를 던져도 나머지 구독자에게는 정상적으로 전달되도록 각각 개별
+        // try/catch로 격리합니다. 격리가 없으면 한 구독자의 예외로 그 뒤 구독자들이
+        // 언어 변경 알림을 통째로 못 받아 일부 UI만 예전 언어로 남는 문제가 있었습니다.
+        private void SafeInvokeLanguageChanged(ELanguage language)
+        {
+            if (OnLanguageChanged == null)
+            {
+                return;
+            }
+
+            Delegate[] handlers = OnLanguageChanged.GetInvocationList();
+
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<ELanguage>)handlers[i]).Invoke(language);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[LocalizationManager] OnLanguageChanged 구독자에서 예외가 발생했습니다: {e}");
+                }
+            }
         }
 
         private ELanguage DetermineInitialLanguage()
         {
+            // LocalizationManager는 BootPriority 없이 지연 초기화되므로, 이 첫 접근이
+            // 다른 매니저의 종료 처리 도중(예: 어떤 오브젝트의 OnDestroy가 이 시점에
+            // 처음으로 GetText를 호출) 일어나면 SaveManager는 이미 종료되어
+            // Instance가 null일 수 있습니다.
+            if (SaveManager.Instance == null)
+            {
+                return _settings.DefaultLanguage;
+            }
+
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(LanguageKey);
 
             if (SaveManager.Instance.TryLoad(key, out LanguageSaveData saved) && Enum.IsDefined(typeof(ELanguage), saved.Language))
@@ -117,6 +152,12 @@ namespace GameFramework.Localization
 
         private void SaveLanguage(ELanguage language)
         {
+            // 위 DetermineInitialLanguage와 동일한 이유의 방어입니다.
+            if (SaveManager.Instance == null)
+            {
+                return;
+            }
+
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(LanguageKey);
             SaveManager.Instance.Save(key, new LanguageSaveData { Language = language });
             SaveManager.Instance.Flush();

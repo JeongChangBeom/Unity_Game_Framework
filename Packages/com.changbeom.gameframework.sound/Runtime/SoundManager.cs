@@ -41,10 +41,27 @@ namespace GameFramework.SoundSystem
         private readonly Dictionary<string, Task<AudioClip>> _pendingClipLoads = new Dictionary<string, Task<AudioClip>>();
         private readonly Dictionary<ESound, int> _pendingOneShotCounts = new Dictionary<ESound, int>();
 
+        // StopSound(id)가 아직 클립 로딩이 끝나지 않아 _pool.Active에 잡히지 않는 원샷
+        // 요청까지 취소할 수 있도록 하는 세대 토큰입니다. PlayOneShot이 시작 시점의 값을
+        // 들고 있다가, await 이후 값이 바뀌어 있으면(그 사이 StopSound가 호출됨) 재생을
+        // 시작하지 않고 조용히 취소합니다.
+        private readonly Dictionary<ESound, int> _oneShotStopTokens = new Dictionary<ESound, int>();
+
+        // OnApplicationQuit 이후에 완료되는 LoadClip이 이미 비워진 _clipCache/_clipHandles에
+        // 다시 항목을 채워 넣으면 그 handle을 아무도 Release하지 못해 영구히 새므로,
+        // 종료 이후에는 캐싱하지 않고 handle을 즉시 Release합니다.
+        private bool _isShuttingDown;
+
         private AudioSource _bgmSource;
         private ESound _currentBgm = ESound.None;
         private ESound _requestedBgm = ESound.None;
         private int _bgmPlayToken;
+
+        // PlayBgm의 크로스페이드가 _bgmSource.volume을 직접 애니메이션하는 동안,
+        // Update()가 같은 프레임에 덕킹 기준으로 볼륨을 되돌려버리면 페이드아웃이
+        // 멈추거나 페이드인이 목표값으로 즉시 튀는 문제가 있었습니다. 크로스페이드가
+        // 진행 중인 동안은 Update()가 볼륨을 건드리지 않도록 이 플래그로 막습니다.
+        private bool _bgmCrossfading;
 
         private int _voiceActiveCount;
         private float _duckTargetMultiplier = 1f;
@@ -204,7 +221,7 @@ namespace GameFramework.SoundSystem
             float duckSpeed = 1f / Mathf.Max(0.01f, _settings.DuckFadeSeconds);
             _duckCurrentMultiplier = Mathf.MoveTowards(_duckCurrentMultiplier, _duckTargetMultiplier, duckSpeed * Time.unscaledDeltaTime);
 
-            if (_currentBgm != ESound.None && _soundData.TryGetValue(_currentBgm, out SoundEntry bgmEntry))
+            if (!_bgmCrossfading && _currentBgm != ESound.None && _soundData.TryGetValue(_currentBgm, out SoundEntry bgmEntry))
             {
                 _bgmSource.volume = ComputeVolume(ESoundChannel.BGM, bgmEntry.defaultVolume) * _duckCurrentMultiplier;
             }
@@ -260,37 +277,62 @@ namespace GameFramework.SoundSystem
             int myToken = ++_bgmPlayToken;
             _requestedBgm = id;
 
-            AudioClip clip = await LoadClip(entry.fileName);
+            // 이 호출 자신이 실제로 _bgmCrossfading을 켰는지 기록합니다. clip 로드가
+            // 실패하면 이 호출은 _bgmCrossfading을 한 번도 켜지 않은 채 finally에
+            // 도달하는데, 그때 "내가 여전히 최신 토큰이다"라는 이유만으로 플래그를
+            // 꺼버리면 실제로는 아직 페이드 중인 이전(선점당한) 호출의 진행 상태를
+            // 대신 꺼버리는 문제가 있었습니다.
+            bool crossfadeStartedByMe = false;
 
-            if (myToken != _bgmPlayToken)
+            try
             {
-                // 그 사이 다른 PlayBgm/StopBgm 호출이 있었다는 뜻입니다. _requestedBgm은
-                // 이미 그 호출이 관리하고 있으므로 여기서 건드리면 안 됩니다.
-                return;
-            }
+                AudioClip clip = await LoadClip(entry.fileName);
 
-            if (clip == null)
+                if (myToken != _bgmPlayToken)
+                {
+                    // 그 사이 다른 PlayBgm/StopBgm 호출이 있었다는 뜻입니다. _requestedBgm은
+                    // 이미 그 호출이 관리하고 있으므로 여기서 건드리면 안 됩니다.
+                    return;
+                }
+
+                if (clip == null)
+                {
+                    // 로드 실패입니다. _requestedBgm을 이 id로 남겨두면, 이후 같은 id로
+                    // PlaySound를 다시 호출해도 위쪽의 "if (_requestedBgm == id) return;"에
+                    // 막혀 영원히 재생되지 않습니다. 실제로 지금 재생 중인 곡(없으면 None)으로 되돌립니다.
+                    _requestedBgm = _currentBgm;
+                    return;
+                }
+
+                // 크로스페이드가 끝날 때까지 Update()가 볼륨을 건드리지 않도록 막습니다.
+                _bgmCrossfading = true;
+                crossfadeStartedByMe = true;
+
+                await FadeVolume(_bgmSource, _bgmSource.volume, 0f, _settings.BgmCrossfadeSeconds, myToken);
+                if (myToken != _bgmPlayToken)
+                {
+                    return;
+                }
+
+                _bgmSource.clip = clip;
+                _bgmSource.loop = entry.loop;
+                _bgmSource.Play();
+                _currentBgm = id;
+
+                float target = ComputeVolume(ESoundChannel.BGM, entry.defaultVolume) * _duckCurrentMultiplier;
+                await FadeVolume(_bgmSource, 0f, target, _settings.BgmCrossfadeSeconds, myToken);
+            }
+            finally
             {
-                // 로드 실패입니다. _requestedBgm을 이 id로 남겨두면, 이후 같은 id로
-                // PlaySound를 다시 호출해도 위쪽의 "if (_requestedBgm == id) return;"에
-                // 막혀 영원히 재생되지 않습니다. 실제로 지금 재생 중인 곡(없으면 None)으로 되돌립니다.
-                _requestedBgm = _currentBgm;
-                return;
+                // 이 호출이 실제로 크로스페이드를 켠 당사자이면서, 여전히 "최신" 요청일
+                // 때만 플래그를 풉니다. 더 최근에 시작된 PlayBgm 호출이 있다면(myToken이
+                // 이미 바뀜), 그 호출이 아직 자기 크로스페이드를 진행 중일 수 있으므로
+                // 여기서 먼저 풀어버리면 그 크로스페이드가 다시 Update()와 충돌하게 됩니다.
+                if (crossfadeStartedByMe && myToken == _bgmPlayToken)
+                {
+                    _bgmCrossfading = false;
+                }
             }
-
-            await FadeVolume(_bgmSource, _bgmSource.volume, 0f, _settings.BgmCrossfadeSeconds);
-            if (myToken != _bgmPlayToken)
-            {
-                return;
-            }
-
-            _bgmSource.clip = clip;
-            _bgmSource.loop = entry.loop;
-            _bgmSource.Play();
-            _currentBgm = id;
-
-            float target = ComputeVolume(ESoundChannel.BGM, entry.defaultVolume) * _duckCurrentMultiplier;
-            await FadeVolume(_bgmSource, 0f, target, _settings.BgmCrossfadeSeconds);
         }
 
         public void StopBgm()
@@ -317,11 +359,21 @@ namespace GameFramework.SoundSystem
             // 중복 요청이 전부 같은(낮은) 값을 보고 maxConcurrent 제한을 그냥 통과해버립니다.
             // await 전에 자리를 미리 예약해서 이 창을 막습니다.
             _pendingOneShotCounts[id] = pending + 1;
+            int myStopToken = _oneShotStopTokens.TryGetValue(id, out int st) ? st : 0;
 
             try
             {
                 AudioClip clip = await LoadClip(entry.fileName);
                 if (clip == null)
+                {
+                    return;
+                }
+
+                // 로딩을 기다리는 동안 StopSound(id)가 호출됐으면(토큰이 바뀜) 재생을
+                // 시작하지 않고 취소합니다 - "현재 재생 중인 모든 인스턴스를 정지"라는
+                // StopSound의 의도상, 아직 로딩 중이던 요청도 취소 대상에 포함됩니다.
+                int currentStopToken = _oneShotStopTokens.TryGetValue(id, out int cur2) ? cur2 : 0;
+                if (currentStopToken != myStopToken)
                 {
                     return;
                 }
@@ -365,6 +417,10 @@ namespace GameFramework.SoundSystem
                 return;
             }
 
+            // 아직 클립 로딩 중이라 _pool.Active에 안 잡히는 대기 중인 원샷 요청도
+            // 취소되도록 세대 토큰을 올립니다 (PlayOneShot 참고).
+            _oneShotStopTokens[id] = (_oneShotStopTokens.TryGetValue(id, out int t) ? t : 0) + 1;
+
             // _currentBgm이 아니라 _requestedBgm으로 확인합니다. _currentBgm은 로드와
             // 크로스페이드가 끝난 뒤에야 채워지므로, 아직 로딩 중인 BGM은 _currentBgm과
             // 절대 같아지지 않아 이 시점에 StopSound를 호출해도 무시되고 로드가 끝나면
@@ -380,21 +436,70 @@ namespace GameFramework.SoundSystem
                 SoundPlayer p = active[i];
                 if (p != null && p.CurrentSound == id)
                 {
-                    _pool.Release(p);
+                    ReleaseAndEndDuckIfNeeded(p);
                 }
             }
         }
 
         public void StopAllOneShots()
         {
-            _pool.StopAll();
+            CancelAllPendingOneShotLoads();
+            ReleaseAllActive();
         }
 
         /// <summary>현재 재생 중인 모든 것을 정지합니다: BGM과 활성 중인 모든 원샷.</summary>
         public void StopAll()
         {
             StopBgm();
-            StopAllOneShots();
+            CancelAllPendingOneShotLoads();
+            ReleaseAllActive();
+        }
+
+        // ReleaseAllActive는 _pool.Active만 훑기 때문에, 아직 클립 로딩 중이라 거기 안
+        // 잡히는 원샷 요청은 StopAllOneShots/StopAll을 불러도 그대로 살아남아 로드가
+        // 끝나는 대로 재생돼버렸습니다. StopSound(id)가 쓰는 것과 동일한 세대 토큰
+        // 메커니즘을, 지금 로딩 중인 모든 id에 대해 한 번에 적용합니다.
+        private void CancelAllPendingOneShotLoads()
+        {
+            if (_pendingOneShotCounts.Count == 0)
+            {
+                return;
+            }
+
+            List<ESound> pendingIds = new List<ESound>(_pendingOneShotCounts.Keys);
+            for (int i = 0; i < pendingIds.Count; i++)
+            {
+                ESound id = pendingIds[i];
+                _oneShotStopTokens[id] = (_oneShotStopTokens.TryGetValue(id, out int t) ? t : 0) + 1;
+            }
+        }
+
+        // _pool.Release/_pool.StopAll을 직접 부르면 자연 종료 시(Tick -> OnOneShotReturned)와
+        // 달리 덕킹 종료 훅이 안 불려서, Voice 사운드를 자연 종료 전에 정지시키면
+        // _voiceActiveCount가 영원히 안 줄어들어 BGM이 계속 덕킹된 채로 남을 수 있었습니다.
+        // 여기서 직접 정지시키는 경로 전부 이 헬퍼를 거치도록 통일합니다.
+        private void ReleaseAndEndDuckIfNeeded(SoundPlayer p)
+        {
+            bool wasDuckingVoice = _settings.DuckBgmOnVoice && p.CurrentChannel == ESoundChannel.Voice;
+            _pool.Release(p);
+
+            if (wasDuckingVoice)
+            {
+                EndDuck();
+            }
+        }
+
+        private void ReleaseAllActive()
+        {
+            IReadOnlyList<SoundPlayer> active = _pool.Active;
+            for (int i = active.Count - 1; i >= 0; i--)
+            {
+                SoundPlayer p = active[i];
+                if (p != null)
+                {
+                    ReleaseAndEndDuckIfNeeded(p);
+                }
+            }
         }
 
         // ---- 볼륨 ----
@@ -440,6 +545,13 @@ namespace GameFramework.SoundSystem
 
         private void SaveVolumeSettings()
         {
+            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 SaveManager.Instance가
+            // 이미 null일 수 있습니다.
+            if (SaveManager.Instance == null)
+            {
+                return;
+            }
+
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(SoundSettingsKey);
             SaveManager.Instance.Save(key, _volumeSettings);
             SaveManager.Instance.Flush();
@@ -498,11 +610,21 @@ namespace GameFramework.SoundSystem
             }
         }
 
-        private static async Awaitable FadeVolume(AudioSource source, float from, float to, float duration)
+        // myToken은 이 페이드를 시작한 PlayBgm 호출의 토큰입니다. 매 프레임 _bgmPlayToken과
+        // 비교해서, 그 사이 더 최신 PlayBgm 호출이 시작됐으면(토큰이 바뀌었으면) 즉시
+        // 멈춥니다 - 안 그러면 아직 진행 중인 이전 페이드와 방금 시작된 새 페이드가 같은
+        // AudioSource.volume을 매 프레임 동시에 덮어쓰는 경쟁이 생깁니다. await 하나가
+        // 끝난 뒤에만 토큰을 확인하는 것으로는 부족합니다 - 그 await 자체가 여러 프레임에
+        // 걸쳐 진행되는 동안 다른 호출이 끼어들 수 있기 때문에, 루프 안에서 매 프레임 확인합니다.
+        private async Awaitable FadeVolume(AudioSource source, float from, float to, float duration, int myToken)
         {
             if (duration <= 0f)
             {
-                source.volume = to;
+                if (myToken == _bgmPlayToken)
+                {
+                    source.volume = to;
+                }
+
                 return;
             }
 
@@ -511,12 +633,20 @@ namespace GameFramework.SoundSystem
 
             while (time < duration)
             {
+                if (myToken != _bgmPlayToken)
+                {
+                    return;
+                }
+
                 time += Time.unscaledDeltaTime;
                 source.volume = Mathf.Lerp(from, to, time / duration);
                 await Awaitable.NextFrameAsync();
             }
 
-            source.volume = to;
+            if (myToken == _bgmPlayToken)
+            {
+                source.volume = to;
+            }
         }
 
         private async Awaitable<AudioClip> LoadClip(string fileName)
@@ -550,7 +680,7 @@ namespace GameFramework.SoundSystem
                 _pendingClipLoads.Remove(fileName);
             }
 
-            if (clip != null)
+            if (clip != null && !_isShuttingDown)
             {
                 // handle을 들고 있지 않으면 Addressables 참조 카운트를 절대 낮출 수 없어서,
                 // 로드한 클립마다 세션 내내 번들이 고정(pin)된 채로 남습니다. 클립 캐시
@@ -562,6 +692,9 @@ namespace GameFramework.SoundSystem
             }
             else
             {
+                // OnApplicationQuit이 이미 지나간 뒤에 완료된 로드라면(clip이 있어도)
+                // 캐시에 다시 채워 넣지 않고 바로 Release합니다 - 안 그러면 아무도 이
+                // handle을 정리해줄 기회가 없어 참조 카운트가 영구히 샙니다.
                 Addressables.Release(handle);
             }
 
@@ -571,6 +704,8 @@ namespace GameFramework.SoundSystem
         protected override void OnApplicationQuit()
         {
             base.OnApplicationQuit();
+
+            _isShuttingDown = true;
 
             foreach (AsyncOperationHandle<AudioClip> handle in _clipHandles.Values)
             {

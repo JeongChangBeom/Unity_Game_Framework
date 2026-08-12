@@ -66,12 +66,22 @@ namespace GameFramework.Pooling
         {
             GameObject go = null;
 
-            if (_inactive.Count > 0)
+            // 비활성 대기 중인 인스턴스가 Despawn을 거치지 않고 외부에서 파괴된 경우
+            // (드물지만 NotifyInstanceDestroyed가 Queue 자체는 못 건드리므로 발생 가능),
+            // Dequeue 결과가 이미 파괴된(Unity의 fake-null) 참조일 수 있습니다. 유효한
+            // 인스턴스를 찾을 때까지 건너뜁니다.
+            while (_inactive.Count > 0 && go == null)
             {
-                go = _inactive.Dequeue();
-                _inactiveSet.Remove(go);
+                GameObject candidate = _inactive.Dequeue();
+                _inactiveSet.Remove(candidate);
+
+                if (candidate != null)
+                {
+                    go = candidate;
+                }
             }
-            else
+
+            if (go == null)
             {
                 if (_autoExpand == true && CanCreateMore() == true)
                 {
@@ -88,7 +98,11 @@ namespace GameFramework.Pooling
 
             // parent가 없으면 -> 씬 루트로 배치합니다. 풀링된(비활성) 인스턴스는 어차피
             // 항상 _root 아래에 있으므로, 이건 활성 인스턴스에만 영향을 줍니다.
-            t.SetParent(parent, false);
+            // parent가 이미 파괴된(Unity의 fake-null) Transform 참조라면 SetParent에
+            // 그대로 넘겼을 때 MissingReferenceException이 날 수 있으므로, Unity의
+            // == 연산자로 파괴 여부까지 확인한 뒤 진짜 null로 정규화해서 넘깁니다.
+            Transform safeParent = parent != null ? parent : null;
+            t.SetParent(safeParent, false);
 
             t.position = position;
             t.rotation = rotation;
@@ -108,11 +122,35 @@ namespace GameFramework.Pooling
                 return;
             }
 
+            // IPoolable 목록은 Instantiate 시점에 한 번만 캐싱되는데, 활성 상태로 있는 동안
+            // 자기 자신의 OnSpawn 등에서 동적으로 자식을 추가하는 프리팹(예: 절차적으로
+            // 이펙트를 붙이는 경우)이 있으면 그 자식의 IPoolable이 영원히 안 불립니다.
+            // Despawn될 때마다(=다음 재사용 전에) 다시 스캔해서 최신 상태로 갱신합니다.
+            if (_pooledByInstance.TryGetValue(go, out PooledObject refreshTarget))
+            {
+                refreshTarget.RefreshPoolables();
+            }
+
             InvokeOnDespawned(go);
 
             SetInactive(go);
             _inactive.Enqueue(go);
             _inactiveSet.Add(go);
+        }
+
+        /// <summary>Despawn을 거치지 않고(씬 언로드에 딸려가거나, 직접 Destroy() 호출 등)
+        /// 인스턴스가 파괴됐을 때 PooledObject.OnDestroy가 호출합니다. 이걸 안 하면
+        /// _totalCreated가 영원히 안 줄어들어서, maxCount에 도달한 풀이 실제로는
+        /// 살아있는 인스턴스가 없는데도 영구히 Spawn을 거부하게 됩니다.</summary>
+        public void NotifyInstanceDestroyed(GameObject go)
+        {
+            _pooledByInstance.Remove(go);
+            _inactiveSet.Remove(go);
+
+            if (_totalCreated > 0)
+            {
+                _totalCreated--;
+            }
         }
 
         private GameObject CreateNew(PoolManager owner)

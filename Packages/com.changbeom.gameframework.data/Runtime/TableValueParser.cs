@@ -16,47 +16,75 @@ namespace GameFramework.DataParsing
     {
         private static readonly char[] ArrayDelimiter = { ',' };
 
-        public static int ParseInt(string raw, int defaultValue)
+        // context는 하위 호환을 위해 선택 인자입니다 - 이미 생성되어 있는(재생성 전)
+        // 테이블 스크립트는 이 인자 없이 예전 시그니처로 호출하므로, 기본값 null을 받아도
+        // 컴파일이 깨지지 않습니다. 다음에 시트를 재생성하면 TableClassGenerator가
+        // context까지 채워서 호출하게 됩니다.
+        public static int ParseInt(string raw, int defaultValue, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
                 return defaultValue;
             }
 
-            return int.TryParse(raw, out int v) ? v : defaultValue;
+            if (int.TryParse(raw, out int v))
+            {
+                return v;
+            }
+
+            LogParseFailure("int", raw, context);
+            return defaultValue;
         }
 
-        public static long ParseLong(string raw, long defaultValue)
+        public static long ParseLong(string raw, long defaultValue, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
                 return defaultValue;
             }
 
-            return long.TryParse(raw, out long v) ? v : defaultValue;
+            if (long.TryParse(raw, out long v))
+            {
+                return v;
+            }
+
+            LogParseFailure("long", raw, context);
+            return defaultValue;
         }
 
-        public static float ParseFloat(string raw, float defaultValue)
+        public static float ParseFloat(string raw, float defaultValue, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
                 return defaultValue;
             }
 
-            return float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float v) ? v : defaultValue;
+            if (float.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out float v))
+            {
+                return v;
+            }
+
+            LogParseFailure("float", raw, context);
+            return defaultValue;
         }
 
-        public static double ParseDouble(string raw, double defaultValue)
+        public static double ParseDouble(string raw, double defaultValue, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
                 return defaultValue;
             }
 
-            return double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double v) ? v : defaultValue;
+            if (double.TryParse(raw, NumberStyles.Float, CultureInfo.InvariantCulture, out double v))
+            {
+                return v;
+            }
+
+            LogParseFailure("double", raw, context);
+            return defaultValue;
         }
 
-        public static bool ParseBool(string raw, bool defaultValue)
+        public static bool ParseBool(string raw, bool defaultValue, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
@@ -75,10 +103,26 @@ namespace GameFramework.DataParsing
                 return false;
             }
 
+            LogParseFailure("bool", raw, context);
             return defaultValue;
         }
 
-        public static int[] ParseIntArray(string raw)
+        // ParseEnum과 달리 기본 Parse* 메서드들은 셀 값이 비어 있는 것과 형식이 잘못된
+        // 것을 구분하지 않고 defaultValue로 조용히 넘어갔었습니다. 시트 오타(예: 숫자
+        // 칸에 문자열 실수 입력)를 놓치지 않도록 ParseEnum과 동일하게 ERROR로 남깁니다.
+        private static void LogParseFailure(string typeName, string raw, string context)
+        {
+            if (string.IsNullOrEmpty(context))
+            {
+                Debug.LogError($"[Table] {typeName} 파싱 실패: value=\"{raw}\". 시트 값의 오타 여부를 확인하세요.");
+            }
+            else
+            {
+                Debug.LogError($"[Table] {typeName} 파싱 실패 ({context}): value=\"{raw}\". 시트 값의 오타 여부를 확인하세요.");
+            }
+        }
+
+        public static int[] ParseIntArray(string raw, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
@@ -90,13 +134,13 @@ namespace GameFramework.DataParsing
 
             for (int i = 0; i < parts.Length; i++)
             {
-                result[i] = ParseInt(parts[i].Trim(), 0);
+                result[i] = ParseInt(parts[i].Trim(), 0, ArrayElementContext(context, i));
             }
 
             return result;
         }
 
-        public static long[] ParseLongArray(string raw)
+        public static long[] ParseLongArray(string raw, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
@@ -108,13 +152,13 @@ namespace GameFramework.DataParsing
 
             for (int i = 0; i < parts.Length; i++)
             {
-                result[i] = ParseLong(parts[i].Trim(), 0L);
+                result[i] = ParseLong(parts[i].Trim(), 0L, ArrayElementContext(context, i));
             }
 
             return result;
         }
 
-        public static float[] ParseFloatArray(string raw)
+        public static float[] ParseFloatArray(string raw, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
@@ -126,13 +170,13 @@ namespace GameFramework.DataParsing
 
             for (int i = 0; i < parts.Length; i++)
             {
-                result[i] = ParseFloat(parts[i].Trim(), 0f);
+                result[i] = ParseFloat(parts[i].Trim(), 0f, ArrayElementContext(context, i));
             }
 
             return result;
         }
 
-        public static double[] ParseDoubleArray(string raw)
+        public static double[] ParseDoubleArray(string raw, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
@@ -144,13 +188,13 @@ namespace GameFramework.DataParsing
 
             for (int i = 0; i < parts.Length; i++)
             {
-                result[i] = ParseDouble(parts[i].Trim(), 0.0);
+                result[i] = ParseDouble(parts[i].Trim(), 0.0, ArrayElementContext(context, i));
             }
 
             return result;
         }
 
-        public static bool[] ParseBoolArray(string raw)
+        public static bool[] ParseBoolArray(string raw, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
             {
@@ -162,10 +206,15 @@ namespace GameFramework.DataParsing
 
             for (int i = 0; i < parts.Length; i++)
             {
-                result[i] = ParseBool(parts[i].Trim(), false);
+                result[i] = ParseBool(parts[i].Trim(), false, ArrayElementContext(context, i));
             }
 
             return result;
+        }
+
+        private static string ArrayElementContext(string context, int index)
+        {
+            return string.IsNullOrEmpty(context) ? null : context + "[" + index + "]";
         }
 
         public static string[] ParseStringArray(string raw)

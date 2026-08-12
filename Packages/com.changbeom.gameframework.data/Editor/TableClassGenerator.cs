@@ -283,6 +283,11 @@ namespace GameFramework.DataParsing.Editor
                 return;
             }
 
+            // ParseEnum 호출부와 동일한 방식으로, 생성되는 코드 안에 "클래스.필드 row=" + (r + 1)
+            // 형태의 C# 문자열 연결식을 그대로 심어 넣습니다. contextLiteral 자체가 이미
+            // 여는/닫는 큰따옴표를 포함한 완성된 식이므로 별도로 감쌀 필요가 없습니다.
+            string contextLiteral = "\"" + className + "." + col.fieldName + " row=\" + (r + 1)";
+
             if (col.isArray)
             {
                 string arrayMethod = col.type switch
@@ -295,7 +300,15 @@ namespace GameFramework.DataParsing.Editor
                     _ => "ParseStringArray",
                 };
 
-                sb.AppendLine("                " + field + " = TableValueParser." + arrayMethod + "(raw);");
+                if (col.type == EDataTableColumnType.String)
+                {
+                    sb.AppendLine("                " + field + " = TableValueParser." + arrayMethod + "(raw);");
+                }
+                else
+                {
+                    sb.AppendLine("                " + field + " = TableValueParser." + arrayMethod + "(raw, " + contextLiteral + ");");
+                }
+
                 return;
             }
 
@@ -324,7 +337,7 @@ namespace GameFramework.DataParsing.Editor
                 _ => "0",
             };
 
-            sb.AppendLine("                " + field + " = TableValueParser." + scalarMethod + "(raw, " + defaultLiteral + ");");
+            sb.AppendLine("                " + field + " = TableValueParser." + scalarMethod + "(raw, " + defaultLiteral + ", " + contextLiteral + ");");
         }
 
         /// <summary>

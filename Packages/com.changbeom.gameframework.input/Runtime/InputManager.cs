@@ -109,7 +109,7 @@ namespace GameFramework.InputSystem
 
         private void HandleDeviceChange(InputDevice device, InputDeviceChange change)
         {
-            OnDeviceChange?.Invoke(device, change);
+            SafeInvoke(OnDeviceChange, device, change, nameof(OnDeviceChange));
         }
 
         /// <summary>지정한 액션의 바인딩 하나를 인터랙티브하게 리바인딩합니다. 이미 진행 중인
@@ -140,28 +140,102 @@ namespace GameFramework.InputSystem
 
             operation.OnComplete(op =>
             {
-                action.Enable();
-                SaveBindings();
-                string effectivePath = action.bindings[bindingIndex].effectivePath;
-                _activeRebind = null;
-                OnRebindCompleted?.Invoke(action, bindingIndex);
-                onComplete?.Invoke(effectivePath);
-                op.Dispose();
+                try
+                {
+                    RestoreEnabledStateAfterRebind(action);
+                    _activeRebind = null;
+                    SaveBindings();
+                    string effectivePath = action.bindings[bindingIndex].effectivePath;
+                    SafeInvoke(OnRebindCompleted, action, bindingIndex, nameof(OnRebindCompleted));
+
+                    try
+                    {
+                        onComplete?.Invoke(effectivePath);
+                    }
+                    catch (Exception e)
+                    {
+                        Debug.LogError($"[InputManager] StartRebind의 onComplete 콜백에서 예외가 발생했습니다: {e}");
+                    }
+                }
+                finally
+                {
+                    // op.Dispose()를 반드시 실행하기 위해 finally에 둡니다 - 위 단계 중
+                    // 하나라도 예외를 던지면 Dispose가 스킵되어 RebindingOperation이 새는
+                    // 문제가 있었습니다. 또한 자기 자신의 OnComplete 콜백 안에서 바로
+                    // Dispose하면 일부 Input System 버전에서 ObjectDisposedException이
+                    // 보고된 바 있어(콜백 스택 안에서 자신을 정리하는 형태라서), 콜백
+                    // 스택을 완전히 벗어난 다음 프레임으로 미룹니다.
+                    _ = DisposeRebindOperationNextFrame(op);
+                }
             });
 
             operation.OnCancel(op =>
             {
-                action.Enable();
-                _activeRebind = null;
-                OnRebindCanceled?.Invoke(action, bindingIndex);
-                op.Dispose();
+                try
+                {
+                    RestoreEnabledStateAfterRebind(action);
+                    _activeRebind = null;
+                    SafeInvoke(OnRebindCanceled, action, bindingIndex, nameof(OnRebindCanceled));
+                }
+                finally
+                {
+                    _ = DisposeRebindOperationNextFrame(op);
+                }
             });
 
             _activeRebind = operation;
-            OnRebindStarted?.Invoke(action, bindingIndex);
             operation.Start();
+            SafeInvoke(OnRebindStarted, action, bindingIndex, nameof(OnRebindStarted));
 
             return operation;
+        }
+
+        // Gameplay 맵 소속 액션은, 리바인딩이 끝난 시점에도 여전히 팝업이 떠 있어
+        // 게임플레이 입력이 막힌 상태라면 무조건 다시 켜면 안 됩니다 - Update()가
+        // 관리하는 블로킹 상태와 어긋나서, 팝업이 떠 있는 동안에도 방금 리바인딩한
+        // 액션 하나만 입력을 받아버리는 구멍이 있었습니다. UI 맵 소속 액션(리바인딩
+        // 화면 자체를 여닫는 액션 등)은 항상 켜둔다는 클래스 설계를 그대로 따르므로
+        // 이 검사에서 제외합니다.
+        private void RestoreEnabledStateAfterRebind(InputAction action)
+        {
+            bool isGameplayAction = action.actionMap == _actions.Gameplay.Get();
+
+            if (isGameplayAction && UIManager.Instance != null && UIManager.Instance.IsBlockingInput)
+            {
+                return;
+            }
+
+            action.Enable();
+        }
+
+        private async Awaitable DisposeRebindOperationNextFrame(InputActionRebindingExtensions.RebindingOperation op)
+        {
+            await Awaitable.NextFrameAsync();
+            op.Dispose();
+        }
+
+        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나가 예외를 던져도 나머지
+        // 구독자에게는 정상적으로 전달되도록 각각 개별 try/catch로 격리합니다.
+        private static void SafeInvoke<T1, T2>(Action<T1, T2> action, T1 arg1, T2 arg2, string eventName)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            Delegate[] handlers = action.GetInvocationList();
+
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<T1, T2>)handlers[i]).Invoke(arg1, arg2);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[InputManager] {eventName} 구독자에서 예외가 발생했습니다: {e}");
+                }
+            }
         }
 
         /// <summary>진행 중인 리바인딩이 있으면 취소합니다. 없으면 아무 일도 하지 않습니다.</summary>
@@ -189,6 +263,13 @@ namespace GameFramework.InputSystem
 
         public void SaveBindings()
         {
+            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 SaveManager.Instance가
+            // 이미 null일 수 있습니다 (예: 리바인딩 완료 콜백이 SaveManager 종료 이후에 옴).
+            if (SaveManager.Instance == null)
+            {
+                return;
+            }
+
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(InputSettingsKey);
             InputBindingOverridesData data = new InputBindingOverridesData { Json = _actions.SaveBindingOverridesAsJson() };
             SaveManager.Instance.Save(key, data);

@@ -56,6 +56,22 @@ namespace GameFramework.Graphics
 
         private GraphicsSaveData LoadOrCreateData()
         {
+            // GraphicsManager는 BootPriority 없이 지연 초기화되므로, 이 첫 접근이 다른
+            // 매니저의 종료 처리 도중 처음 일어나면 SaveManager는 이미 종료되어
+            // Instance가 null일 수 있습니다.
+            if (SaveManager.Instance == null)
+            {
+                return new GraphicsSaveData
+                {
+                    QualityLevel = _settings.DefaultQualityLevel,
+                    TargetFrameRate = _settings.DefaultTargetFrameRate,
+                    IsFullscreen = _settings.DefaultFullscreen,
+                    VSyncEnabled = _settings.DefaultVSync,
+                    ResolutionWidth = Screen.currentResolution.width,
+                    ResolutionHeight = Screen.currentResolution.height,
+                };
+            }
+
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(GraphicsKey);
 
             return SaveManager.Instance.LoadOrCreate(key, () => new GraphicsSaveData
@@ -76,6 +92,9 @@ namespace GameFramework.Graphics
             // Unity가 알아서 클램프해줄 수도 있지만, 우리가 노출하는 QualityLevel
             // getter가 실제 적용된 값과 어긋나지 않도록 여기서 직접 보정합니다.
             _data.QualityLevel = Mathf.Clamp(_data.QualityLevel, 0, QualitySettings.names.Length - 1);
+            _data.TargetFrameRate = ClampTargetFrameRate(_data.TargetFrameRate);
+            _data.ResolutionWidth = Mathf.Max(1, _data.ResolutionWidth);
+            _data.ResolutionHeight = Mathf.Max(1, _data.ResolutionHeight);
 
             QualitySettings.SetQualityLevel(_data.QualityLevel, true);
             Application.targetFrameRate = _data.TargetFrameRate;
@@ -87,6 +106,21 @@ namespace GameFramework.Graphics
             {
                 Screen.SetResolution(_data.ResolutionWidth, _data.ResolutionHeight, _data.IsFullscreen);
             }
+        }
+
+        // Application.targetFrameRate는 -1(플랫폼 기본/무제한)이 의도된 "제한 없음"
+        // 값이고, 0은 아예 다른 의미로 프레임레이트를 심하게 제한해버리는 잘 알려진
+        // Unity 함정입니다. 예전 버전 저장 데이터에 이 필드가 없거나(기본값 0) 손상된
+        // 값이 들어있으면 그대로 적용했을 때 부팅부터 심각한 프레임 드랍이 생기므로,
+        // -1(무제한)과 양수만 그대로 두고 나머지(0 포함)는 -1로 보정합니다.
+        private static int ClampTargetFrameRate(int fps)
+        {
+            if (fps == -1 || fps > 0)
+            {
+                return fps;
+            }
+
+            return -1;
         }
 
         public void SetQualityLevel(int level)
@@ -102,15 +136,17 @@ namespace GameFramework.Graphics
             QualitySettings.vSyncCount = _data.VSyncEnabled ? 1 : 0;
 
             Save();
-            OnQualityLevelChanged?.Invoke(level);
+            SafeInvoke(OnQualityLevelChanged, level, nameof(OnQualityLevelChanged));
         }
 
         public void SetTargetFrameRate(int fps)
         {
+            fps = ClampTargetFrameRate(fps);
+
             _data.TargetFrameRate = fps;
             Application.targetFrameRate = fps;
             Save();
-            OnTargetFrameRateChanged?.Invoke(fps);
+            SafeInvoke(OnTargetFrameRateChanged, fps, nameof(OnTargetFrameRateChanged));
         }
 
         /// <summary>PC 전용입니다. 모바일에서는 항상 전체화면이라 호출해도 효과가 없습니다.</summary>
@@ -119,7 +155,7 @@ namespace GameFramework.Graphics
             _data.IsFullscreen = fullscreen;
             Screen.fullScreen = fullscreen;
             Save();
-            OnFullscreenChanged?.Invoke(fullscreen);
+            SafeInvoke(OnFullscreenChanged, fullscreen, nameof(OnFullscreenChanged));
         }
 
         /// <summary>PC 전용입니다. 모바일에서는 효과가 없습니다.</summary>
@@ -128,24 +164,79 @@ namespace GameFramework.Graphics
             _data.VSyncEnabled = enabled;
             QualitySettings.vSyncCount = enabled ? 1 : 0;
             Save();
-            OnVSyncChanged?.Invoke(enabled);
+            SafeInvoke(OnVSyncChanged, enabled, nameof(OnVSyncChanged));
         }
 
         /// <summary>PC 전용입니다. 모바일에서는 해상도가 고정이라 효과가 없습니다.</summary>
         public void SetResolution(int width, int height)
         {
+            width = Mathf.Max(1, width);
+            height = Mathf.Max(1, height);
+
             _data.ResolutionWidth = width;
             _data.ResolutionHeight = height;
             Screen.SetResolution(width, height, _data.IsFullscreen);
             Save();
-            OnResolutionChanged?.Invoke(width, height);
+            SafeInvoke(OnResolutionChanged, width, height, nameof(OnResolutionChanged));
         }
 
         private void Save()
         {
+            // LoadOrCreateData와 동일한 이유의 방어입니다.
+            if (SaveManager.Instance == null)
+            {
+                return;
+            }
+
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(GraphicsKey);
             SaveManager.Instance.Save(key, _data);
             SaveManager.Instance.Flush();
+        }
+
+        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나가 예외를 던져도 나머지
+        // 구독자에게는 정상적으로 전달되도록 각각 개별 try/catch로 격리합니다.
+        private static void SafeInvoke<T>(Action<T> action, T arg, string eventName)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            Delegate[] handlers = action.GetInvocationList();
+
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<T>)handlers[i]).Invoke(arg);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[GraphicsManager] {eventName} 구독자에서 예외가 발생했습니다: {e}");
+                }
+            }
+        }
+
+        private static void SafeInvoke<T1, T2>(Action<T1, T2> action, T1 arg1, T2 arg2, string eventName)
+        {
+            if (action == null)
+            {
+                return;
+            }
+
+            Delegate[] handlers = action.GetInvocationList();
+
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<T1, T2>)handlers[i]).Invoke(arg1, arg2);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[GraphicsManager] {eventName} 구독자에서 예외가 발생했습니다: {e}");
+                }
+            }
         }
 
         [Serializable]

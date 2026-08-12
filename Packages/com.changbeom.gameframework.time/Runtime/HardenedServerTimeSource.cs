@@ -24,6 +24,16 @@ namespace GameFramework.TimeSystem
         private double _monoAtSyncSeconds;
         private long _deviceUtcAtSyncTicks;
 
+        // 지금까지 관측한 모노토닉 클럭의 최댓값과, 그걸 관측한 시점의 기기 벽시계입니다.
+        // 재부팅 감지에 씁니다 - 아래 CheckAndUpdateRebootGuard 참고.
+        private double _maxObservedMonoSeconds;
+        private long _maxObservedWallClockUtcTicks;
+
+        // 재부팅 감지에서 실제 재부팅과 정상적인 시계 오차(NTP 보정, 절전 관련 미세한
+        // 클럭 오차 등)를 구분하기 위한 여유입니다. 너무 작으면 오탐이 나고, 너무 크면
+        // 감지가 둔감해집니다.
+        private const double RebootDetectionSlackSeconds = 300.0;
+
         public HardenedServerTimeSource(TimeStore store, IMonotonicClock monotonicClock, int trustWindowSeconds)
         {
             _store = store;
@@ -33,6 +43,64 @@ namespace GameFramework.TimeSystem
             _serverUtcAtSyncTicks = store.GetLong(TimeKeys.ServerSyncServerUtcTicks, 0);
             _monoAtSyncSeconds = ReadDouble(store, TimeKeys.ServerSyncMonotonicSeconds, 0.0);
             _deviceUtcAtSyncTicks = store.GetLong(TimeKeys.ServerSyncDeviceUtcTicks, 0);
+            _maxObservedMonoSeconds = ReadDouble(store, TimeKeys.ServerSyncMaxObservedMonotonicSeconds, 0.0);
+            _maxObservedWallClockUtcTicks = store.GetLong(TimeKeys.ServerSyncMaxObservedWallClockUtcTicks, 0);
+        }
+
+        // 모노토닉 클럭이 이전에 한 번이라도 관측했던 최댓값보다 작아지면, 그건 재부팅이
+        // 일어났다는 확실한 증거입니다(Stopwatch 기반 클럭은 재부팅 전까지는 절대
+        // 거꾸로 가지 않으므로). 하지만 이 비교만으로는 부족합니다: 재부팅 후 기기
+        // 가동 시간이 다시 그 예전 최댓값을 자연스럽게 넘어서는 순간부터는(예: 재부팅
+        // 직후 앱을 안 열고 기기를 오래 켜둔 뒤 나중에 여는 경우) 신뢰가 잘못 되살아납니다
+        // -- 최댓값 자체는 "넘어섰다"는 사실만 볼 뿐 그 사이에 재부팅이 있었는지는 모르기
+        // 때문입니다.
+        //
+        // 그래서 마지막으로 관측했을 때의 벽시계도 같이 저장해두고, "재부팅이 없었다면
+        // 모노토닉 클럭도 그때 이후 흐른 벽시계 시간만큼 늘어나 있어야 한다"는 기댓값과
+        // 비교합니다. 재부팅이 있었다면 새 세션의 모노토닉 클럭은 실제 재부팅 이후
+        // 가동 시간일 뿐이라, 마지막 관측 시점부터 지금까지의 전체 경과 시간(기댓값)보다
+        // 항상 작을 수밖에 없습니다(재부팅이 마지막 관측 이후에 일어났으므로). 벽시계
+        // 자체는 조작 가능하지만, 이 검사가 막으려는 것은 "정상적으로 시간이 흘러
+        // 최댓값을 넘어서는" 케이스이지 벽시계 조작이 아니므로 문제되지 않습니다 -
+        // 벽시계를 조작해 기댓값을 속이는 시나리오는 원래 있던 단순 최댓값 비교로도
+        // 못 막던 것과 동일한 수준입니다.
+        private bool CheckAndUpdateRebootGuard()
+        {
+            double nowMono = _mono.Seconds;
+            long nowWallTicks = TimeUtil.ToUtcTicks(DateTimeOffset.UtcNow);
+
+            if (nowMono < _maxObservedMonoSeconds)
+            {
+                Clear();
+                return false;
+            }
+
+            if (_maxObservedWallClockUtcTicks > 0)
+            {
+                double elapsedWallSeconds = (nowWallTicks - _maxObservedWallClockUtcTicks) / (double)TimeSpan.TicksPerSecond;
+
+                if (elapsedWallSeconds > 0.0)
+                {
+                    double expectedMinMono = _maxObservedMonoSeconds + elapsedWallSeconds - RebootDetectionSlackSeconds;
+
+                    if (nowMono < expectedMinMono)
+                    {
+                        Clear();
+                        return false;
+                    }
+                }
+            }
+
+            if (nowMono > _maxObservedMonoSeconds)
+            {
+                _maxObservedMonoSeconds = nowMono;
+                WriteDouble(_store, TimeKeys.ServerSyncMaxObservedMonotonicSeconds, _maxObservedMonoSeconds);
+            }
+
+            _maxObservedWallClockUtcTicks = nowWallTicks;
+            _store.SetLong(TimeKeys.ServerSyncMaxObservedWallClockUtcTicks, _maxObservedWallClockUtcTicks);
+
+            return true;
         }
 
         public DateTimeOffset UtcNow
@@ -68,6 +136,11 @@ namespace GameFramework.TimeSystem
         {
             get
             {
+                if (!CheckAndUpdateRebootGuard())
+                {
+                    return false;
+                }
+
                 if (_serverUtcAtSyncTicks <= 0)
                 {
                     return false;

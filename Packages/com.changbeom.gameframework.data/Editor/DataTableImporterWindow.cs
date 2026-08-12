@@ -25,6 +25,11 @@ namespace GameFramework.DataParsing.Editor
             public string resourcesPath;
 
             public bool assetExists;
+
+            /// <summary>다른 탭과 sanitize 후 className이 겹치는지 여부입니다 (예: "Item Table"과
+            /// "ItemTable" 둘 다 -> "ItemTable"). 겹친 채로 생성하면 나중 탭이 먼저 만든 탭의
+            /// 스크립트/에셋을 조용히 덮어쓰므로, 생성 단계에서 이 값을 보고 걸러냅니다.</summary>
+            public bool duplicateClassName;
         }
 
         [Serializable]
@@ -168,6 +173,11 @@ namespace GameFramework.DataParsing.Editor
                 EditorGUILayout.LabelField("Asset: " + t.assetPath);
                 EditorGUILayout.LabelField("ResPath: " + t.resourcesPath);
 
+                if (t.duplicateClassName)
+                {
+                    EditorGUILayout.HelpBox("다른 탭과 className이 겹칩니다. 시트 탭 이름을 바꾸기 전까지 생성에서 제외됩니다.", MessageType.Warning);
+                }
+
                 EditorGUILayout.EndVertical();
             }
 
@@ -304,14 +314,62 @@ namespace GameFramework.DataParsing.Editor
                 _tabs.Add(item);
             }
 
+            MarkDuplicateClassNames(_tabs);
+
+            int duplicateCount = 0;
+            for (int i = 0; i < _tabs.Count; i++)
+            {
+                if (_tabs[i].duplicateClassName)
+                {
+                    duplicateCount++;
+                }
+            }
+
             _status = "시트 로드 완료: " + _tabs.Count + "개";
+            if (duplicateCount > 0)
+            {
+                _status += " (className이 겹치는 탭 " + duplicateCount + "개 - 아래 목록에서 확인, 생성 시 제외됩니다)";
+            }
+
             SavePrefs();
             Repaint();
+        }
+
+        // 시트 탭 제목이 서로 달라도(예: "Item Table" vs "Item-Table") ToSafeClassName을
+        // 거치면 같은 className으로 sanitize될 수 있습니다. 이 상태로 둘 다 생성하면
+        // 나중 탭이 먼저 만든 탭의 .cs/.asset을 파일명이 같다는 이유로 조용히 덮어씁니다.
+        private static void MarkDuplicateClassNames(List<SheetTabInfo> tabs)
+        {
+            Dictionary<string, int> countByClassName = new Dictionary<string, int>();
+
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                string name = tabs[i].className;
+                countByClassName[name] = (countByClassName.TryGetValue(name, out int c) ? c : 0) + 1;
+            }
+
+            for (int i = 0; i < tabs.Count; i++)
+            {
+                bool isDuplicate = countByClassName[tabs[i].className] > 1;
+                tabs[i].duplicateClassName = isDuplicate;
+
+                if (isDuplicate)
+                {
+                    Debug.LogError("[DataTableImporter] 시트 탭 \"" + tabs[i].title + "\"이(가) 다른 탭과 같은 className(\"" + tabs[i].className + "\")으로 변환됩니다. 시트 탭 이름을 다르게 바꾸기 전까지 이 탭은 생성 대상에서 제외됩니다.");
+                }
+            }
         }
 
         private void CreateSelected()
         {
             List<SheetTabInfo> targets = GetSelected();
+
+            int skippedDuplicates = targets.RemoveAll(t => t.duplicateClassName);
+            if (skippedDuplicates > 0)
+            {
+                Debug.LogWarning("[DataTableImporter] className이 겹치는 탭 " + skippedDuplicates + "개를 생성 대상에서 제외했습니다.");
+            }
+
             if (targets.Count == 0)
             {
                 _status = "선택된 시트가 없습니다.";
@@ -493,21 +551,31 @@ namespace GameFramework.DataParsing.Editor
                         System.Reflection.BindingFlags.Public |
                         System.Reflection.BindingFlags.Instance);
 
-                    HashSet<string> fieldSet = new HashSet<string>();
+                    // RowKey를 제외한 나머지 필드를 선언 순서 그대로 사용합니다. .NET 명세는
+                    // GetFields()의 반환 순서를 보장하지 않지만, 이 프레임워크가 생성하는
+                    // 클래스는 항상 TableClassGenerator.WriteTableScript가 쓴 순서 그대로
+                    // 컴파일되고 Mono/CoreCLR 둘 다 실제로는 선언 순서를 반환하므로 기댑니다.
+                    List<System.Reflection.FieldInfo> orderedFields = new List<System.Reflection.FieldInfo>();
                     for (int f = 0; f < fields.Length; f++)
                     {
-                        fieldSet.Add(fields[f].Name);
+                        if (fields[f].Name != "RowKey")
+                        {
+                            orderedFields.Add(fields[f]);
+                        }
                     }
 
-                    fieldSet.Remove("RowKey");
-
-                    bool schemaMismatch = columns.Count != fieldSet.Count;
+                    bool schemaMismatch = columns.Count != orderedFields.Count;
 
                     if (!schemaMismatch)
                     {
                         for (int c = 0; c < columns.Count; c++)
                         {
-                            if (!fieldSet.Contains(columns[c].fieldName))
+                            // 이름만 비교하면 컬럼 순서가 바뀌거나 타입이 바뀐 경우를 놓칩니다.
+                            // 이미 컴파일된 ParseFromTsv는 예전 컬럼 인덱스/타입으로 셀을
+                            // 읽으므로, 순서가 바뀌면 엉뚱한 필드에 값이 들어가고 타입이
+                            // 바뀌면 조용히 잘못 파싱됩니다. 둘 다 여기서 걸러냅니다.
+                            if (orderedFields[c].Name != columns[c].fieldName ||
+                                !ColumnTypeMatchesField(columns[c], orderedFields[c].FieldType))
                             {
                                 schemaMismatch = true;
                                 break;
@@ -550,6 +618,50 @@ namespace GameFramework.DataParsing.Editor
                 _isBusy = false;
                 SavePrefs();
                 Repaint();
+            }
+        }
+
+        // ColumnInfo가 기대하는 C# 타입과 이미 컴파일된 Data 클래스 필드의 실제 타입이
+        // 일치하는지 확인합니다 (배열 여부 포함).
+        private static bool ColumnTypeMatchesField(TableClassGenerator.ColumnInfo col, Type fieldType)
+        {
+            if (col.isArray != fieldType.IsArray)
+            {
+                return false;
+            }
+
+            Type elementType = col.isArray ? fieldType.GetElementType() : fieldType;
+            if (elementType == null)
+            {
+                return false;
+            }
+
+            switch (col.type)
+            {
+                case EDataTableColumnType.Int:
+                    return elementType == typeof(int);
+
+                case EDataTableColumnType.Long:
+                    return elementType == typeof(long);
+
+                case EDataTableColumnType.Float:
+                    return elementType == typeof(float);
+
+                case EDataTableColumnType.Double:
+                    return elementType == typeof(double);
+
+                case EDataTableColumnType.Bool:
+                    return elementType == typeof(bool);
+
+                case EDataTableColumnType.String:
+                    return elementType == typeof(string);
+
+                case EDataTableColumnType.Enum:
+                    return elementType.IsEnum && elementType.FullName != null &&
+                           elementType.FullName.Replace('+', '.') == col.enumTypeFullName;
+
+                default:
+                    return false;
             }
         }
 

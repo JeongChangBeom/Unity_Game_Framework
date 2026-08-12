@@ -345,7 +345,12 @@ namespace GameFramework.TimeSystem
 
             if (pause)
             {
-                _cheatGuard.RecordLastSeen(now);
+                // RecordLastSeen으로 기준선을 검증 없이 덮어쓰면, 기기 시계를 되돌린 뒤
+                // 곧바로 백그라운드로 보내는 것만으로 CheckBackward의 forward-only 보호를
+                // 완전히 우회해 기준선을 조작할 수 있었습니다(치트 플래그도 안 남음).
+                // Resume/재시작 시점과 똑같이 CheckBackward를 거치게 해서, 백그라운드
+                // 전환 경로도 동일하게 검증되도록 합니다.
+                _cheatGuard.CheckBackward(now, IsTrusted);
                 return;
             }
 
@@ -358,7 +363,11 @@ namespace GameFramework.TimeSystem
         protected override void OnApplicationQuit()
         {
             base.OnApplicationQuit();
-            _cheatGuard.RecordLastSeen(UtcNow);
+
+            // 위 OnApplicationPause(true)와 동일한 이유로, 종료 시점에도 검증 없는
+            // RecordLastSeen 대신 CheckBackward를 거쳐 기준선을 기록합니다 - 시계를
+            // 되돌린 뒤 종료하는 것만으로 기준선이 조용히 조작되는 것을 막습니다.
+            _cheatGuard.CheckBackward(UtcNow, IsTrusted);
         }
     }
 }

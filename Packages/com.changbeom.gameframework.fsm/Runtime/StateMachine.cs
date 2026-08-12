@@ -71,7 +71,7 @@ namespace GameFramework.FSM
 
             if (_isTransitioning)
             {
-                Debug.LogWarning($"[StateMachine] OnEnter/OnExit 도중에는 ChangeState({key})를 호출할 수 없습니다 (재진입 방지).");
+                Debug.LogWarning($"[StateMachine] OnEnter/OnExit/OnStateChanged 도중에는 ChangeState({key})를 호출할 수 없습니다 (재진입 방지).");
                 return;
             }
 
@@ -82,15 +82,53 @@ namespace GameFramework.FSM
             TStateKey previousKey = _currentKey;
 
             _isTransitioning = true;
-            _currentState?.OnExit();
-            _currentState = nextState;
-            _currentKey = key;
-            _currentState.OnEnter();
-            _isTransitioning = false;
 
-            if (hadPreviousState)
+            try
             {
-                OnStateChanged?.Invoke(previousKey, key);
+                _currentState?.OnExit();
+                _currentState = nextState;
+                _currentKey = key;
+                _currentState.OnEnter();
+
+                // OnStateChanged가 끝날 때까지도 재진입을 막습니다. 여기서 먼저 플래그를
+                // 풀어버리면, 구독자가 이벤트 핸들러 안에서 다시 ChangeState를 호출했을 때
+                // 그 중첩 호출이 곧바로 완료돼버려서, 아직 도는 중인 이 Invoke의 나머지
+                // 구독자들이 이미 낡아버린 (previousKey, key) 인자를 받게 됩니다.
+                if (hadPreviousState)
+                {
+                    InvokeStateChanged(previousKey, key);
+                }
+            }
+            finally
+            {
+                // OnEnter/OnExit/OnStateChanged 구독자 중 하나가 예외를 던져도 이 플래그가
+                // 영원히 true로 남아 상태 머신 전체가 이후 모든 ChangeState 호출을 조용히
+                // 무시해버리는(경고 로그만 남기고 복구 불가) 상황을 막기 위해 finally에서 해제합니다.
+                _isTransitioning = false;
+            }
+        }
+
+        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나가 예외를 던져도 나머지
+        // 구독자에게는 정상적으로 전달되도록 각각 개별 try/catch로 격리합니다.
+        private void InvokeStateChanged(TStateKey previousKey, TStateKey key)
+        {
+            if (OnStateChanged == null)
+            {
+                return;
+            }
+
+            Delegate[] handlers = OnStateChanged.GetInvocationList();
+
+            for (int i = 0; i < handlers.Length; i++)
+            {
+                try
+                {
+                    ((Action<TStateKey, TStateKey>)handlers[i]).Invoke(previousKey, key);
+                }
+                catch (Exception e)
+                {
+                    Debug.LogError($"[StateMachine] OnStateChanged 구독자에서 예외가 발생했습니다: {e}");
+                }
             }
         }
 

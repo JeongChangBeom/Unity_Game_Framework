@@ -60,10 +60,19 @@ namespace GameFramework.Pooling.Editor
             string code = BuildCode(ordered);
             WriteFile(OutputPath, code);
 
-            AssetDatabase.ImportAsset(OutputPath);
-            AssetDatabase.Refresh();
-
-            Debug.Log("[PoolKeyGenerator] 생성됨: " + OutputPath + " (개수: " + ordered.Count + ")");
+            // Generate()는 PoolFolderSync(AssetPostprocessor.OnPostprocessAllAssets) 안에서
+            // 호출될 수 있습니다. 그 콜백이 아직 끝나지 않은 도중에
+            // AssetDatabase.ImportAsset/Refresh를 바로 부르면, 지금 진행 중인 임포트
+            // 배치와 겹치면서 에디터가 멈출 수 있습니다 (여러 프리팹을 한꺼번에 폴더에
+            // 넣을 때 재현됨 - Localization 패키지에서 동일한 원인으로 이미 확인된
+            // 문제입니다). 그래서 파일 쓰기까지만 동기로 하고, 실제 재임포트는 지금
+            // 콜백이 완전히 끝난 다음 프레임으로 미룹니다.
+            EditorApplication.delayCall += () =>
+            {
+                AssetDatabase.ImportAsset(OutputPath);
+                AssetDatabase.Refresh();
+                Debug.Log("[PoolKeyGenerator] 생성됨: " + OutputPath + " (개수: " + ordered.Count + ")");
+            };
         }
 
         // 새로 생성할 때 이름을 알파벳순으로 정렬하면, enum은 값을 안 주면 선언 순서대로
