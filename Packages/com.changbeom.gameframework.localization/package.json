@@ -4,6 +4,10 @@
     "displayName": "Game Framework - Localization",
     "description": "Data Parsing table-driven text localization (ELocKey/ELanguage auto-generated from a sheet, reflection-based table loading like Sound). Depends on Core and Save / Load.",
     "unity": "6000.0",
+    "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.saveload": "0.1.0"
+    },
     "author": {
         "name": "ChangBeom"
     }
