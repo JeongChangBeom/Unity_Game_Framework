@@ -144,7 +144,7 @@ MyManager.Instance.DoSomething();
 
 ### 테스트 방법
 `Assets/00.Scripts/Tests/BootOrderTester.cs`를 아무 GameObject에 붙이고 Play하면:
-- `[BootPriority(-100)]`, `[BootPriority(-50)]`가 붙은 더미 매니저 2개가 씬 로드 전에 이미 자동 초기화되어 순서대로 로그에 기록되어 있는 걸 확인할 수 있습니다.
+- `[BootPriority(1)]`, `[BootPriority(2)]`가 붙은 더미 매니저 2개가 씬 로드 전에 이미 자동 초기화되어 순서대로 로그에 기록되어 있는 걸 확인할 수 있습니다.
 - attribute가 없는 매니저는 버튼을 눌러 `.Instance`를 직접 건드리기 전까지는 기록되지 않는 것도 함께 확인할 수 있습니다.
 
 </details>
@@ -291,7 +291,7 @@ Pool Settings에 Key들을 다 적은 뒤, Unity Editor에서 아래 메뉴를 �
 `Game Framework/Pooling/Generate EPoolKey From Pool Settings`
 
 * 동작: Pool Settings의 모든 `Key`를 모아 `EPoolKey.cs`를 자동 생성 (유효하지 않은 Key/중복 Key는 Console에 에러·경고를 남기고 건너뜀)
-* 생성 위치: `Packages/com.changbeom.gameframework.pooling/Runtime/EPoolKey.cs`
+* 생성 위치: `Assets/00.Scripts/GeneratedFramework/EPoolKey.cs` (패키지가 아니라 프로젝트 쪽입니다 - git URL로 설치해도 그대로 동작하도록, `PoolManager`/`UIManager`는 `string` 기반 API만 제공하고 `EPoolKey` 오버로드는 이 파일에 같이 생성되는 확장 메서드가 제공합니다)
 
 ```cs
 // PoolSettings에 Key="Orc"로 등록해둔 프리팹을 스폰. 오타는 컴파일 에러로 즉시 드러남
@@ -546,7 +546,7 @@ Data Parsing의 `Game Framework/Data Parsing/DataTable Importer`에서 Sound 탭
 1. `ESound.cs` 재생성 (`FileName` 기반)
 2. `Assets/03.Sound/`의 AudioClip을 Addressables `Sound` 그룹에 자동 등록 (address = fileName)
 
-`ESound`는 `SoundPlayer`/`SoundManager`가 직접 참조하는 프로젝트 전용 타입이라 패키지 어셈블리 내부(`Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs`)에 생성됩니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, `SoundTable`을 처음 생성하는 순간 실제 사운드 id들로 덮어써집니다.
+`ESound`는 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`Assets/00.Scripts/GeneratedFramework/ESound.cs`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `SoundManager`/`SoundPlayer` 자체는 `FileName` 문자열만 알고 `ESound`를 전혀 참조하지 않으며, `PlaySound(ESound.xxx)`처럼 강타입으로 호출할 수 있는 건 `ESound.cs`에 같이 생성되는 확장 메서드 덕분입니다. `SoundTable`을 아직 한 번도 생성하지 않았다면 이 파일 자체가 없는 상태입니다.
 
 `SoundManager`는 프로젝트가 생성한 `SoundTable` 타입을 직접 참조할 수 없기 때문에(패키지는 프로젝트를 참조할 수 없음), 부팅 시 `SoundTable`을 1회 리플렉션으로 읽어 Channel/Volume/MaxConcurrent/Loop를 자체 Dictionary로 캐싱합니다 - 별도의 데이터베이스 에셋은 없습니다.
 
@@ -569,7 +569,7 @@ Data Parsing의 `Game Framework/Data Parsing/DataTable Importer`에서 Sound 탭
 * 채널별 AudioMixerGroup (선택)
 * BGM Crossfade Seconds
 * Duck Bgm On Voice / Ducked Bgm Volume Scale / Duck Fade Seconds
-* Preload Sounds (부팅 시 미리 로드할 `ESound` 목록)
+* Preload Sounds (부팅 시 미리 로드할 사운드 `FileName` 목록 - `ESound`는 패키지 설정에서 강타입으로 참조할 수 없어 문자열로 입력합니다)
 
 ---
 
@@ -1037,7 +1037,7 @@ Build Settings에 씬을 등록한 뒤, Unity Editor에서 아래 메뉴를 누�
 `Game Framework/Scene Loading/Generate ESceneKey From Build Settings`
 
 * 동작: Build Settings에 등록된(활성화된) 모든 씬 이름을 모아 `ESceneKey.cs`를 자동 생성 (유효하지 않은 이름/중복 이름은 Console에 에러를 남기고 건너뜀)
-* 생성 위치: `Packages/com.changbeom.gameframework.sceneloading/Runtime/ESceneKey.cs`
+* 생성 위치: `Assets/00.Scripts/GeneratedFramework/ESceneKey.cs` (패키지가 아니라 프로젝트 쪽입니다 - git URL로 설치해도 그대로 동작하도록, `SceneLoadingManager`는 `string` 기반 API만 제공하고 `ESceneKey` 오버로드는 이 파일에 같이 생성되는 확장 메서드가 제공합니다)
 * 기존 멤버의 선언 순서(=정수 값)는 재생성해도 보존되고, 새로 등록한 씬만 맨 뒤에 추가됩니다.
 
 ---
@@ -1204,7 +1204,7 @@ public class GameSceneBootstrap : MonoBehaviour, ISceneEntryPoint
 9. 같은 테스트 + 한 단계가 실패(`Critical=false`) - 씬 로드는 성공해야 함
 10. 같은 테스트 + 한 단계가 실패(`Critical=true` 기본값) - 씬 로드도 실패해야 함
 
-상단에는 `IsLoading`/`Progress`/`CurrentSceneName`과 `OnProgressChanged` 발행 횟수가 실시간으로 표시되고, 로드 시작/완료/실패/재시도/폴백 이벤트는 전부 로그에 자동으로 찍힙니다. 실제 씬 전환을 확인하려면 Build Settings에 씬이 최소 2개 등록되어 있어야 합니다. 6~7번 버튼을 테스트하려면 Unity 에디터에서 대상 씬을 Addressable로 표시하고 주소를 인스펙터의 `_addressableSceneAddress` 필드에 맞게 지정해야 합니다. `ESceneKey`를 생성하지 않아도(즉 `None`만 있는 상태여도) 컴파일에 문제가 없도록, 2번 버튼을 제외한 나머지는 문자열 오버로드를 사용하고 3번 버튼은 항상 존재하는 `ESceneKey.None`만 사용합니다.
+상단에는 `IsLoading`/`Progress`/`CurrentSceneName`과 `OnProgressChanged` 발행 횟수가 실시간으로 표시되고, 로드 시작/완료/실패/재시도/폴백 이벤트는 전부 로그에 자동으로 찍힙니다. 실제 씬 전환을 확인하려면 Build Settings에 씬이 최소 2개 등록되어 있어야 합니다. 6~7번 버튼을 테스트하려면 Unity 에디터에서 대상 씬을 Addressable로 표시하고 주소를 인스펙터의 `_addressableSceneAddress` 필드에 맞게 지정해야 합니다. `ESceneKey`는 시트가 아니라 `Generate ESceneKey From Build Settings`(또는 씬 폴더 자동 등록)로 한 번은 생성해야 비로소 만들어지는 프로젝트 쪽 파일이라, 그 전까지는 `ESceneKey`를 참조하는 이 테스터 자체가 컴파일되지 않습니다.
 
 </details>
 
@@ -1502,7 +1502,7 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 
 - **`AddState(key, state)`** - 상태 등록. 이미 등록된 key면 경고 로그를 남기고 덮어씁니다
 - **`ChangeState(key)`** - 등록된 상태로 전환. 등록 안 된 key면 에러 로그, 현재 상태의 `CanExit`이 `false`면 경고 로그와 함께 무시됩니다. 이미 있는 상태로 다시 전환해도(자기 자신으로) 특별 취급 없이 `OnExit → OnEnter`가 다시 실행됩니다 - 공격 연타처럼 같은 동작을 처음부터 재생해야 하는 경우를 위한 의도된 동작입니다
-  - **재진입 방지**: `OnEnter`/`OnExit` 안에서 `ChangeState`를 다시 호출하면 경고 로그와 함께 무시됩니다 (상태 진입 도중 상태가 또 바뀌면서 내부 정보가 꼬이는 걸 방지). 상태 진입 조건에 따라 즉시 다른 상태로 리다이렉트하고 싶다면 `OnEnter`가 아니라 `Update`에서 조건을 확인해 호출하세요
+  - **재진입 방지**: `OnEnter`/`OnExit`뿐 아니라 `OnStateChanged` 구독자 안에서 `ChangeState`를 다시 호출해도 경고 로그와 함께 무시됩니다 (상태 전이 도중 상태가 또 바뀌면서 내부 정보가 꼬이거나, 아직 발행 중인 `OnStateChanged`의 나머지 구독자가 낡은 인자를 받는 걸 방지). 상태 진입 조건에 따라 즉시 다른 상태로 리다이렉트하고 싶다면 `OnEnter`가 아니라 `Update`에서 조건을 확인해 호출하세요
   - 아직 한 번도 상태가 없었던 첫 `ChangeState` 호출에서는 `OnStateChanged`가 발행되지 않습니다 - 진짜 "이전 상태"가 없기 때문입니다
 - **`CurrentKey`** / **`CanChangeState`** - 현재 상태 키 / 지금 전환 가능한지(현재 상태의 `CanExit`) 조회
 - **`OnStateChanged`** - `public event Action<TStateKey, TStateKey>`(이전, 다음). 다른 매니저 이벤트와 동일하게 `+=`/`-=`로 구독
@@ -1535,7 +1535,7 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 - `OnLanguageChanged` 이벤트 - 언어가 바뀌면 발행되며, `LocalizedText`가 이 이벤트만으로 동작합니다. 나중에 음성 더빙/언어별 이미지가 필요해져도 이 이벤트만 구독하는 새 컴포넌트를 추가하면 되고, `LocalizationManager` 자체는 손댈 필요가 없습니다
 - `SetLanguageAsync(ELanguage)` - v1은 내부적으로 동기 테이블 룩업이라 사실상 즉시 끝나지만, 나중에 언어 전환이 실제 비동기 작업(리소스 로드 등)이 되어도 호출부가 안 바뀌도록 처음부터 `Awaitable`을 반환합니다
 - **첫 실행 시 언어 결정 순서**: 저장된 언어(SaveManager) → `Application.systemLanguage` 매핑(설정으로 끄기 가능) → Settings의 Default Language
-- `LocalizedText` - `ELocKey` + 레거시 `Text`를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트
+- `LocalizedText` - Key(`KeyName` 문자열) + 레거시 `Text`를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 
 > **주의**: 음성 더빙이나 언어별 이미지는 이 패키지가 직접 다루지 않습니다. 서버 없이는 지원 언어 데이터를 전부 빌드에 포함할 수밖에 없는데, 텍스트는 용량이 작아 문제되지 않지만 음성/이미지는 다릅니다 - 그런 요구가 실제로 생기면(그리고 서버가 생기면) `OnLanguageChanged`를 구독하는 별도 컴포넌트(예: 오디오는 Sound 패키지 확장, 이미지는 Addressables 원격 카탈로그)로 그때 가서 설계하는 걸 권장합니다.
@@ -1562,7 +1562,7 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 1. `ELocKey.cs` 재생성 (`KeyName` 기반)
 2. `ELanguage.cs` 재생성 (`RowKey`/`KeyName`을 제외한 나머지 컬럼 기반)
 
-두 enum 모두 패키지 어셈블리 내부(`Packages/com.changbeom.gameframework.localization/Runtime/`)에 생성됩니다. 패키지가 처음 설치되면 `None`만 있는 placeholder 상태이며, 시트를 처음 생성하는 순간 실제 키/언어들로 덮어써집니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
+두 enum 모두 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`Assets/00.Scripts/GeneratedFramework/`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `LocalizationManager` 자체는 `KeyName`/언어 코드 문자열만 알고 두 enum을 전혀 참조하지 않으며, `GetText(ELocKey.X)`/`SetLanguageAsync(ELanguage.X)`처럼 강타입으로 호출할 수 있는 건 각각 `ELocKey.cs`/`ELanguage.cs`에 같이 생성되는 확장 메서드 덕분입니다. 시트를 아직 한 번도 생성하지 않았다면 이 두 파일 자체가 없는 상태입니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
 
 수동으로 다시 실행하고 싶을 때를 위한 메뉴도 있습니다: `Game Framework/Localization/Generate ELocKey + ELanguage From Localization Table`.
 
@@ -1577,14 +1577,14 @@ string text = LocalizationManager.Instance.GetText(ELocKey.UI_Button_Start);
 ```cs
 // Text 컴포넌트가 있는 GameObject에 LocalizedText를 붙이고 Key를 지정하면 끝
 ```
-인스펙터에서 `ELocKey`만 지정하면, 이후 언어가 바뀔 때마다 알아서 갱신됩니다.
+`LocalizedText`는 패키지 자신이 제공하는 컴포넌트라 `ELocKey`를 강타입으로 참조하지 못해, Inspector의 Key 필드는 문자열 입력입니다(`KeyName` 컬럼 값과 정확히 같게 입력). 이후 언어가 바뀔 때마다 알아서 갱신되는 건 동일합니다.
 
 #### 4) 언어 전환
 ```cs
 await LocalizationManager.Instance.SetLanguageAsync(ELanguage.EN);
 
-// 상태 조회
-ELanguage current = LocalizationManager.Instance.CurrentLanguage;
+// 상태 조회 (CurrentLanguage는 string입니다 - 언어 코드 그대로)
+string current = LocalizationManager.Instance.CurrentLanguage;
 
 // 언어 변경 구독 (음성/이미지 등 텍스트 이외의 것을 나중에 추가할 때도 이 이벤트만 쓰면 됨)
 LocalizationManager.Instance.OnLanguageChanged += lang => Debug.Log($"언어 변경: {lang}");
@@ -1600,13 +1600,13 @@ LocalizationManager.Instance.OnLanguageChanged += lang => Debug.Log($"언어 변
 
 설정 가능한 항목:
 * Table Resource Path (기본: `GeneratedTables/LocalizationTable`) - 시트 탭 이름을 다르게 지어서 생성된 클래스명이 다르면 여기를 맞춰주세요
-* Default Language / Fallback Language
+* Default Language / Fallback Language - 언어 코드 문자열입니다(예: `KO`). `ELanguage`는 패키지 설정에서 강타입으로 참조할 수 없어 문자열로 입력합니다
 * Use System Language On First Launch (기본 켜짐)
 
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/LocalizationTester.cs`를 아무 GameObject에 붙이고 Play하면 `CurrentLanguage`와 `GetText` 결과가 실시간으로 표시되고, `ELanguage`에 등록된 언어마다 전환 버튼이 자동으로 생깁니다. 패키지를 막 설치한 상태(시트를 아직 안 만든 상태)에서는 `ELanguage`에 `None`만 있어서 전환 버튼도 하나뿐입니다 - 실제 테스트는 Data Parsing으로 Localization 시트를 생성한 뒤에 의미가 있습니다.
+`Assets/00.Scripts/Tests/LocalizationTester.cs`를 아무 GameObject에 붙이고 Play하면 `CurrentLanguage`와 `GetText` 결과가 실시간으로 표시되고, `ELanguage`에 등록된 언어마다 전환 버튼이 자동으로 생깁니다. `ELocKey`/`ELanguage`는 시트를 한 번 생성해야 비로소 만들어지는 프로젝트 쪽 파일이라, Data Parsing으로 Localization 시트를 먼저 생성해야 이 테스터 자체가 컴파일됩니다.
 
 </details>
 
