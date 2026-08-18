@@ -17,8 +17,14 @@ namespace GameFramework.SoundSystem
         // Data Parsing이 생성하는 Sound 테이블(SoundTable)은 프로젝트 쪽 어셈블리에 있어서
         // 이 패키지가 타입으로 직접 참조할 수 없습니다 (패키지는 프로젝트를 참조할 수 없음).
         // 그래서 부팅 시 1회, ScriptableObject로만 로드해 리플렉션으로 필드를 읽고
-        // ESound 기준 Dictionary로 캐싱해둡니다. 이후 조회는 전부 이 캐시로만 처리되므로
-        // 런타임 리플렉션 비용은 부팅 시 1회로 끝납니다.
+        // FileName(string) 기준 Dictionary로 캐싱해둡니다. 이후 조회는 전부 이 캐시로만
+        // 처리되므로 런타임 리플렉션 비용은 부팅 시 1회로 끝납니다.
+        //
+        // 사운드 식별자는 예전에는 이 패키지 자신의 Runtime 폴더 안에 재생성되는 ESound
+        // enum이었지만, git URL로 설치된 패키지는 읽기 전용 캐시에서 로드되어 그 방식이
+        // 성립하지 않습니다(SceneLoading의 ESceneKey와 동일한 이유). 그래서 이 매니저는
+        // FileName 문자열을 그대로 식별자로 씁니다. 강타입 호출부(PlaySound(ESound.X))는
+        // 프로젝트 쪽에 생성되는 ESoundExtensions 확장 메서드가 담당합니다.
         private struct SoundEntry
         {
             public ESoundChannel channel;
@@ -32,20 +38,20 @@ namespace GameFramework.SoundSystem
         private const string SoundSettingsKey = "sound";
 
         private SoundManagerSettings _settings;
-        private Dictionary<ESound, SoundEntry> _soundData;
+        private Dictionary<string, SoundEntry> _soundData;
         private SoundSettingsData _volumeSettings;
         private SoundPlayerPool _pool;
 
         private readonly Dictionary<string, AudioClip> _clipCache = new Dictionary<string, AudioClip>();
         private readonly Dictionary<string, AsyncOperationHandle<AudioClip>> _clipHandles = new Dictionary<string, AsyncOperationHandle<AudioClip>>();
         private readonly Dictionary<string, Task<AudioClip>> _pendingClipLoads = new Dictionary<string, Task<AudioClip>>();
-        private readonly Dictionary<ESound, int> _pendingOneShotCounts = new Dictionary<ESound, int>();
+        private readonly Dictionary<string, int> _pendingOneShotCounts = new Dictionary<string, int>();
 
         // StopSound(id)가 아직 클립 로딩이 끝나지 않아 _pool.Active에 잡히지 않는 원샷
         // 요청까지 취소할 수 있도록 하는 세대 토큰입니다. PlayOneShot이 시작 시점의 값을
         // 들고 있다가, await 이후 값이 바뀌어 있으면(그 사이 StopSound가 호출됨) 재생을
         // 시작하지 않고 조용히 취소합니다.
-        private readonly Dictionary<ESound, int> _oneShotStopTokens = new Dictionary<ESound, int>();
+        private readonly Dictionary<string, int> _oneShotStopTokens = new Dictionary<string, int>();
 
         // OnApplicationQuit 이후에 완료되는 LoadClip이 이미 비워진 _clipCache/_clipHandles에
         // 다시 항목을 채워 넣으면 그 handle을 아무도 Release하지 못해 영구히 새므로,
@@ -53,8 +59,8 @@ namespace GameFramework.SoundSystem
         private bool _isShuttingDown;
 
         private AudioSource _bgmSource;
-        private ESound _currentBgm = ESound.None;
-        private ESound _requestedBgm = ESound.None;
+        private string _currentBgm;
+        private string _requestedBgm;
         private int _bgmPlayToken;
 
         // PlayBgm의 크로스페이드가 _bgmSource.volume을 직접 애니메이션하는 동안,
@@ -95,9 +101,9 @@ namespace GameFramework.SoundSystem
             return ScriptableObject.CreateInstance<SoundManagerSettings>();
         }
 
-        private static Dictionary<ESound, SoundEntry> LoadSoundData(string resourcePath)
+        private static Dictionary<string, SoundEntry> LoadSoundData(string resourcePath)
         {
-            Dictionary<ESound, SoundEntry> data = new Dictionary<ESound, SoundEntry>();
+            Dictionary<string, SoundEntry> data = new Dictionary<string, SoundEntry>();
 
             ScriptableObject table = Resources.Load<ScriptableObject>(resourcePath);
             if (table == null)
@@ -130,15 +136,9 @@ namespace GameFramework.SoundSystem
                     continue;
                 }
 
-                if (!Enum.TryParse(fileName, out ESound id) || !Enum.IsDefined(typeof(ESound), id))
-                {
-                    Debug.LogWarning($"[SoundManager] FileName \"{fileName}\"에 해당하는 ESound 멤버가 없습니다. Game Framework/Sound System/Generate ESound + Register Addressables로 다시 생성해보세요.");
-                    continue;
-                }
-
                 string channelRaw = GetFieldValue<string>(rowType, row, "channel");
 
-                data[id] = new SoundEntry
+                data[fileName] = new SoundEntry
                 {
                     channel = ParseChannel(channelRaw),
                     fileName = fileName,
@@ -198,9 +198,9 @@ namespace GameFramework.SoundSystem
                 return;
             }
 
-            foreach (ESound id in _settings.PreloadSounds)
+            foreach (string id in _settings.PreloadSounds)
             {
-                if (id == ESound.None)
+                if (string.IsNullOrEmpty(id))
                 {
                     continue;
                 }
@@ -221,13 +221,13 @@ namespace GameFramework.SoundSystem
             float duckSpeed = 1f / Mathf.Max(0.01f, _settings.DuckFadeSeconds);
             _duckCurrentMultiplier = Mathf.MoveTowards(_duckCurrentMultiplier, _duckTargetMultiplier, duckSpeed * Time.unscaledDeltaTime);
 
-            if (!_bgmCrossfading && _currentBgm != ESound.None && _soundData.TryGetValue(_currentBgm, out SoundEntry bgmEntry))
+            if (!_bgmCrossfading && _currentBgm != null && _soundData.TryGetValue(_currentBgm, out SoundEntry bgmEntry))
             {
                 _bgmSource.volume = ComputeVolume(ESoundChannel.BGM, bgmEntry.defaultVolume) * _duckCurrentMultiplier;
             }
         }
 
-        private void OnOneShotReturned(ESound finishedId)
+        private void OnOneShotReturned(string finishedId)
         {
             // 원샷 사운드가 실제로 끝났다는 것을 확실히 아는 유일한 지점입니다
             // (Tick()이 풀의 IsFinished() 폴링을 담당합니다) -- PlayOneShot 안에 별도의
@@ -244,9 +244,9 @@ namespace GameFramework.SoundSystem
 
         // ---- 재생 ----
 
-        public void PlaySound(ESound id)
+        public void PlaySound(string id)
         {
-            if (id == ESound.None)
+            if (string.IsNullOrEmpty(id))
             {
                 return;
             }
@@ -267,7 +267,7 @@ namespace GameFramework.SoundSystem
             }
         }
 
-        private async Awaitable PlayBgm(ESound id, SoundEntry entry)
+        private async Awaitable PlayBgm(string id, SoundEntry entry)
         {
             if (_requestedBgm == id)
             {
@@ -299,7 +299,7 @@ namespace GameFramework.SoundSystem
                 {
                     // 로드 실패입니다. _requestedBgm을 이 id로 남겨두면, 이후 같은 id로
                     // PlaySound를 다시 호출해도 위쪽의 "if (_requestedBgm == id) return;"에
-                    // 막혀 영원히 재생되지 않습니다. 실제로 지금 재생 중인 곡(없으면 None)으로 되돌립니다.
+                    // 막혀 영원히 재생되지 않습니다. 실제로 지금 재생 중인 곡(없으면 null)으로 되돌립니다.
                     _requestedBgm = _currentBgm;
                     return;
                 }
@@ -338,13 +338,13 @@ namespace GameFramework.SoundSystem
         public void StopBgm()
         {
             _bgmPlayToken++;
-            _requestedBgm = ESound.None;
+            _requestedBgm = null;
             _bgmSource.Stop();
             _bgmSource.clip = null;
-            _currentBgm = ESound.None;
+            _currentBgm = null;
         }
 
-        private async Awaitable PlayOneShot(ESound id, SoundEntry entry)
+        private async Awaitable PlayOneShot(string id, SoundEntry entry)
         {
             int maxConcurrent = Mathf.Max(1, entry.maxConcurrent);
             int pending = _pendingOneShotCounts.TryGetValue(id, out int p) ? p : 0;
@@ -410,9 +410,9 @@ namespace GameFramework.SoundSystem
         }
 
         /// <summary>이 사운드가 현재 재생 중인 모든 인스턴스를 정지합니다 (BGM 또는 원샷).</summary>
-        public void StopSound(ESound id)
+        public void StopSound(string id)
         {
-            if (id == ESound.None)
+            if (string.IsNullOrEmpty(id))
             {
                 return;
             }
@@ -466,10 +466,10 @@ namespace GameFramework.SoundSystem
                 return;
             }
 
-            List<ESound> pendingIds = new List<ESound>(_pendingOneShotCounts.Keys);
+            List<string> pendingIds = new List<string>(_pendingOneShotCounts.Keys);
             for (int i = 0; i < pendingIds.Count; i++)
             {
-                ESound id = pendingIds[i];
+                string id = pendingIds[i];
                 _oneShotStopTokens[id] = (_oneShotStopTokens.TryGetValue(id, out int t) ? t : 0) + 1;
             }
         }
@@ -534,7 +534,7 @@ namespace GameFramework.SoundSystem
             for (int i = 0; i < active.Count; i++)
             {
                 SoundPlayer p = active[i];
-                if (p == null || !_soundData.TryGetValue(p.CurrentSound, out SoundEntry entry))
+                if (p == null || p.CurrentSound == null || !_soundData.TryGetValue(p.CurrentSound, out SoundEntry entry))
                 {
                     continue;
                 }
@@ -582,7 +582,7 @@ namespace GameFramework.SoundSystem
 
         // ---- 헬퍼 ----
 
-        private int CountActive(ESound id)
+        private int CountActive(string id)
         {
             IReadOnlyList<SoundPlayer> active = _pool.Active;
             int count = 0;

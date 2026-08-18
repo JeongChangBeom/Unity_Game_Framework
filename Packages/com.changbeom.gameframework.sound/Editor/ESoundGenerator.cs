@@ -10,10 +10,13 @@ using UnityEngine;
 
 namespace GameFramework.SoundSystem.Editor
 {
-    // ESound.cs는 (Data Parsing이 생성하는 프로젝트 쪽 폴더가 아니라) 이 패키지의 Runtime
-    // 폴더 안에서 직접 재생성됩니다. SoundManager가 ESound를 구체 타입으로 참조하기
-    // 때문에 같은 어셈블리를 공유해야 하기 때문입니다. 여기서 재생성하면 placeholder가
-    // 이 프로젝트의 실제 사운드 id들로 덮어써집니다.
+    // ESound.cs는 패키지 자신의 폴더가 아니라 "이 프로젝트"의 Assets 아래에 생성됩니다.
+    // git URL/레지스트리로 설치된 패키지는 읽기 전용 캐시(Library/PackageCache)에서
+    // 로드되기 때문에, 패키지 자신의 Runtime 폴더에 프로젝트마다 달라지는 값을 쓰는 건
+    // 애초에 성립하지 않습니다. 그래서 enum은 프로젝트 쪽에 생성하고, SoundManager는 이
+    // enum을 전혀 모르는 채로 FileName(string) 기반 API만 제공하며, 강타입 호출부
+    // (sm.PlaySound(ESound.X))는 같이 생성되는 확장 메서드(ESoundExtensions)로
+    // 제공합니다. SceneLoading의 ESceneKey/Pooling의 EPoolKey와 동일한 패턴입니다.
     //
     // Data Parsing이 생성한 Sound 테이블(SoundTable)은 프로젝트 쪽에 있어서 이 패키지가
     // 타입으로 직접 참조할 수 없기 때문에, 리플렉션(SerializedProperty)으로 FileName만
@@ -21,7 +24,7 @@ namespace GameFramework.SoundSystem.Editor
     // Volume 등을 자체 캐시로 만듭니다 (SoundManager.cs 참고).
     public static class ESoundGenerator
     {
-        private const string OutputPath = "Packages/com.changbeom.gameframework.sound/Runtime/ESound.cs";
+        private const string OutputPath = "Assets/00.Scripts/GeneratedFramework/ESound.cs";
         private const string DefaultSoundFolder = "Assets/03.Sound";
         private const string DefaultAddressablesGroup = "Sound";
 
@@ -66,9 +69,10 @@ namespace GameFramework.SoundSystem.Editor
 
                 if (safe != raw)
                 {
-                    // SoundManager는 런타임에 테이블에 적힌 원본 FileName 문자열로
-                    // Enum.TryParse하기 때문에, 여기서 이름이 바뀌면(공백/하이픈 등) 그
-                    // 사운드는 절대 재생되지 않습니다. 조용히 넘어가지 않고 바로 알려줍니다.
+                    // SoundManager는 런타임에 테이블에 적힌 원본 FileName 문자열을 그대로
+                    // 키로 쓰기 때문에, 여기서 이름이 바뀌면(공백/하이픈 등) enum 멤버로
+                    // ESound.X를 호출해도 실제로는 다른 문자열(X)을 찾게 되어 그 사운드는
+                    // 절대 재생되지 않습니다. 조용히 넘어가지 않고 바로 알려줍니다.
                     Debug.LogError($"[ESoundGenerator] FileName \"{raw}\"은(는) 유효한 식별자가 아니라서 enum 멤버는 \"{safe}\"로 생성되지만, 런타임에는 원본 이름으로 조회하므로 이 사운드는 재생되지 않습니다. 시트의 FileName과 오디오 파일명을 영문/숫자/밑줄로만 바꿔주세요.");
                 }
 
@@ -107,7 +111,7 @@ namespace GameFramework.SoundSystem.Editor
             List<string> result = new List<string>();
             HashSet<string> seen = new HashSet<string>();
 
-            string[] currentNames = Enum.GetNames(typeof(ESound));
+            string[] currentNames = GetExistingEnumNames();
             for (int i = 0; i < currentNames.Length; i++)
             {
                 string name = currentNames[i];
@@ -129,6 +133,27 @@ namespace GameFramework.SoundSystem.Editor
             }
 
             return result;
+        }
+
+        // ESound는 이제 프로젝트 쪽(Assets)에 생성되어 이 패키지가 컴파일 타임에 직접
+        // 참조할 수 없으므로, 이미 컴파일된 프로젝트 어셈블리들에서 TypeCache로 찾습니다
+        // (Data Parsing의 TableClassGenerator.TryFindEnumType과 동일한 패턴). 한 번도
+        // 생성된 적 없으면(첫 실행) 못 찾는 게 정상이라 빈 배열을 반환합니다.
+        private static string[] GetExistingEnumNames()
+        {
+            TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<Enum>();
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                Type t = candidates[i];
+
+                if (t.Namespace == "GameFramework.SoundSystem" && t.Name == "ESound")
+                {
+                    return Enum.GetNames(t);
+                }
+            }
+
+            return Array.Empty<string>();
         }
 
         private static void RegisterAddressables(List<string> rawNames)
@@ -266,6 +291,9 @@ namespace GameFramework.SoundSystem.Editor
 
             sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
             sb.AppendLine();
+            sb.AppendLine("using UnityEngine;");
+            sb.AppendLine("using GameFramework.SoundSystem;");
+            sb.AppendLine();
             sb.AppendLine("namespace GameFramework.SoundSystem");
             sb.AppendLine("{");
             sb.AppendLine("    public enum ESound");
@@ -286,6 +314,32 @@ namespace GameFramework.SoundSystem.Editor
                 sb.AppendLine(",");
             }
 
+            sb.AppendLine("    }");
+            sb.AppendLine();
+            sb.AppendLine("    // SoundManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일 타임에");
+            sb.AppendLine("    // 알 수 없습니다. 대신 FileName(string) 기반 API를 감싸는 확장 메서드로");
+            sb.AppendLine("    // 강타입 호출부(sm.PlaySound(ESound.X))를 그대로 제공합니다.");
+            sb.AppendLine("    public static class ESoundExtensions");
+            sb.AppendLine("    {");
+            sb.AppendLine("        public static void PlaySound(this SoundManager manager, ESound id)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (id == ESound.None)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                return;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            manager.PlaySound(id.ToString());");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        public static void StopSound(this SoundManager manager, ESound id)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (id == ESound.None)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                return;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            manager.StopSound(id.ToString());");
+            sb.AppendLine("        }");
             sb.AppendLine("    }");
             sb.AppendLine("}");
 

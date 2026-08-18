@@ -91,7 +91,7 @@ namespace GameFramework.SoundSystem
             }
         }
 
-        public void Tick(Action<ESound> onReturned)
+        public void Tick(Action<string> onReturned)
         {
             for (int i = _active.Count - 1; i >= 0; i--)
             {
@@ -104,10 +104,10 @@ namespace GameFramework.SoundSystem
 
                 if (p.IsFinished())
                 {
-                    ESound finished = p.CurrentSound;
+                    string finished = p.CurrentSound;
                     Release(p);
 
-                    if (finished != ESound.None)
+                    if (finished != null)
                     {
                         onReturned?.Invoke(finished);
                     }

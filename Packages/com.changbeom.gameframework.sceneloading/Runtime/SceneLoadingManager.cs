@@ -92,25 +92,6 @@ namespace GameFramework.SceneLoading
             await LoadSceneCoreAsync(SceneLoadRequest.FromBuildSettings(sceneName), extraSteps);
         }
 
-        /// <summary>생성된 ESceneKey로 씬을 전환합니다.</summary>
-        public async Awaitable LoadSceneAsync(ESceneKey sceneKey)
-        {
-            await LoadSceneAsync(sceneKey, null);
-        }
-
-        /// <summary>생성된 ESceneKey로 씬을 전환하면서, extraSteps의 진행률까지 Progress에 가중 합산합니다.</summary>
-        public async Awaitable LoadSceneAsync(ESceneKey sceneKey, IReadOnlyList<SceneLoadStep> extraSteps)
-        {
-            if (sceneKey == ESceneKey.None)
-            {
-                Debug.LogError("[SceneLoadingManager] ESceneKey.None으로는 씬을 로드할 수 없습니다.");
-                OnSceneLoadFailed?.Invoke(sceneKey.ToString());
-                return;
-            }
-
-            await LoadSceneAsync(sceneKey.ToString(), extraSteps);
-        }
-
         /// <summary>Addressables 주소로 씬을 전환합니다 (LoadSceneMode.Single). 이미 로딩 중이면 무시됩니다.</summary>
         public async Awaitable LoadSceneFromAddressableAsync(string address)
         {

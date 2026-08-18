@@ -40,7 +40,9 @@ namespace GameFramework.SoundSystem
         public float DuckFadeSeconds = 0.2f;
 
         [Header("Preload")]
-        [Tooltip("씬 시작 시 미리 로드해둘 사운드 (첫 재생 지연 방지)")]
-        public ESound[] PreloadSounds;
+        [Tooltip("씬 시작 시 미리 로드해둘 사운드의 FileName (첫 재생 지연 방지). ESound는 이 " +
+            "프로젝트 쪽에 생성되는 타입이라 패키지 설정에서 강타입으로 참조할 수 없어 문자열로 " +
+            "직접 입력합니다 (Data Parsing Sound 시트의 FileName 컬럼 값과 정확히 같아야 합니다).")]
+        public string[] PreloadSounds;
     }
 }

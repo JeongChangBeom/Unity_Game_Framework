@@ -6,7 +6,10 @@ namespace GameFramework.SoundSystem
     public class SoundPlayer : MonoBehaviour
     {
         public AudioSource Source { get; private set; }
-        public ESound CurrentSound { get; private set; }
+
+        /// <summary>현재 재생 중인 사운드의 식별자입니다(Data Parsing Sound 시트의 FileName).
+        /// 아무것도 재생 중이 아니면 null입니다.</summary>
+        public string CurrentSound { get; private set; }
         public ESoundChannel CurrentChannel { get; private set; }
 
         private float _endTime;
@@ -34,7 +37,7 @@ namespace GameFramework.SoundSystem
             Source.outputAudioMixerGroup = group;
         }
 
-        public void Play(ESound sound, ESoundChannel channel, AudioClip clip, float volume, float pitch, bool loop)
+        public void Play(string sound, ESoundChannel channel, AudioClip clip, float volume, float pitch, bool loop)
         {
             CurrentSound = sound;
             CurrentChannel = channel;
@@ -81,7 +84,7 @@ namespace GameFramework.SoundSystem
         public void Stop()
         {
             _isPlaying = false;
-            CurrentSound = ESound.None;
+            CurrentSound = null;
 
             if (Source != null)
             {

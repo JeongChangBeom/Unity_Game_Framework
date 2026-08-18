@@ -83,7 +83,7 @@ namespace GameFramework.Tests
             Log($"SetLanguageAsync({language}) 완료");
         }
 
-        private void HandleLanguageChanged(ELanguage language)
+        private void HandleLanguageChanged(string language)
         {
             Log($"OnLanguageChanged: {language}");
         }

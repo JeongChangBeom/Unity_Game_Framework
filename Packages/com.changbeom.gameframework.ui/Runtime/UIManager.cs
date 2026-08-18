@@ -206,7 +206,7 @@ namespace GameFramework.UISystem
 
         /// <summary>Pool Settings에 등록된 Key로 팝업 프리팹을 찾아 요청합니다. 프리팹 참조를 직접 들고 있을 필요가 없습니다.</summary>
         public void RequestPopup(
-            EPoolKey key,
+            string key,
             EPopupPriority priority,
             object payload = null,
             bool unique = true,
@@ -225,7 +225,7 @@ namespace GameFramework.UISystem
 
         /// <summary>Key 기반 RequestPopup의 결과 콜백(<typeparamref name="TResult"/>) 버전입니다.</summary>
         public void RequestPopup<TResult>(
-            EPoolKey key,
+            string key,
             EPopupPriority priority,
             Action<TResult> onResult,
             object payload = null,
@@ -242,11 +242,11 @@ namespace GameFramework.UISystem
             RequestPopup(prefab, priority, onResult, payload, unique, policy);
         }
 
-        private UIPopupBase ResolvePopupPrefab(EPoolKey key)
+        private UIPopupBase ResolvePopupPrefab(string key)
         {
-            if (key == EPoolKey.None)
+            if (string.IsNullOrEmpty(key))
             {
-                Debug.LogError("[UIManager] EPoolKey.None으로는 팝업을 열 수 없습니다.");
+                Debug.LogError("[UIManager] 빈 key로는 팝업을 열 수 없습니다.");
                 return null;
             }
 
@@ -257,7 +257,7 @@ namespace GameFramework.UISystem
                 return null;
             }
 
-            if (!PoolManager.Instance.TryGetPrefab(key.ToString(), out GameObject prefabGo))
+            if (!PoolManager.Instance.TryGetPrefab(key, out GameObject prefabGo))
             {
                 Debug.LogError($"[UIManager] PoolSettings에 등록되지 않은 key입니다: {key}");
                 return null;

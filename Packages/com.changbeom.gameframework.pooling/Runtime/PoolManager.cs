@@ -172,33 +172,6 @@ namespace GameFramework.Pooling
             return instance.GetComponent<T>();
         }
 
-        /// <summary>
-        /// Game Framework/Pooling/Generate EPoolKey From Pool Settings로 생성한 EPoolKey를 사용합니다.
-        /// 오타가 나면 컴파일 에러가 나므로, 문자열 오버로드보다 이쪽을 우선 사용하세요.
-        /// </summary>
-        public GameObject Spawn(EPoolKey key, Vector3 position, Quaternion rotation, Transform parent = null)
-        {
-            if (key == EPoolKey.None)
-            {
-                Debug.LogError("[PoolManager] EPoolKey.None으로는 Spawn할 수 없습니다.");
-                return null;
-            }
-
-            return Spawn(key.ToString(), position, rotation, parent);
-        }
-
-        /// <summary>위와 동일하되 컴포넌트 타입으로 바로 반환합니다.</summary>
-        public T Spawn<T>(EPoolKey key, Vector3 position, Quaternion rotation, Transform parent = null) where T : Component
-        {
-            if (key == EPoolKey.None)
-            {
-                Debug.LogError("[PoolManager] EPoolKey.None으로는 Spawn할 수 없습니다.");
-                return null;
-            }
-
-            return Spawn<T>(key.ToString(), position, rotation, parent);
-        }
-
         public void Despawn(GameObject instance)
         {
             if (instance == null)

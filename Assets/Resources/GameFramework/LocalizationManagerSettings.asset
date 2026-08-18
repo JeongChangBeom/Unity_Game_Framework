@@ -13,6 +13,6 @@ MonoBehaviour:
   m_Name: LocalizationManagerSettings
   m_EditorClassIdentifier: 
   TableResourcePath: GeneratedTables/LocalizationTable
-  DefaultLanguage: 1
-  FallbackLanguage: 1
+  DefaultLanguage: KO
+  FallbackLanguage: KO
   UseSystemLanguageOnFirstLaunch: 1

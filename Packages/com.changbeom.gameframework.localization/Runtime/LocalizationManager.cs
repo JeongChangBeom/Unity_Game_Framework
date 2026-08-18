@@ -14,6 +14,13 @@ namespace GameFramework.Localization
     /// (Sound의 SoundManager와 동일한 이유), 부팅 시 리플렉션으로 1회 읽어 자체
     /// Dictionary로 캐싱합니다.
     ///
+    /// 번역 키와 언어 코드는 전부 문자열입니다 - 예전에는 이 패키지 자신의 Runtime 폴더
+    /// 안에 재생성되는 ELocKey/ELanguage enum이었지만, git URL로 설치된 패키지는 읽기
+    /// 전용 캐시에서 로드되어 그 방식이 성립하지 않습니다(SceneLoading의 ESceneKey와
+    /// 동일한 이유). 강타입 호출부(GetText(ELocKey.X), SetLanguageAsync(ELanguage.X))는
+    /// 프로젝트 쪽에 생성되는 ELocKeyExtensions 확장 메서드가 담당합니다. 다만
+    /// OnLanguageChanged는 이벤트라서(확장 메서드로 감쌀 수 없음) string 그대로 노출됩니다.
+    ///
     /// 언어가 바뀔 때마다 OnLanguageChanged가 발행되므로, 음성 더빙/언어별 이미지처럼
     /// 나중에 추가될 수 있는 기능도 이 이벤트만 구독하면 됩니다 - LocalizationManager
     /// 자체를 다시 고칠 필요가 없습니다.
@@ -36,11 +43,11 @@ namespace GameFramework.Localization
         };
 
         private LocalizationManagerSettings _settings;
-        private Dictionary<ELocKey, Dictionary<ELanguage, string>> _table = new Dictionary<ELocKey, Dictionary<ELanguage, string>>();
+        private Dictionary<string, Dictionary<string, string>> _table = new Dictionary<string, Dictionary<string, string>>();
 
-        public ELanguage CurrentLanguage { get; private set; }
+        public string CurrentLanguage { get; private set; }
 
-        public event Action<ELanguage> OnLanguageChanged;
+        public event Action<string> OnLanguageChanged;
 
         protected override void OnInitialize()
         {
@@ -64,9 +71,9 @@ namespace GameFramework.Localization
 
         /// <summary>키의 현재 언어 텍스트를 반환합니다. 현재 언어에 번역이 없으면 Fallback
         /// Language를 시도하고, 그마저 없으면 "[MISSING:key]"를 반환하며 에러 로그를 남깁니다.</summary>
-        public string GetText(ELocKey key)
+        public string GetText(string key)
         {
-            if (!_table.TryGetValue(key, out Dictionary<ELanguage, string> perLanguage))
+            if (!_table.TryGetValue(key, out Dictionary<string, string> perLanguage))
             {
                 Debug.LogError($"[LocalizationManager] {key} 키가 테이블에 없습니다.");
                 return $"[MISSING:{key}]";
@@ -90,7 +97,7 @@ namespace GameFramework.Localization
         /// <summary>언어를 바꾸고 저장합니다. v1은 즉시 완료되는 동기 작업이지만, 나중에
         /// 언어별 리소스(음성 등)를 비동기로 로드해야 해도 호출부를 바꿀 필요가 없도록
         /// 처음부터 Awaitable을 반환합니다.</summary>
-        public Awaitable SetLanguageAsync(ELanguage language)
+        public Awaitable SetLanguageAsync(string language)
         {
             CurrentLanguage = language;
             SaveLanguage(language);
@@ -102,7 +109,7 @@ namespace GameFramework.Localization
         // 핸들러)가 예외를 던져도 나머지 구독자에게는 정상적으로 전달되도록 각각 개별
         // try/catch로 격리합니다. 격리가 없으면 한 구독자의 예외로 그 뒤 구독자들이
         // 언어 변경 알림을 통째로 못 받아 일부 UI만 예전 언어로 남는 문제가 있었습니다.
-        private void SafeInvokeLanguageChanged(ELanguage language)
+        private void SafeInvokeLanguageChanged(string language)
         {
             if (OnLanguageChanged == null)
             {
@@ -115,7 +122,7 @@ namespace GameFramework.Localization
             {
                 try
                 {
-                    ((Action<ELanguage>)handlers[i]).Invoke(language);
+                    ((Action<string>)handlers[i]).Invoke(language);
                 }
                 catch (Exception e)
                 {
@@ -124,7 +131,7 @@ namespace GameFramework.Localization
             }
         }
 
-        private ELanguage DetermineInitialLanguage()
+        private string DetermineInitialLanguage()
         {
             // LocalizationManager는 BootPriority 없이 지연 초기화되므로, 이 첫 접근이
             // 다른 매니저의 종료 처리 도중(예: 어떤 오브젝트의 OnDestroy가 이 시점에
@@ -137,12 +144,12 @@ namespace GameFramework.Localization
 
             SaveKey key = SaveManager.Instance.Domain(SettingsDomain).Join(LanguageKey);
 
-            if (SaveManager.Instance.TryLoad(key, out LanguageSaveData saved) && Enum.IsDefined(typeof(ELanguage), saved.Language))
+            if (SaveManager.Instance.TryLoad(key, out LanguageSaveData saved) && !string.IsNullOrEmpty(saved.Language))
             {
                 return saved.Language;
             }
 
-            if (_settings.UseSystemLanguageOnFirstLaunch && TryMapSystemLanguage(out ELanguage systemLanguage))
+            if (_settings.UseSystemLanguageOnFirstLaunch && TryMapSystemLanguage(out string systemLanguage))
             {
                 return systemLanguage;
             }
@@ -150,7 +157,7 @@ namespace GameFramework.Localization
             return _settings.DefaultLanguage;
         }
 
-        private void SaveLanguage(ELanguage language)
+        private void SaveLanguage(string language)
         {
             // 위 DetermineInitialLanguage와 동일한 이유의 방어입니다.
             if (SaveManager.Instance == null)
@@ -163,26 +170,27 @@ namespace GameFramework.Localization
             SaveManager.Instance.Flush();
         }
 
-        private static bool TryMapSystemLanguage(out ELanguage language)
+        private static bool TryMapSystemLanguage(out string language)
         {
-            if (SystemLanguageToCode.TryGetValue(Application.systemLanguage, out string code) &&
-                Enum.TryParse(code, out language) &&
-                Enum.IsDefined(typeof(ELanguage), language))
+            if (SystemLanguageToCode.TryGetValue(Application.systemLanguage, out string code))
             {
+                language = code;
                 return true;
             }
 
-            language = default;
+            language = null;
             return false;
         }
 
         // Data Parsing이 생성한 LocalizationTable을 리플렉션으로 읽습니다 (SoundManager의
-        // LoadSoundData와 동일한 패턴). ELanguage의 각 멤버 이름이 테이블 행의 필드
-        // 이름과 정확히 같아야 합니다 - LocalizationGenerator가 그렇게 되도록 시트의
-        // 언어 컬럼명 그대로 ELanguage를 생성합니다.
-        private static Dictionary<ELocKey, Dictionary<ELanguage, string>> LoadLocalizationData(string resourcePath)
+        // LoadSoundData와 동일한 패턴). 언어 컬럼은 RowKey(int)/KeyName(언어 아님)을 제외한
+        // string 타입 필드를 전부 언어 컬럼으로 간주해서 찾습니다 - LocalizationGenerator.
+        // ExtractLanguageColumns(에디터, SerializedProperty 기반)와 동일한 판별 기준을
+        // 런타임 리플렉션으로 재현한 것이라, 언어 컬럼 집합이 항상 실제 테이블과
+        // 자체적으로 일치합니다(더 이상 별도 enum과 동기화될 필요가 없음).
+        private static Dictionary<string, Dictionary<string, string>> LoadLocalizationData(string resourcePath)
         {
-            Dictionary<ELocKey, Dictionary<ELanguage, string>> data = new Dictionary<ELocKey, Dictionary<ELanguage, string>>();
+            Dictionary<string, Dictionary<string, string>> data = new Dictionary<string, Dictionary<string, string>>();
 
             ScriptableObject table = Resources.Load<ScriptableObject>(resourcePath);
             if (table == null)
@@ -200,7 +208,7 @@ namespace GameFramework.Localization
                 return data;
             }
 
-            string[] languageNames = Enum.GetNames(typeof(ELanguage));
+            string[] languageFieldNames = null;
 
             foreach (object row in rows)
             {
@@ -211,47 +219,62 @@ namespace GameFramework.Localization
 
                 Type rowType = row.GetType();
 
+                // 모든 행이 같은 필드 구조를 공유하므로 첫 번째 행에서 한 번만 찾습니다.
+                if (languageFieldNames == null)
+                {
+                    languageFieldNames = ExtractLanguageFieldNames(rowType);
+                }
+
                 string keyName = GetFieldValue<string>(rowType, row, "KeyName");
                 if (string.IsNullOrEmpty(keyName))
                 {
                     continue;
                 }
 
-                if (!Enum.TryParse(keyName, out ELocKey locKey) || !Enum.IsDefined(typeof(ELocKey), locKey))
+                Dictionary<string, string> perLanguage = new Dictionary<string, string>();
+
+                for (int i = 0; i < languageFieldNames.Length; i++)
                 {
-                    Debug.LogWarning($"[LocalizationManager] KeyName \"{keyName}\"에 해당하는 ELocKey 멤버가 없습니다. Game Framework/Localization/Generate ELocKey + ELanguage From Localization Table로 다시 생성해보세요.");
-                    continue;
-                }
-
-                Dictionary<ELanguage, string> perLanguage = new Dictionary<ELanguage, string>();
-
-                for (int i = 0; i < languageNames.Length; i++)
-                {
-                    string languageName = languageNames[i];
-                    if (languageName == "None")
-                    {
-                        continue;
-                    }
-
+                    string languageName = languageFieldNames[i];
                     string text = GetFieldValue<string>(rowType, row, languageName);
+
                     if (string.IsNullOrEmpty(text))
                     {
                         continue;
                     }
 
-                    Enum.TryParse(languageName, out ELanguage language);
-                    perLanguage[language] = text;
+                    perLanguage[languageName] = text;
                 }
 
-                if (data.ContainsKey(locKey))
+                if (data.ContainsKey(keyName))
                 {
                     Debug.LogWarning($"[LocalizationManager] KeyName \"{keyName}\"이(가) 테이블에 중복으로 있어 나중 행으로 덮어씁니다.");
                 }
 
-                data[locKey] = perLanguage;
+                data[keyName] = perLanguage;
             }
 
             return data;
+        }
+
+        private static string[] ExtractLanguageFieldNames(Type rowType)
+        {
+            FieldInfo[] fields = rowType.GetFields(BindingFlags.Public | BindingFlags.Instance);
+            List<string> names = new List<string>();
+
+            for (int i = 0; i < fields.Length; i++)
+            {
+                FieldInfo field = fields[i];
+
+                if (field.FieldType != typeof(string) || field.Name == "KeyName")
+                {
+                    continue;
+                }
+
+                names.Add(field.Name);
+            }
+
+            return names.ToArray();
         }
 
         private static T GetFieldValue<T>(Type type, object instance, string fieldName)
@@ -269,7 +292,7 @@ namespace GameFramework.Localization
         [Serializable]
         private sealed class LanguageSaveData
         {
-            public ELanguage Language;
+            public string Language;
         }
     }
 }

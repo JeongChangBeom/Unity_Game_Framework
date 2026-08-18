@@ -7,9 +7,14 @@ using UnityEngine;
 
 namespace GameFramework.Localization.Editor
 {
-    // ELocKey.cs/ELanguage.cs는 (Data Parsing이 생성하는 프로젝트 쪽 폴더가 아니라) 이
-    // 패키지의 Runtime 폴더 안에서 직접 재생성됩니다. LocalizationManager가 이 두
-    // enum을 구체 타입으로 참조하기 때문에 같은 어셈블리를 공유해야 하기 때문입니다.
+    // ELocKey.cs/ELanguage.cs는 패키지 자신의 폴더가 아니라 "이 프로젝트"의 Assets
+    // 아래에 생성됩니다. git URL/레지스트리로 설치된 패키지는 읽기 전용 캐시
+    // (Library/PackageCache)에서 로드되기 때문에, 패키지 자신의 Runtime 폴더에
+    // 프로젝트마다 달라지는 값을 쓰는 건 애초에 성립하지 않습니다(SceneLoading의
+    // ESceneKey와 동일한 이유). 그래서 두 enum은 프로젝트 쪽에 생성하고,
+    // LocalizationManager는 이 enum들을 전혀 모르는 채로 string 기반 API만
+    // 제공하며, 강타입 호출부(GetText(ELocKey.X), SetLanguageAsync(ELanguage.X))는
+    // 같이 생성되는 확장 메서드로 제공합니다.
     //
     // Data Parsing이 생성한 Localization 테이블은 프로젝트 쪽에 있어서 이 패키지가
     // 타입으로 직접 참조할 수 없기 때문에, 리플렉션(SerializedProperty)으로 KeyName과
@@ -18,8 +23,8 @@ namespace GameFramework.Localization.Editor
     // (LocalizationManager.cs 참고).
     public static class LocalizationGenerator
     {
-        private const string LocKeyOutputPath = "Packages/com.changbeom.gameframework.localization/Runtime/ELocKey.cs";
-        private const string LanguageOutputPath = "Packages/com.changbeom.gameframework.localization/Runtime/ELanguage.cs";
+        private const string LocKeyOutputPath = "Assets/00.Scripts/GeneratedFramework/ELocKey.cs";
+        private const string LanguageOutputPath = "Assets/00.Scripts/GeneratedFramework/ELanguage.cs";
 
         [MenuItem("Game Framework/Localization/Generate ELocKey + ELanguage From Localization Table")]
         public static void Generate()
@@ -61,11 +66,11 @@ namespace GameFramework.Localization.Editor
                 return;
             }
 
-            List<string> orderedLocKeys = BuildOrderedNames(keyNames, Enum.GetNames(typeof(ELocKey)));
-            List<string> orderedLanguages = BuildOrderedNames(languageColumns, Enum.GetNames(typeof(ELanguage)));
+            List<string> orderedLocKeys = BuildOrderedNames(keyNames, GetExistingEnumNames("ELocKey"));
+            List<string> orderedLanguages = BuildOrderedNames(languageColumns, GetExistingEnumNames("ELanguage"));
 
-            WriteFile(LocKeyOutputPath, BuildCode("ELocKey", orderedLocKeys));
-            WriteFile(LanguageOutputPath, BuildCode("ELanguage", orderedLanguages));
+            WriteFile(LocKeyOutputPath, BuildLocKeyCode(orderedLocKeys));
+            WriteFile(LanguageOutputPath, BuildLanguageCode(orderedLanguages));
 
             // Generate()는 LocalizationTableSync(AssetPostprocessor.OnPostprocessAllAssets)
             // 안에서 호출될 수 있습니다. 그 콜백이 아직 끝나지 않은 도중에
@@ -81,6 +86,28 @@ namespace GameFramework.Localization.Editor
 
                 Debug.Log($"[LocalizationGenerator] 생성됨: ELocKey({keyNames.Count}개), ELanguage({languageColumns.Count}개)");
             };
+        }
+
+        // ELocKey/ELanguage는 이제 프로젝트 쪽(Assets)에 생성되어 이 패키지가 컴파일
+        // 타임에 직접 참조할 수 없으므로, 이미 컴파일된 프로젝트 어셈블리들에서
+        // TypeCache로 찾습니다 (Data Parsing의 TableClassGenerator.TryFindEnumType과
+        // 동일한 패턴). 한 번도 생성된 적 없으면(첫 실행) 못 찾는 게 정상이라 빈
+        // 배열을 반환합니다.
+        private static string[] GetExistingEnumNames(string enumTypeName)
+        {
+            TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<Enum>();
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                Type t = candidates[i];
+
+                if (t.Namespace == "GameFramework.Localization" && t.Name == enumTypeName)
+                {
+                    return Enum.GetNames(t);
+                }
+            }
+
+            return Array.Empty<string>();
         }
 
         private static SerializedProperty FindTableProperty(SerializedObject so)
@@ -232,9 +259,10 @@ namespace GameFramework.Localization.Editor
 
                 if (safe != raw)
                 {
-                    // LocalizationManager는 런타임에 테이블에 적힌 원본 이름 문자열로
-                    // Enum.TryParse하기 때문에, 여기서 이름이 바뀌면(공백/하이픈 등) 그
-                    // 항목은 절대 조회되지 않습니다. 조용히 넘어가지 않고 바로 알려줍니다.
+                    // LocalizationManager는 런타임에 테이블에 적힌 원본 이름 문자열을
+                    // 그대로 키로 쓰기 때문에, 여기서 이름이 바뀌면(공백/하이픈 등) enum
+                    // 멤버로 호출해도 실제로는 다른 문자열을 찾게 되어 그 항목은 절대
+                    // 조회되지 않습니다. 조용히 넘어가지 않고 바로 알려줍니다.
                     Debug.LogError($"[LocalizationGenerator] \"{raw}\"은(는) 유효한 식별자가 아니라서 enum 멤버는 \"{safe}\"로 생성되지만, 런타임에는 원본 이름으로 조회하므로 이 항목은 인식되지 않습니다. 시트의 KeyName/언어 컬럼명을 영문/숫자/밑줄로만 바꿔주세요.");
                 }
 
@@ -247,11 +275,56 @@ namespace GameFramework.Localization.Editor
             return result;
         }
 
-        private static string BuildCode(string enumName, List<string> names)
+        private static string BuildLocKeyCode(List<string> names)
         {
             StringBuilder sb = new StringBuilder();
+            AppendEnumHeader(sb, "ELocKey", names);
 
+            sb.AppendLine();
+            sb.AppendLine("    // LocalizationManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일");
+            sb.AppendLine("    // 타임에 알 수 없습니다. 대신 KeyName(string) 기반 API를 감싸는 확장");
+            sb.AppendLine("    // 메서드로 강타입 호출부(lm.GetText(ELocKey.X))를 그대로 제공합니다.");
+            sb.AppendLine("    public static class ELocKeyExtensions");
+            sb.AppendLine("    {");
+            sb.AppendLine("        public static string GetText(this LocalizationManager manager, ELocKey key)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return manager.GetText(key.ToString());");
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            return sb.ToString();
+        }
+
+        private static string BuildLanguageCode(List<string> names)
+        {
+            StringBuilder sb = new StringBuilder();
+            AppendEnumHeader(sb, "ELanguage", names);
+
+            sb.AppendLine();
+            sb.AppendLine("    // LocalizationManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일");
+            sb.AppendLine("    // 타임에 알 수 없습니다. 대신 언어 코드(string) 기반 API를 감싸는 확장");
+            sb.AppendLine("    // 메서드로 강타입 호출부(lm.SetLanguageAsync(ELanguage.X))를 그대로");
+            sb.AppendLine("    // 제공합니다. OnLanguageChanged는 이벤트라서 확장 메서드로 감쌀 수 없어");
+            sb.AppendLine("    // string 그대로 노출됩니다.");
+            sb.AppendLine("    public static class ELanguageExtensions");
+            sb.AppendLine("    {");
+            sb.AppendLine("        public static Awaitable SetLanguageAsync(this LocalizationManager manager, ELanguage language)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return manager.SetLanguageAsync(language.ToString());");
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            return sb.ToString();
+        }
+
+        private static void AppendEnumHeader(StringBuilder sb, string enumName, List<string> names)
+        {
             sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
+            sb.AppendLine();
+            sb.AppendLine("using UnityEngine;");
+            sb.AppendLine("using GameFramework.Localization;");
             sb.AppendLine();
             sb.AppendLine("namespace GameFramework.Localization");
             sb.AppendLine("{");
@@ -274,9 +347,6 @@ namespace GameFramework.Localization.Editor
             }
 
             sb.AppendLine("    }");
-            sb.AppendLine("}");
-
-            return sb.ToString();
         }
 
         private static void WriteFile(string path, string content)

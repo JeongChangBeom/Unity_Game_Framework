@@ -7,14 +7,21 @@ using UnityEngine;
 
 namespace GameFramework.Pooling.Editor
 {
-    // EPoolKey.cs는 이 패키지의 Runtime 폴더 안에서 직접 재생성됩니다. PoolManager가
-    // EPoolKey를 구체 타입으로 참조하기 때문에 같은 어셈블리를 공유해야 하기 때문입니다.
+    // EPoolKey.cs는 패키지 자신의 폴더가 아니라 "이 프로젝트"의 Assets 아래에 생성됩니다.
+    // git URL/레지스트리로 설치된 패키지는 읽기 전용 캐시(Library/PackageCache)에서
+    // 로드되기 때문에, 패키지 자신의 Runtime 폴더에 프로젝트마다 달라지는 값을 쓰는 건
+    // 애초에 성립하지 않습니다(불변/공유 콘텐츠에 프로젝트별 값을 넣으려는 모순). 그래서
+    // enum은 프로젝트 쪽에 생성하고, PoolManager/UIManager는 이 enum을 전혀 모르는 채로
+    // string 기반 API만 제공하며, 강타입 호출부(pm.Spawn(EPoolKey.X, ...))는 같이
+    // 생성되는 확장 메서드(EPoolKeyExtensions)로 제공합니다. SceneLoading의 ESceneKey와
+    // 동일한 패턴입니다.
+    //
     // 기존 멤버의 선언 순서(=정수 값)는 그대로 보존되고, 새로 등록된 Key만 맨 뒤에 추가됩니다
     // (BuildOrderedNames 참고 -- 순서가 바뀌면 기존에 저장된 EPoolKey 값이 다른 프리팹을
     // 가리키게 되는 사고가 생기기 때문입니다).
     public static class PoolKeyGenerator
     {
-        private const string OutputPath = "Packages/com.changbeom.gameframework.pooling/Runtime/EPoolKey.cs";
+        private const string OutputPath = "Assets/00.Scripts/GeneratedFramework/EPoolKey.cs";
 
         [MenuItem("Game Framework/Pooling/Generate EPoolKey From Pool Settings")]
         public static void Generate()
@@ -84,7 +91,7 @@ namespace GameFramework.Pooling.Editor
             List<string> result = new List<string>();
             HashSet<string> seen = new HashSet<string>();
 
-            string[] existingNames = Enum.GetNames(typeof(EPoolKey));
+            string[] existingNames = GetExistingEnumNames();
             for (int i = 0; i < existingNames.Length; i++)
             {
                 string name = existingNames[i];
@@ -106,6 +113,27 @@ namespace GameFramework.Pooling.Editor
             }
 
             return result;
+        }
+
+        // EPoolKey는 이제 프로젝트 쪽(Assets)에 생성되어 이 패키지가 컴파일 타임에 직접
+        // 참조할 수 없으므로, 이미 컴파일된 프로젝트 어셈블리들에서 TypeCache로 찾습니다
+        // (Data Parsing의 TableClassGenerator.TryFindEnumType과 동일한 패턴). 한 번도
+        // 생성된 적 없으면(첫 실행) 못 찾는 게 정상이라 빈 배열을 반환합니다.
+        private static string[] GetExistingEnumNames()
+        {
+            TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<Enum>();
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                Type t = candidates[i];
+
+                if (t.Namespace == "GameFramework.Pooling" && t.Name == "EPoolKey")
+                {
+                    return Enum.GetNames(t);
+                }
+            }
+
+            return Array.Empty<string>();
         }
 
         // PoolFolderSync도 폴더에서 자동 등록할 때 같은 검증을 재사용합니다.
@@ -152,6 +180,11 @@ namespace GameFramework.Pooling.Editor
 
             sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
             sb.AppendLine();
+            sb.AppendLine("using System;");
+            sb.AppendLine("using UnityEngine;");
+            sb.AppendLine("using GameFramework.Pooling;");
+            sb.AppendLine("using GameFramework.UISystem;");
+            sb.AppendLine();
             sb.AppendLine("namespace GameFramework.Pooling");
             sb.AppendLine("{");
             sb.AppendLine("    public enum EPoolKey");
@@ -170,6 +203,45 @@ namespace GameFramework.Pooling.Editor
                 sb.AppendLine(",");
             }
 
+            sb.AppendLine("    }");
+            sb.AppendLine();
+            sb.AppendLine("    // PoolManager/UIManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일");
+            sb.AppendLine("    // 타임에 알 수 없습니다. 대신 string 기반 API를 감싸는 확장 메서드로 강타입");
+            sb.AppendLine("    // 호출부(pm.Spawn(EPoolKey.X, ...), uiManager.RequestPopup(EPoolKey.X, ...))를");
+            sb.AppendLine("    // 그대로 제공합니다.");
+            sb.AppendLine("    public static class EPoolKeyExtensions");
+            sb.AppendLine("    {");
+            sb.AppendLine("        public static GameObject Spawn(this PoolManager manager, EPoolKey key, Vector3 position, Quaternion rotation, Transform parent = null)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (key == EPoolKey.None)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                Debug.LogError(\"[EPoolKeyExtensions] EPoolKey.None으로는 Spawn할 수 없습니다.\");");
+            sb.AppendLine("                return null;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            return manager.Spawn(key.ToString(), position, rotation, parent);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        public static T Spawn<T>(this PoolManager manager, EPoolKey key, Vector3 position, Quaternion rotation, Transform parent = null) where T : Component");
+            sb.AppendLine("        {");
+            sb.AppendLine("            if (key == EPoolKey.None)");
+            sb.AppendLine("            {");
+            sb.AppendLine("                Debug.LogError(\"[EPoolKeyExtensions] EPoolKey.None으로는 Spawn할 수 없습니다.\");");
+            sb.AppendLine("                return null;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            return manager.Spawn<T>(key.ToString(), position, rotation, parent);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        public static void RequestPopup(this UIManager uiManager, EPoolKey key, EPopupPriority priority, object payload = null, bool unique = true, EPopupPolicy policy = EPopupPolicy.PreemptIfHigher, Action<object> onResult = null)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            uiManager.RequestPopup(key.ToString(), priority, payload, unique, policy, onResult);");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        public static void RequestPopup<TResult>(this UIManager uiManager, EPoolKey key, EPopupPriority priority, Action<TResult> onResult, object payload = null, bool unique = true, EPopupPolicy policy = EPopupPolicy.PreemptIfHigher)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            uiManager.RequestPopup(key.ToString(), priority, onResult, payload, unique, policy);");
+            sb.AppendLine("        }");
             sb.AppendLine("    }");
             sb.AppendLine("}");
 

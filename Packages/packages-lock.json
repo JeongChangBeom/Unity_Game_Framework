@@ -31,7 +31,10 @@
       "version": "file:com.changbeom.gameframework.graphics",
       "depth": 0,
       "source": "embedded",
-      "dependencies": {}
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.saveload": "0.1.0"
+      }
     },
     "com.changbeom.gameframework.input": {
       "version": "file:com.changbeom.gameframework.input",
@@ -48,7 +51,10 @@
       "version": "file:com.changbeom.gameframework.localization",
       "depth": 0,
       "source": "embedded",
-      "dependencies": {}
+      "dependencies": {
+        "com.changbeom.gameframework.core": "0.1.0",
+        "com.changbeom.gameframework.saveload": "0.1.0"
+      }
     },
     "com.changbeom.gameframework.pooling": {
       "version": "file:com.changbeom.gameframework.pooling",
