@@ -8,6 +8,7 @@ using UnityEngine.UI;
 
 namespace GameFramework.UISystem
 {
+    [BootPriority(-10)]
     public class UIManager : MonoSingleton<UIManager>
     {
         private UIManagerSettings _settings;
