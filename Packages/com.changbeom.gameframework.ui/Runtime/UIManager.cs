@@ -608,6 +608,19 @@ namespace GameFramework.UISystem
             if (_uiRootCanvas == null)
             {
                 _uiRootCanvas = UnityEngine.Object.FindFirstObjectByType<Canvas>();
+
+                if (_uiRootCanvas != null)
+                {
+                    // 씬에 이미 배치돼 있던 Canvas를 그대로 재사용하는 경로입니다. 아래의
+                    // "새로 생성" 경로는 go.transform.SetParent(transform, ...)로 UIManager
+                    // 자신(DontDestroyOnLoad 적용됨) 밑에 붙어 자동으로 영속되지만, 이렇게
+                    // 주워온 Canvas는 원래 자기가 배치된 씬에 그대로 속해 있어 영속 대상이
+                    // 아닙니다. HudRoot/PopupRoot/ToastRoot/OverlayRoot가 전부 이 Canvas
+                    // 밑에 생성되므로, 손대지 않으면 이 Canvas가 배치된 씬이 언로드될 때
+                    // UIManager의 UI 레이어 전체가 함께 파괴됩니다. DontDestroyOnLoad는
+                    // 루트 GameObject에만 적용되므로 transform.root 기준으로 호출합니다.
+                    UnityEngine.Object.DontDestroyOnLoad(_uiRootCanvas.transform.root.gameObject);
+                }
             }
 
             if (_uiRootCanvas != null)
