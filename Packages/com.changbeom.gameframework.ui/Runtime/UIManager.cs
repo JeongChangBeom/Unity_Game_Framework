@@ -20,6 +20,9 @@ namespace GameFramework.UISystem
         private RectTransform _overlayRoot;
         private GameObject _modalBlocker;
 
+        private GameObject _hudInstance;
+        private GameObject _overlayInstance;
+
         private readonly List<PopupRequest> _pending = new();
         private readonly HashSet<UIToastBase> _activeToasts = new();
 
@@ -40,6 +43,12 @@ namespace GameFramework.UISystem
         /// <summary>팝업과 토스트보다 위에 있는 최상단 레이어입니다. 전체화면 로딩/전환 연출용입니다.</summary>
         public Transform OverlayRoot => _overlayRoot;
 
+        /// <summary>UIManagerSettings.HudPrefabOverride로 미리 생성해둔 인스턴스입니다(설정 안 했으면 null). 시작 시 비활성화 상태이므로 필요할 때 SetActive(true)로 켜세요.</summary>
+        public GameObject HudInstance => _hudInstance;
+
+        /// <summary>UIManagerSettings.OverlayPrefabOverride로 미리 생성해둔 인스턴스입니다(설정 안 했으면 null). 시작 시 비활성화 상태이므로 필요할 때 SetActive(true)로 켜세요.</summary>
+        public GameObject OverlayInstance => _overlayInstance;
+
         public bool IsAnyPopupOpen => _current != null;
         public bool HasPendingPopups => _pending.Count > 0;
         public bool IsBlockingInput => _current != null;
@@ -56,6 +65,7 @@ namespace GameFramework.UISystem
             EnsureCanvasRoot();
             EnsureLayers();
             EnsureModalBlocker();
+            EnsurePersistentLayerInstances();
         }
 
         private static UIManagerSettings LoadSettings()
@@ -666,6 +676,29 @@ namespace GameFramework.UISystem
             rt.offsetMax = Vector2.zero;
 
             return rt;
+        }
+
+        // HUD/Overlay는 프로젝트가 그때그때 필요할 때 Instantiate하기보다, 초기화 시점에
+        // 미리 만들어두고 활성/비활성만 토글하는 편이 낫습니다(반복 Instantiate/Destroy
+        // 비용, 그 사이 참조 유실 방지). 시작 시 비활성화해두는 이유는 이 인스턴스들이
+        // 무엇을 보여줄지(HUD 수치, 오버레이 내용)는 UIManager가 알 수 없는 프로젝트
+        // 고유 로직이라, 언제 보여줄지도 프로젝트가 직접 결정해야 하기 때문입니다.
+        private void EnsurePersistentLayerInstances()
+        {
+            _hudInstance = InstantiateInactive(_settings.HudPrefabOverride, _hudRoot);
+            _overlayInstance = InstantiateInactive(_settings.OverlayPrefabOverride, _overlayRoot);
+        }
+
+        private static GameObject InstantiateInactive(GameObject prefab, Transform parent)
+        {
+            if (prefab == null)
+            {
+                return null;
+            }
+
+            GameObject instance = Instantiate(prefab, parent);
+            instance.SetActive(false);
+            return instance;
         }
 
         private void EnsureModalBlocker()
