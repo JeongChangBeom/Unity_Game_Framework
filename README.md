@@ -1535,7 +1535,7 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 - `OnLanguageChanged` 이벤트 - 언어가 바뀌면 발행되며, `LocalizedText`가 이 이벤트만으로 동작합니다. 나중에 음성 더빙/언어별 이미지가 필요해져도 이 이벤트만 구독하는 새 컴포넌트를 추가하면 되고, `LocalizationManager` 자체는 손댈 필요가 없습니다
 - `SetLanguageAsync(ELanguage)` - v1은 내부적으로 동기 테이블 룩업이라 사실상 즉시 끝나지만, 나중에 언어 전환이 실제 비동기 작업(리소스 로드 등)이 되어도 호출부가 안 바뀌도록 처음부터 `Awaitable`을 반환합니다
 - **첫 실행 시 언어 결정 순서**: 저장된 언어(SaveManager) → `Application.systemLanguage` 매핑(설정으로 끄기 가능) → Settings의 Default Language
-- `LocalizedText` - Key(`KeyName` 문자열) + 레거시 `Text`를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트
+- `LocalizedText` - Key(`KeyName` 문자열)를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트. 레거시 `Text`와 `TextMeshProUGUI`를 둘 다 지원하며, GameObject에 붙어있는 쪽에 자동으로 반영됩니다
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 
 > **주의**: 음성 더빙이나 언어별 이미지는 이 패키지가 직접 다루지 않습니다. 서버 없이는 지원 언어 데이터를 전부 빌드에 포함할 수밖에 없는데, 텍스트는 용량이 작아 문제되지 않지만 음성/이미지는 다릅니다 - 그런 요구가 실제로 생기면(그리고 서버가 생기면) `OnLanguageChanged`를 구독하는 별도 컴포넌트(예: 오디오는 Sound 패키지 확장, 이미지는 Addressables 원격 카탈로그)로 그때 가서 설계하는 걸 권장합니다.
@@ -1543,7 +1543,7 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 ---
 
 ### 외부 패키지
-없음. Data Parsing이 생성한 `LocalizationTable`은 Sound가 `SoundTable`을 다루는 것과 동일하게 리플렉션으로 읽기 때문에, 이 패키지가 Data Parsing에 직접 의존하지 않습니다.
+`LocalizedText`가 `TextMeshProUGUI`를 지원하기 위해 **Unity 공식 UI 패키지**(`com.unity.ugui`, TextMeshPro 포함)를 사용합니다 - 대부분의 Unity 프로젝트에 기본으로 들어있어 별도 설치가 필요 없는 경우가 많습니다. Data Parsing이 생성한 `LocalizationTable`은 Sound가 `SoundTable`을 다루는 것과 동일하게 리플렉션으로 읽기 때문에, 이 패키지가 Data Parsing에 직접 의존하지는 않습니다.
 
 ---
 
@@ -1575,9 +1575,9 @@ string text = LocalizationManager.Instance.GetText(ELocKey.UI_Button_Start);
 
 #### 3) UI에 자동 반영하기
 ```cs
-// Text 컴포넌트가 있는 GameObject에 LocalizedText를 붙이고 Key를 지정하면 끝
+// Text 또는 TextMeshProUGUI 컴포넌트가 있는 GameObject에 LocalizedText를 붙이고 Key를 지정하면 끝
 ```
-`LocalizedText`는 패키지 자신이 제공하는 컴포넌트라 `ELocKey`를 강타입으로 참조하지 못해, Inspector의 Key 필드는 문자열 입력입니다(`KeyName` 컬럼 값과 정확히 같게 입력). 이후 언어가 바뀔 때마다 알아서 갱신되는 건 동일합니다.
+`LocalizedText`는 패키지 자신이 제공하는 컴포넌트라 `ELocKey`를 강타입으로 참조하지 못해, Inspector의 Key 필드는 문자열 입력입니다(`KeyName` 컬럼 값과 정확히 같게 입력). `Text`/`TextMeshProUGUI` 둘 중 GameObject에 실제로 붙어있는 쪽에 자동으로 반영되고, 언어가 바뀔 때마다 알아서 갱신됩니다. 둘 다 없으면 Console에 에러가 남습니다.
 
 #### 4) 언어 전환
 ```cs

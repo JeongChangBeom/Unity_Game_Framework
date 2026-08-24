@@ -3,7 +3,8 @@
     "rootNamespace": "GameFramework.Localization",
     "references": [
         "GameFramework.Core",
-        "GameFramework.SaveLoad"
+        "GameFramework.SaveLoad",
+        "Unity.TextMeshPro"
     ],
     "includePlatforms": [],
     "excludePlatforms": [],
