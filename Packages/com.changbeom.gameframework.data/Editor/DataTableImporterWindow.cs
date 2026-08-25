@@ -443,6 +443,14 @@ namespace GameFramework.DataParsing.Editor
                         TableClassGenerator.WriteTableScript(tab.scriptPath, tab.className, cols);
                     }
 
+                    // WriteTableScript가 "key:" 컬럼의 Get(EnumName) 메서드를 이미 새로 쓴
+                    // 스크립트에 넣었더라도, 그 EnumName 타입 자체는 아직 존재하지 않을 수
+                    // 있습니다(첫 생성). 재컴파일 전에(AssetDatabase.Refresh() 이전) 여기서
+                    // 미리 만들어둬야 컴파일이 깨지지 않습니다. 스키마가 그대로라
+                    // WriteTableScript를 건너뛴 경우에도, 그 사이 시트 행이 바뀌었을 수
+                    // 있으므로 항상 호출합니다.
+                    TableClassGenerator.SyncKeyEnums(tsv, cols, Path.GetDirectoryName(tab.scriptPath));
+
                     string payloadLine = tab.className + "|" + tab.assetPath + "|" + EscapeForPrefs(tsv);
                     pending.Add(payloadLine);
                 }
@@ -600,6 +608,11 @@ namespace GameFramework.DataParsing.Editor
 
                     method.Invoke(asset, new object[] { tsv });
                     EditorUtility.SetDirty(asset);
+
+                    // "선택 시트 갱신"은 스키마가 그대로면 WriteTableScript를 다시 실행하지
+                    // 않으므로(위 스키마 검증 참고), "key:" 컬럼의 enum 동기화는 여기서
+                    // 별도로 호출해야 새로 추가/삭제된 행의 키 값이 반영됩니다.
+                    TableClassGenerator.SyncKeyEnums(tsv, columns, Path.GetDirectoryName(tab.scriptPath));
                 }
 
                 AssetDatabase.SaveAssets();

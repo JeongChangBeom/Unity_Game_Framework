@@ -3,6 +3,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Text;
 using UnityEditor;
+using UnityEngine;
 
 namespace GameFramework.DataParsing.Editor
 {
@@ -18,6 +19,12 @@ namespace GameFramework.DataParsing.Editor
 
             /// <summary>정규화된(fully-qualified) enum 타입 이름입니다 (type == Enum일 때만 설정됨).</summary>
             public string enumTypeFullName;
+
+            /// <summary>"key:EnumName" 컬럼일 때만 설정됩니다. 필드 타입은 계속 string으로
+            /// 남고(enum: 컬럼과 다름), 이 값이 있으면 WriteTableScript가 생성 클래스에
+            /// Get(EnumName key) 오버로드를 추가하고, SyncKeyEnums가 이 컬럼의 실제 시트 값들로
+            /// 그 EnumName의 .cs 파일을 자동으로 만들거나 갱신합니다.</summary>
+            public string keyEnumName;
         }
 
         public static bool TryExtractColumnsFromTsv(string tsv, out List<ColumnInfo> columns, out string error)
@@ -62,6 +69,7 @@ namespace GameFramework.DataParsing.Editor
 
                 EDataTableColumnType type;
                 string enumTypeFullName = null;
+                string keyEnumName = null;
 
                 if (baseTypeText.StartsWith("enum:", StringComparison.OrdinalIgnoreCase))
                 {
@@ -77,6 +85,37 @@ namespace GameFramework.DataParsing.Editor
 
                     type = EDataTableColumnType.Enum;
                     enumTypeFullName = resolvedType.FullName.Replace('+', '.');
+                }
+                else if (baseTypeText.StartsWith("key:", StringComparison.OrdinalIgnoreCase))
+                {
+                    // "enum:"과 달리 이 시점엔 enum 타입이 존재할 필요가 없습니다(오히려
+                    // 존재하지 않는 게 정상인 첫 생성 경우가 있습니다). 필드는 계속 string으로
+                    // 남습니다 - SyncKeyEnums가 이 컬럼의 실제 시트 값들로 그 enum을 만들거나
+                    // 갱신합니다(WriteTableScript 참고).
+                    keyEnumName = baseTypeText.Substring("key:".Length).Trim();
+
+                    if (string.IsNullOrEmpty(keyEnumName))
+                    {
+                        error = "\"key:\" 뒤에 생성할 enum 이름이 필요합니다 (col=" + (c + 1) + ", name=" + name + ")";
+                        return false;
+                    }
+
+                    if (isArray)
+                    {
+                        error = "\"key:\" 컬럼은 배열(\"[]\")을 지원하지 않습니다 (col=" + (c + 1) + ", name=" + name + ")";
+                        return false;
+                    }
+
+                    for (int i = 0; i < columns.Count; i++)
+                    {
+                        if (columns[i].keyEnumName == keyEnumName)
+                        {
+                            error = "\"key:" + keyEnumName + "\"이(가) 이미 다른 컬럼(\"" + columns[i].columnName + "\")에서 쓰이고 있습니다. 한 enum 이름은 테이블당 한 컬럼에만 쓸 수 있습니다 (col=" + (c + 1) + ", name=" + name + ")";
+                            return false;
+                        }
+                    }
+
+                    type = EDataTableColumnType.String;
                 }
                 else if (!TryParseType(baseTypeText.ToLowerInvariant(), out type))
                 {
@@ -121,6 +160,7 @@ namespace GameFramework.DataParsing.Editor
                 info.type = type;
                 info.isArray = isArray;
                 info.enumTypeFullName = enumTypeFullName;
+                info.keyEnumName = keyEnumName;
 
                 columns.Add(info);
             }
@@ -138,6 +178,8 @@ namespace GameFramework.DataParsing.Editor
         {
             StringBuilder sb = new StringBuilder(16 * 1024);
 
+            List<ColumnInfo> keyColumns = columns.FindAll(c => c.keyEnumName != null);
+
             sb.AppendLine("using System;");
             sb.AppendLine("using System.Collections.Generic;");
             sb.AppendLine("using UnityEngine;");
@@ -151,6 +193,12 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine();
             sb.AppendLine("    private Dictionary<int, Data> _cache;");
             sb.AppendLine("    private bool _cacheBuilt;");
+
+            for (int i = 0; i < keyColumns.Count; i++)
+            {
+                sb.AppendLine("    private Dictionary<string, Data> _keyCache_" + keyColumns[i].fieldName + ";");
+            }
+
             sb.AppendLine();
             sb.AppendLine("    [Serializable]");
             sb.AppendLine("    public class Data");
@@ -204,11 +252,23 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine("        _cacheBuilt = true;");
             sb.AppendLine("    }");
             sb.AppendLine();
+
+            for (int i = 0; i < keyColumns.Count; i++)
+            {
+                AppendKeyAccessor(sb, keyColumns[i]);
+            }
+
             sb.AppendLine("    public void ParseFromTsv(string tsv)");
             sb.AppendLine("    {");
             sb.AppendLine("        _table.Clear();");
             sb.AppendLine("        _cacheBuilt = false;");
             sb.AppendLine("        _cache = null;");
+
+            for (int i = 0; i < keyColumns.Count; i++)
+            {
+                sb.AppendLine("        _keyCache_" + keyColumns[i].fieldName + " = null;");
+            }
+
             sb.AppendLine();
             sb.AppendLine("        TsvTable table = TsvParser.Parse(tsv);");
             sb.AppendLine("        if (table == null)");
@@ -270,6 +330,321 @@ namespace GameFramework.DataParsing.Editor
 
             File.WriteAllText(scriptPath, sb.ToString(), Encoding.UTF8);
             AssetDatabase.ImportAsset(scriptPath);
+        }
+
+        // Get(EnumName key)는 항상 문자열 필드(col.fieldName) 값으로 조회합니다 - 필드
+        // 타입은 절대 enum으로 바꾸지 않으므로(SyncKeyEnums 참고), "선택 시트 갱신"이
+        // 스키마 불변 시 이 클래스를 재컴파일하지 않고도 계속 동작합니다.
+        private static void AppendKeyAccessor(StringBuilder sb, ColumnInfo col)
+        {
+            string cache = "_keyCache_" + col.fieldName;
+            string build = "BuildKeyCacheIfNeeded_" + col.fieldName;
+
+            sb.AppendLine("    public Data Get(" + col.keyEnumName + " key)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        " + build + "();");
+            sb.AppendLine();
+            sb.AppendLine("        Data d;");
+            sb.AppendLine("        if (!" + cache + ".TryGetValue(key.ToString(), out d))");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return null;");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        return d;");
+            sb.AppendLine("    }");
+            sb.AppendLine();
+            sb.AppendLine("    private void " + build + "()");
+            sb.AppendLine("    {");
+            sb.AppendLine("        if (" + cache + " != null)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            return;");
+            sb.AppendLine("        }");
+            sb.AppendLine();
+            sb.AppendLine("        " + cache + " = new Dictionary<string, Data>();");
+            sb.AppendLine();
+            sb.AppendLine("        for (int i = 0; i < _table.Count; i++)");
+            sb.AppendLine("        {");
+            sb.AppendLine("            Data d = _table[i];");
+            sb.AppendLine("            if (d == null || string.IsNullOrEmpty(d." + col.fieldName + "))");
+            sb.AppendLine("            {");
+            sb.AppendLine("                continue;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            if (" + cache + ".ContainsKey(d." + col.fieldName + "))");
+            sb.AppendLine("            {");
+            sb.AppendLine("                Debug.LogWarning(\"[Table] 중복 " + col.fieldName + " 스킵: key=\" + d." + col.fieldName + ");");
+            sb.AppendLine("                continue;");
+            sb.AppendLine("            }");
+            sb.AppendLine();
+            sb.AppendLine("            " + cache + "[d." + col.fieldName + "] = d;");
+            sb.AppendLine("        }");
+            sb.AppendLine("    }");
+            sb.AppendLine();
+        }
+
+        /// <summary>
+        /// "key:EnumName" 컬럼들의 실제 시트 값(행)을 읽어, 필요하면 그 EnumName의 .cs 파일을
+        /// outputDir에 새로 쓰거나 갱신합니다. WriteTableScript(스키마 기반)와 달리 이 메서드는
+        /// 행 값에만 의존하므로, 스키마가 그대로라 WriteTableScript가 실행되지 않는 "선택 시트
+        /// 갱신"에서도 반드시 호출되어야 새로 추가/삭제된 행의 키 값이 enum에 반영됩니다
+        /// (DataTableImporterWindow의 생성/갱신 두 경로 모두에서 호출). outputDir은 보통
+        /// 테이블 클래스 스크립트와 같은 폴더를 넘깁니다.
+        /// </summary>
+        public static void SyncKeyEnums(string tsv, List<ColumnInfo> columns, string outputDir)
+        {
+            TsvTable table = TsvParser.Parse(tsv);
+            if (table == null)
+            {
+                return;
+            }
+
+            for (int i = 0; i < columns.Count; i++)
+            {
+                ColumnInfo col = columns[i];
+                if (col.keyEnumName == null)
+                {
+                    continue;
+                }
+
+                SyncOneKeyEnum(table, col, outputDir);
+            }
+        }
+
+        private static void SyncOneKeyEnum(TsvTable table, ColumnInfo col, string outputDir)
+        {
+            List<string> rawValues = new List<string>();
+
+            for (int r = 3; r < table.RowCount; r++)
+            {
+                string raw = table.GetCell(r, col.colIndex).Trim();
+
+                if (!string.IsNullOrEmpty(raw))
+                {
+                    rawValues.Add(raw);
+                }
+            }
+
+            if (!TryGetExistingGlobalEnumNames(col.keyEnumName, out string[] existingNames))
+            {
+                // 동일 이름의 enum이 여러 개 있어 모호합니다 - 로그는
+                // TryGetExistingGlobalEnumNames가 이미 남겼으므로 여기서는 그냥 건너뜁니다.
+                return;
+            }
+
+            List<string> ordered = BuildOrderedKeyNames(rawValues, existingNames);
+            bool alreadyExists = existingNames.Length > 0;
+
+            if (alreadyExists && SameMembers(existingNames, ordered))
+            {
+                return;
+            }
+
+            string path = outputDir.TrimEnd('/', '\\') + "/" + col.keyEnumName + ".cs";
+            string content = BuildKeyEnumFileContent(col.keyEnumName, ordered);
+            WriteKeyEnumFile(path, content, col.keyEnumName, ordered.Count);
+        }
+
+        /// <summary>이미 컴파일된 프로젝트 어셈블리들에서 같은 이름의 "전역 네임스페이스"
+        /// enum을 찾습니다(key: enum은 항상 전역에 생성되므로, 다른 네임스페이스의 동명
+        /// enum은 무시합니다 - 예: 마이그레이션 중 남아있는 구 GameFramework.SoundSystem.ESound와
+        /// 헷갈리지 않도록). 한 번도 생성된 적 없으면(첫 실행) 못 찾는 게 정상이라 빈 배열을
+        /// 반환합니다. 전역 네임스페이스에 동일 이름 enum이 여러 개면(있을 수 없어야 정상이지만)
+        /// 어느 걸 "기존 값"으로 봐야 할지 알 수 없어 실패로 처리합니다.</summary>
+        private static bool TryGetExistingGlobalEnumNames(string enumTypeName, out string[] names)
+        {
+            names = Array.Empty<string>();
+
+            TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<Enum>();
+            Type found = null;
+
+            for (int i = 0; i < candidates.Count; i++)
+            {
+                Type t = candidates[i];
+
+                if (t.Name != enumTypeName || t.Namespace != null)
+                {
+                    continue;
+                }
+
+                if (found != null)
+                {
+                    Debug.LogError("[TableClassGenerator] 전역 네임스페이스에 동일 이름의 enum이 여러 개입니다: " + enumTypeName);
+                    return false;
+                }
+
+                found = t;
+            }
+
+            if (found != null)
+            {
+                names = Enum.GetNames(found);
+            }
+
+            return true;
+        }
+
+        /// <summary>새로 생성할 때 이름을 시트 순서 그대로 두면, enum은 값을 안 주면 선언
+        /// 순서대로 0,1,2...가 매겨지기 때문에, 기존 멤버는 시트에서 지워졌더라도 순서/값을
+        /// 그대로 보존하고(저장된 데이터/Inspector 참조가 조용히 다른 값을 가리키지 않도록)
+        /// 새로 추가된 이름만 맨 뒤에 붙입니다. "None"은 항상 0번으로 별도 예약되어 있어
+        /// 결과 목록에서 제외합니다(BuildKeyEnumFileContent가 항상 맨 앞에 붙임).</summary>
+        private static List<string> BuildOrderedKeyNames(List<string> sheetValues, string[] existingNames)
+        {
+            List<string> result = new List<string>();
+            HashSet<string> seen = new HashSet<string>();
+
+            for (int i = 0; i < existingNames.Length; i++)
+            {
+                string name = existingNames[i];
+
+                if (name == "None" || !seen.Add(name))
+                {
+                    continue;
+                }
+
+                result.Add(name);
+            }
+
+            for (int i = 0; i < sheetValues.Count; i++)
+            {
+                string raw = sheetValues[i];
+                string safe = MakeEnumName(raw);
+
+                if (string.IsNullOrEmpty(safe))
+                {
+                    continue;
+                }
+
+                if (safe == "None")
+                {
+                    Debug.LogWarning("[TableClassGenerator] \"" + raw + "\"은(는) 예약된 이름 \"None\"과 겹쳐서 별도 멤버로 생성되지 않고 기존 None(0)과 합쳐집니다. 시트의 값을 바꿔주세요.");
+                    continue;
+                }
+
+                if (safe != raw)
+                {
+                    // Get(enum)은 key.ToString()(=enum 멤버 이름)으로 원본 문자열 필드 값을
+                    // 그대로 조회합니다. 여기서 이름이 sanitize로 바뀌면 둘이 달라져서 이
+                    // 항목은 Get(enum)으로 절대 조회되지 않습니다 - 조용히 넘어가지 않고
+                    // 바로 알려줍니다.
+                    Debug.LogError("[TableClassGenerator] \"" + raw + "\"은(는) 유효한 식별자가 아니라서 enum 멤버는 \"" + safe + "\"로 생성되지만, Get(enum) 조회는 원본 값(\"" + raw + "\")으로 이루어지므로 이 항목은 조회되지 않습니다. 시트 값을 영문/숫자/밑줄로만 바꿔주세요.");
+                }
+
+                if (seen.Add(safe))
+                {
+                    result.Add(safe);
+                }
+            }
+
+            return result;
+        }
+
+        private static bool SameMembers(string[] existingNames, List<string> ordered)
+        {
+            List<string> existingWithoutNone = new List<string>();
+
+            for (int i = 0; i < existingNames.Length; i++)
+            {
+                if (existingNames[i] != "None")
+                {
+                    existingWithoutNone.Add(existingNames[i]);
+                }
+            }
+
+            if (existingWithoutNone.Count != ordered.Count)
+            {
+                return false;
+            }
+
+            for (int i = 0; i < ordered.Count; i++)
+            {
+                if (existingWithoutNone[i] != ordered[i])
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        private static string BuildKeyEnumFileContent(string enumName, List<string> orderedNames)
+        {
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
+            sb.AppendLine();
+            sb.AppendLine("public enum " + enumName);
+            sb.AppendLine("{");
+            sb.AppendLine("    None = 0,");
+
+            for (int i = 0; i < orderedNames.Count; i++)
+            {
+                sb.AppendLine("    " + orderedNames[i] + ",");
+            }
+
+            sb.AppendLine("}");
+
+            return sb.ToString();
+        }
+
+        private static void WriteKeyEnumFile(string path, string content, string enumName, int count)
+        {
+            string dir = Path.GetDirectoryName(path);
+
+            if (!string.IsNullOrEmpty(dir) && !Directory.Exists(dir))
+            {
+                Directory.CreateDirectory(dir);
+            }
+
+            File.WriteAllText(path, content, new UTF8Encoding(false));
+            AssetDatabase.ImportAsset(path);
+
+            Debug.Log("[TableClassGenerator] 생성됨: " + enumName + "(" + count + "개)");
+        }
+
+        // MakeEnumName: 공백/하이픈을 밑줄로 바꾸고, 영문/숫자/밑줄이 아닌 문자는 제거해서
+        // 유효한 C# 식별자를 만듭니다. 숫자로 시작하면 앞에 밑줄을 붙입니다. ToSafeFieldName과
+        // 달리 여기서는 잘못된 문자를 "_"로 치환하지 않고 아예 제거합니다 - 결과가 원본과
+        // 달라지면(BuildOrderedKeyNames에서) 에러로 알리는 쪽이 필드 이름 sanitize보다
+        // 엄격해야 하기 때문입니다(치환하면 서로 다른 원본 값이 같은 이름으로 뭉개질 수 있음).
+        private static string MakeEnumName(string raw)
+        {
+            if (string.IsNullOrEmpty(raw))
+            {
+                return null;
+            }
+
+            string s = raw.Trim().Replace(" ", "_").Replace("-", "_");
+            StringBuilder sb = new StringBuilder();
+
+            for (int i = 0; i < s.Length; i++)
+            {
+                char c = s[i];
+
+                bool ok =
+                    (c >= 'a' && c <= 'z') ||
+                    (c >= 'A' && c <= 'Z') ||
+                    (c >= '0' && c <= '9') ||
+                    (c == '_');
+
+                if (ok)
+                {
+                    sb.Append(c);
+                }
+            }
+
+            string result = sb.ToString();
+
+            if (string.IsNullOrEmpty(result))
+            {
+                return null;
+            }
+
+            if (result[0] >= '0' && result[0] <= '9')
+            {
+                result = "_" + result;
+            }
+
+            return result;
         }
 
         private static void AppendParseAssign(StringBuilder sb, string dataVar, ColumnInfo col, string className)

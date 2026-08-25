@@ -42,13 +42,13 @@ namespace GameFramework.Tests
                     continue;
                 }
 
-                GUILayout.Label($"{key} = {LocalizationManager.Instance.GetText(key)}");
+                GUILayout.Label($"{key} = {LocalizationManager.Instance.GetText(key.ToString())}");
             }
 
             GUILayout.Space(10);
             if (GUILayout.Button("존재하지 않는 키 조회 테스트 (None - 에러 로그 1회만 남아야 함)"))
             {
-                Log($"GetText(None) = {LocalizationManager.Instance.GetText(ELocKey.None)}");
+                Log($"GetText(None) = {LocalizationManager.Instance.GetText(ELocKey.None.ToString())}");
             }
 
             GUILayout.Space(10);

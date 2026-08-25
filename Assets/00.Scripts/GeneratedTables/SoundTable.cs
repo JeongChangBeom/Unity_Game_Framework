@@ -11,6 +11,7 @@ public class SoundTable : ScriptableObject
 
     private Dictionary<int, Data> _cache;
     private bool _cacheBuilt;
+    private Dictionary<string, Data> _keyCache_fileName;
 
     [Serializable]
     public class Data
@@ -59,11 +60,52 @@ public class SoundTable : ScriptableObject
         _cacheBuilt = true;
     }
 
+    public Data Get(ESound key)
+    {
+        BuildKeyCacheIfNeeded_fileName();
+
+        Data d;
+        if (!_keyCache_fileName.TryGetValue(key.ToString(), out d))
+        {
+            return null;
+        }
+
+        return d;
+    }
+
+    private void BuildKeyCacheIfNeeded_fileName()
+    {
+        if (_keyCache_fileName != null)
+        {
+            return;
+        }
+
+        _keyCache_fileName = new Dictionary<string, Data>();
+
+        for (int i = 0; i < _table.Count; i++)
+        {
+            Data d = _table[i];
+            if (d == null || string.IsNullOrEmpty(d.fileName))
+            {
+                continue;
+            }
+
+            if (_keyCache_fileName.ContainsKey(d.fileName))
+            {
+                Debug.LogWarning("[Table] 중복 fileName 스킵: key=" + d.fileName);
+                continue;
+            }
+
+            _keyCache_fileName[d.fileName] = d;
+        }
+    }
+
     public void ParseFromTsv(string tsv)
     {
         _table.Clear();
         _cacheBuilt = false;
         _cache = null;
+        _keyCache_fileName = null;
 
         TsvTable table = TsvParser.Parse(tsv);
         if (table == null)

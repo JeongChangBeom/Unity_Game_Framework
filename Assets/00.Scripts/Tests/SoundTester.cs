@@ -1,3 +1,4 @@
+using GameFramework.DataParsing;
 using GameFramework.SoundSystem;
 using UnityEngine;
 
@@ -19,8 +20,7 @@ namespace GameFramework.Tests
             GUILayout.Label("Playback");
             if (GUILayout.Button("1) Play BGM"))
             {
-                SoundManager.Instance.PlaySound(_bgmSound);
-                Log("PlaySound(" + _bgmSound + ")");
+                PlayById(_bgmSound);
             }
 
             if (GUILayout.Button("2) Stop BGM"))
@@ -31,14 +31,12 @@ namespace GameFramework.Tests
 
             if (GUILayout.Button("3) Play One-Shot"))
             {
-                SoundManager.Instance.PlaySound(_oneShotSound);
-                Log("PlaySound(" + _oneShotSound + ")");
+                PlayById(_oneShotSound);
             }
 
             if (GUILayout.Button("4) Stop This Sound via StopSound(BGM id) -- proves StopSound also stops BGM"))
             {
-                SoundManager.Instance.StopSound(_bgmSound);
-                Log("StopSound(" + _bgmSound + ")");
+                StopById(_bgmSound);
             }
 
             if (GUILayout.Button("5) Stop All One-Shots"))
@@ -87,7 +85,7 @@ namespace GameFramework.Tests
             GUILayout.Label("Ducking (play a Voice-channel sound to test)");
             if (GUILayout.Button("11) Play BGM then simulate Voice ducking"))
             {
-                SoundManager.Instance.PlaySound(_bgmSound);
+                PlayById(_bgmSound);
                 Log("BGM 시작됨. 덕킹을 확인하려면 Voice 채널 ESound를 재생하세요.");
             }
 
@@ -102,6 +100,35 @@ namespace GameFramework.Tests
             GUILayout.EndScrollView();
 
             GUILayout.EndArea();
+        }
+
+        // PlaySound(ESound) 확장 메서드는 삭제되었습니다 - ESound는 이제 Data Parsing이
+        // SoundTable.Get(ESound)으로 원본 행을 조회하도록만 제공하고, SoundManager는
+        // 계속 string(FileName) 기반 API만 노출합니다.
+        private void PlayById(ESound id)
+        {
+            SoundTable.Data row = DataManager.Instance.GetTable<SoundTable>().Get(id);
+            if (row == null)
+            {
+                Log("Get(" + id + ") = null (SoundTable에 해당 행 없음)");
+                return;
+            }
+
+            SoundManager.Instance.PlaySound(row.fileName);
+            Log("PlaySound(" + row.fileName + ") via Get(" + id + ")");
+        }
+
+        private void StopById(ESound id)
+        {
+            SoundTable.Data row = DataManager.Instance.GetTable<SoundTable>().Get(id);
+            if (row == null)
+            {
+                Log("Get(" + id + ") = null (SoundTable에 해당 행 없음)");
+                return;
+            }
+
+            SoundManager.Instance.StopSound(row.fileName);
+            Log("StopSound(" + row.fileName + ") via Get(" + id + ")");
         }
 
         private void Log(string msg)

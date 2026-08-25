@@ -190,6 +190,31 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 |`bool`|bool|`1`/`0`/`true`/`false` 모두 인식|
 |`int[]`, `long[]`, `float[]`, `double[]`, `string[]`, `bool[]`|배열|셀 안에서 콤마(`,`)로 구분. 예: `1,2,3`|
 |`enum:EnumTypeName`|해당 enum 타입|먼저 C# 코드에 `public enum EnumTypeName { ... }`을 정의해야 함. 배열은 `enum:EnumTypeName[]`|
+|`key:EnumName`|string (필드 타입은 그대로 string)|배열 불가. 아래 "key 컬럼" 참고|
+
+---
+
+### key 컬럼 - 시트 값으로 만드는 조회용 enum
+`enum:`은 **이미 존재하는** enum을 참조하는 용도지만, `key:EnumName`은 반대로 **그 컬럼의 시트 값 자체로 enum을 자동 생성**하고, 그 enum으로 행 전체를 조회할 수 있게 해줍니다 - "이 행의 고유 이름"에 해당하는 컬럼(예: `KeyName`, `FileName`)에 씁니다.
+
+```
+RowKey | Name  | ItemKey
+       | string| key:EItemKey
+1001   | 불꽃검 | FireSword
+1002   | 돌방패 | IceShield
+```
+
+"선택 시트 생성/갱신"을 실행할 때마다(버튼 하나로 끝 - 별도 메뉴 없음):
+1. `ItemTable.cs`가 있는 폴더에 `EItemKey.cs`가 자동으로 생성/갱신됩니다(`None = 0` 예약 + 시트에 등장하는 값들, 기존 멤버 순서/값은 보존되고 새 값만 뒤에 추가됨).
+2. `ItemTable`에 `Get(EItemKey key)` 오버로드가 추가되어(기존 `Get(int rowKey)`와 나란히), 그 행 전체를 바로 조회할 수 있습니다:
+```cs
+ItemTable.Data item = DataManager.Instance.GetTable<ItemTable>().Get(EItemKey.FireSword);
+```
+
+- `ItemKey` 필드 자체는 계속 `string`입니다(`enum:`과 다름) - "선택 시트 갱신"이 스키마가 그대로면 재컴파일 없이 데이터만 갱신하는 기존 동작을 그대로 유지하기 위함입니다.
+- 시트 값이 유효한 C# 식별자가 아니면(공백/특수문자 등) Console 에러가 남습니다 - `Get(enum)`은 `key.ToString()`으로 원본 문자열을 조회하므로, 정제된 이름과 원본이 다르면 그 행은 절대 조회되지 않기 때문입니다.
+- 한 enum 이름은 테이블당 한 컬럼에만 쓸 수 있고, 값이 행마다 중복되면 경고 후 첫 값만 유지됩니다.
+- 같은 테이블에 `key:` 컬럼을 여러 개 둘 수 있습니다(각각 다른 enum 이름이면) - `Get(EnumA)`/`Get(EnumB)`가 나란히 생깁니다.
 
 ---
 
@@ -232,7 +257,7 @@ enum은 시트에 문자열로 적은 값(`"Fire"` 등)을 실제 C# enum으로 
 - `IPoolable.OnSpawn/OnDespawn` 상태 초기화 훅 제공 (자식 오브젝트 포함 자동 호출)
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 - Pool Settings에 등록한 Key로 프리팹 참조 없이 바로 Spawn 가능
-- `EPoolKey` 자동 생성 - Key 오타를 컴파일 타임 에러로 잡음 (Sound System의 `ESound`와 동일한 방식)
+- `EPoolKey` 자동 생성 - Key 오타를 컴파일 타임 에러로 잡음 (Scene Loading의 `ESceneKey`와 동일한 방식)
 - `Assets/02.Prefabs/Pooling/`에 프리팹을 넣기만 하면 Pool Settings 등록 + `EPoolKey` 재생성까지 전부 자동 (버튼 조작 불필요)
 
 ---
@@ -488,19 +513,19 @@ public class MandatoryConfirmPopup : UIPopupBase
 - Sound Sheet 기반 사운드 관리
   * Channel(BGM/SFX/UI/Voice), Volume, Loop, MaxConcurrent 등을 Sheet에서 관리
 - ESound 자동 생성
-  * Sheet의 `FileName`을 기반으로 `ESound` enum 자동 생성
+  * Sound 시트의 `FileName` 컬럼 타입을 `key:ESound`로 선언하면, Data Parsing이 "선택 시트 생성/갱신"마다 `ESound` enum을 자동 생성/동기화 (Sound 패키지 자체는 이 enum을 만들지 않음)
 - Addressables 자동 등록
   * Sound 폴더 스캔 후 Addressables 그룹에 자동 등록
   * Addressables address = fileName 규칙 강제
-- Sound 데이터는 Data Parsing이 생성하는 `SoundTable` 하나로 통일 (별도의 데이터베이스 에셋 없음) - `SoundTable`이 갱신될 때마다 ESound 재생성 + Addressables 등록까지 버튼 없이 자동 동기화
+- Sound 데이터는 Data Parsing이 생성하는 `SoundTable` 하나로 통일 (별도의 데이터베이스 에셋 없음) - `SoundTable`이 갱신될 때마다 ESound 동기화 + Addressables 등록까지 버튼 없이 자동
 - 사운드 재생 통합 API
-  * `SoundManager.Instance.PlaySound(ESound.xxx)` 형태로 단순 사용
+  * `SoundManager.Instance.PlaySound(string fileName)` - `SoundTable.Get(ESound.xxx)`로 행을 조회해 `fileName`을 넘기면 Key 오타를 컴파일 타임에 잡을 수 있음
   * Channel이 BGM이면 자동으로 크로스페이드 전환, 그 외에는 원샷 재생
 - BGM 크로스페이드
 - 동시 재생 제한
   * 사운드별 MaxConcurrent 설정 지원
 - 개별 사운드 정지
-  * `StopSound(ESound id)`로 현재 재생 중인 특정 사운드(BGM/원샷 불문)만 골라서 정지
+  * `StopSound(string id)`로 현재 재생 중인 특정 사운드(BGM/원샷 불문)만 골라서 정지
   * `StopAll()`로 BGM + 모든 원샷을 한 번에 전부 정지
 - Voice 재생 시 BGM 자동 더킹(Ducking)
   * Voice 채널 사운드가 재생되는 동안 BGM 볼륨을 자동으로 낮추고, 끝나면 원복
@@ -530,7 +555,7 @@ public class MandatoryConfirmPopup : UIPopupBase
 ---
 
 #### 2) Google Sheet(Sound 탭)에 Row 추가
-`FileName`은 확장자 제외 파일명과 반드시 동일해야 합니다.
+`FileName`은 확장자 제외 파일명과 반드시 동일해야 합니다. `FileName` 컬럼의 타입은 `key:ESound`로 지정하세요(Data Parsing의 "key 컬럼" 기능 - [1. Data Parsing](#data) 참고).
 
 예)
 |Google Sheet|
@@ -543,18 +568,21 @@ public class MandatoryConfirmPopup : UIPopupBase
 Data Parsing의 `Game Framework/Data Parsing/DataTable Importer`에서 Sound 탭을 다른 테이블(Item/Monster/Quest 등)과 완전히 똑같은 방식으로 "선택 시트 생성"/"선택 시트 갱신"합니다. Sound만을 위한 별도 절차나 예외는 없습니다 - `SoundTable.cs`/`SoundTable.asset`이 그대로 생성됩니다.
 
 `SoundTable`이 (재)생성되는 순간 **버튼 조작 없이 자동으로**:
-1. `ESound.cs` 재생성 (`FileName` 기반)
+1. `FileName` 컬럼이 `key:ESound`이므로, Data Parsing이 `ESound.cs`를 `SoundTable.cs`와 같은 폴더에 생성/갱신 (기존 멤버 순서/값은 보존)
 2. `Assets/03.Sound/`의 AudioClip을 Addressables `Sound` 그룹에 자동 등록 (address = fileName)
 
-`ESound`는 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`Assets/00.Scripts/GeneratedFramework/ESound.cs`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `SoundManager`/`SoundPlayer` 자체는 `FileName` 문자열만 알고 `ESound`를 전혀 참조하지 않으며, `PlaySound(ESound.xxx)`처럼 강타입으로 호출할 수 있는 건 `ESound.cs`에 같이 생성되는 확장 메서드 덕분입니다. `SoundTable`을 아직 한 번도 생성하지 않았다면 이 파일 자체가 없는 상태입니다.
+`ESound`는 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`SoundTable.cs`와 같은 폴더, 기본 `Assets/00.Scripts/GeneratedTables/ESound.cs`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `SoundManager`/`SoundPlayer` 자체는 `FileName` 문자열만 알고 `ESound`를 전혀 참조하지 않습니다 - 강타입으로 재생하고 싶으면 `SoundTable.Get(ESound key)`로 행을 조회해 `FileName` 문자열을 얻은 뒤 `PlaySound`에 넘기면 됩니다(아래 5번 예시). `SoundTable`을 아직 한 번도 생성하지 않았다면 `ESound` 자체가 없는 상태입니다.
 
 `SoundManager`는 프로젝트가 생성한 `SoundTable` 타입을 직접 참조할 수 없기 때문에(패키지는 프로젝트를 참조할 수 없음), 부팅 시 `SoundTable`을 1회 리플렉션으로 읽어 Channel/Volume/MaxConcurrent/Loop를 자체 Dictionary로 캐싱합니다 - 별도의 데이터베이스 에셋은 없습니다.
 
-수동으로 다시 실행하고 싶을 때를 위한 메뉴도 남아 있습니다: `Game Framework/Sound System/Generate ESound + Register Addressables`.
+Addressables 등록만 수동으로 다시 실행하고 싶을 때를 위한 메뉴도 남아 있습니다: `Game Framework/Sound System/Register Addressables From Sound Table` (ESound 생성은 이 메뉴가 아니라 Data Parsing의 "선택 시트 생성/갱신"이 담당합니다).
 
 이제 런타임에서 다음처럼 바로 사용 가능합니다.
 
-`SoundManager.Instance.PlaySound(ESound.UI_Click);`
+```cs
+SoundTable.Data row = DataManager.Instance.GetTable<SoundTable>().Get(ESound.UI_Click);
+SoundManager.Instance.PlaySound(row.fileName);
+```
 
 ---
 
@@ -574,23 +602,28 @@ Data Parsing의 `Game Framework/Data Parsing/DataTable Importer`에서 Sound 탭
 ---
 
 #### 5) 런타임 사용
+`ESound`로 Key 오타 없이 `FileName`을 얻는 작은 헬퍼를 하나 두면 편합니다(`SoundTester.cs`의 `PlayById`/`StopById` 참고):
+
+```cs
+private static string FileNameOf(ESound id) => DataManager.Instance.GetTable<SoundTable>().Get(id)?.fileName;
+```
 
 ```cs
 // SFX/UI/Voice - 원샷 재생
-SoundManager.Instance.PlaySound(ESound.UI_Click);
-SoundManager.Instance.PlaySound(ESound.SFX_Merge);
+SoundManager.Instance.PlaySound(FileNameOf(ESound.UI_Click));
+SoundManager.Instance.PlaySound(FileNameOf(ESound.SFX_Merge));
 
 // Voice 재생 시 SoundManagerSettings.DuckBgmOnVoice가 켜져 있으면 BGM이 자동으로 낮아졌다 복구됩니다.
-SoundManager.Instance.PlaySound(ESound.Voice_Greeting);
+SoundManager.Instance.PlaySound(FileNameOf(ESound.Voice_Greeting));
 
 // BGM - 자동 크로스페이드 전환
-SoundManager.Instance.PlaySound(ESound.BGM_Main);
+SoundManager.Instance.PlaySound(FileNameOf(ESound.BGM_Main));
 
 // BGM 정지
 SoundManager.Instance.StopBgm();
 
 // 특정 사운드만 정지 (BGM/원샷 불문, 현재 재생 중인 모든 인스턴스)
-SoundManager.Instance.StopSound(ESound.SFX_Merge);
+SoundManager.Instance.StopSound(FileNameOf(ESound.SFX_Merge));
 
 // 모든 원샷 정지
 SoundManager.Instance.StopAllOneShots();
@@ -1529,9 +1562,10 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 
 ### 기능
 - Data Parsing의 "Localization" 시트 탭으로 텍스트를 관리 (`RowKey`, `KeyName`, 언어별 컬럼)
-- `ELocKey`/`ELanguage` 자동 생성 - `LocalizationTable`이 (재)생성되는 순간 버튼 조작 없이 자동으로 동기화 (Sound의 `ESound`와 동일한 방식)
+- `ELocKey` 자동 생성 - `KeyName` 컬럼 타입을 `key:ELocKey`로 선언하면 Data Parsing이 "선택 시트 생성/갱신"마다 자동 생성/동기화 (Localization 패키지 자체는 이 enum을 만들지 않음)
+- `ELanguage` 자동 생성 - 언어 컬럼 이름 기반이라 Localization 패키지가 직접 생성하되, `LocalizationTable`이 (재)생성되는 순간 버튼 조작 없이 자동으로 동기화
 - **언어 컬럼도 완전 자동 인식** - 시트에 새 언어 컬럼(`RowKey`/`KeyName`을 제외한 나머지 전부)을 추가하고 재생성하면 `ELanguage`에 코드 수정 없이 새 멤버가 생깁니다
-- `GetText(ELocKey)` - 현재 언어에 번역이 없으면 Fallback Language로 대체, 그마저 없으면 `"[MISSING:key]"` + 에러 로그로 누락을 눈에 띄게 표시
+- `GetText(string key)` - 현재 언어에 번역이 없으면 Fallback Language로 대체, 그마저 없으면 `"[MISSING:key]"` + 에러 로그로 누락을 눈에 띄게 표시. `ELocKey`로 Key 오타를 컴파일 타임에 잡고 싶으면 `LocalizationTable.Get(ELocKey.X)`로 행을 조회해 `KeyName`을 얻으면 됩니다
 - `OnLanguageChanged` 이벤트 - 언어가 바뀌면 발행되며, `LocalizedText`가 이 이벤트만으로 동작합니다. 나중에 음성 더빙/언어별 이미지가 필요해져도 이 이벤트만 구독하는 새 컴포넌트를 추가하면 되고, `LocalizationManager` 자체는 손댈 필요가 없습니다
 - `SetLanguageAsync(ELanguage)` - v1은 내부적으로 동기 테이블 룩업이라 사실상 즉시 끝나지만, 나중에 언어 전환이 실제 비동기 작업(리소스 로드 등)이 되어도 호출부가 안 바뀌도록 처음부터 `Awaitable`을 반환합니다
 - **첫 실행 시 언어 결정 순서**: 저장된 언어(SaveManager) → `Application.systemLanguage` 매핑(설정으로 끄기 가능) → Settings의 Default Language
@@ -1550,7 +1584,7 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 ### 사용 방법
 
 #### 1) 시트 작성 (Data Parsing)
-"Localization" 탭에 아래처럼 작성합니다. 언어 컬럼 이름(`KO`/`EN`/`JP` 등)이 그대로 `ELanguage` 멤버 이름이 되므로, 영문/숫자/밑줄로만 짓는 걸 권장합니다.
+"Localization" 탭에 아래처럼 작성합니다. 언어 컬럼 이름(`KO`/`EN`/`JP` 등)이 그대로 `ELanguage` 멤버 이름이 되므로, 영문/숫자/밑줄로만 짓는 걸 권장합니다. `KeyName` 컬럼의 타입은 `key:ELocKey`로 지정하세요(Data Parsing의 "key 컬럼" 기능 - [1. Data Parsing](#data) 참고).
 
 |RowKey|KeyName|KO|EN|JP|
 |-|-|-|-|-|
@@ -1559,18 +1593,23 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 `Game Framework/Data Parsing/DataTable Importer`에서 다른 테이블과 완전히 같은 방식으로 "선택 시트 생성"/"선택 시트 갱신"합니다.
 
 `LocalizationTable`이 (재)생성되는 순간 **버튼 조작 없이 자동으로**:
-1. `ELocKey.cs` 재생성 (`KeyName` 기반)
-2. `ELanguage.cs` 재생성 (`RowKey`/`KeyName`을 제외한 나머지 컬럼 기반)
+1. `KeyName` 컬럼이 `key:ELocKey`이므로, Data Parsing이 `ELocKey.cs`를 `LocalizationTable.cs`와 같은 폴더에 생성/갱신
+2. Localization 패키지가 `ELanguage.cs` 재생성 (`RowKey`/`KeyName`을 제외한 나머지 컬럼 기반)
 
-두 enum 모두 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`Assets/00.Scripts/GeneratedFramework/`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `LocalizationManager` 자체는 `KeyName`/언어 코드 문자열만 알고 두 enum을 전혀 참조하지 않으며, `GetText(ELocKey.X)`/`SetLanguageAsync(ELanguage.X)`처럼 강타입으로 호출할 수 있는 건 각각 `ELocKey.cs`/`ELanguage.cs`에 같이 생성되는 확장 메서드 덕분입니다. 시트를 아직 한 번도 생성하지 않았다면 이 두 파일 자체가 없는 상태입니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
+두 enum 모두 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`ELocKey`는 `LocalizationTable.cs`와 같은 폴더, 기본 `Assets/00.Scripts/GeneratedTables/`; `ELanguage`는 `Assets/00.Scripts/GeneratedFramework/`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `LocalizationManager` 자체는 `KeyName`/언어 코드 문자열만 알고 두 enum을 전혀 참조하지 않습니다 - `ELocKey`로 강타입 조회를 하고 싶으면 `LocalizationTable.Get(ELocKey key)`로 행을 얻으면 되고, `SetLanguageAsync(ELanguage.X)`처럼 강타입으로 호출하는 건 `ELanguage.cs`에 같이 생성되는 확장 메서드 덕분입니다. 시트를 아직 한 번도 생성하지 않았다면 두 파일 자체가 없는 상태입니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
 
-수동으로 다시 실행하고 싶을 때를 위한 메뉴도 있습니다: `Game Framework/Localization/Generate ELocKey + ELanguage From Localization Table`.
+`ELanguage`만 수동으로 다시 실행하고 싶을 때를 위한 메뉴도 있습니다: `Game Framework/Localization/Generate ELanguage From Localization Table` (`ELocKey` 생성은 이 메뉴가 아니라 Data Parsing의 "선택 시트 생성/갱신"이 담당합니다).
 
 ---
 
 #### 2) 코드에서 텍스트 가져오기
 ```cs
-string text = LocalizationManager.Instance.GetText(ELocKey.UI_Button_Start);
+// Key 문자열을 직접 아는 경우
+string text = LocalizationManager.Instance.GetText("UI_Button_Start");
+
+// ELocKey로 Key 오타를 컴파일 타임에 잡고 싶은 경우
+LocalizationTable.Data row = DataManager.Instance.GetTable<LocalizationTable>().Get(ELocKey.UI_Button_Start);
+string text2 = LocalizationManager.Instance.GetText(row.KeyName);
 ```
 
 #### 3) UI에 자동 반영하기

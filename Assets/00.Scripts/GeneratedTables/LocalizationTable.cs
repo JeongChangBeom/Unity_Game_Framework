@@ -11,6 +11,7 @@ public class LocalizationTable : ScriptableObject
 
     private Dictionary<int, Data> _cache;
     private bool _cacheBuilt;
+    private Dictionary<string, Data> _keyCache_KeyName;
 
     [Serializable]
     public class Data
@@ -58,11 +59,52 @@ public class LocalizationTable : ScriptableObject
         _cacheBuilt = true;
     }
 
+    public Data Get(ELocKey key)
+    {
+        BuildKeyCacheIfNeeded_KeyName();
+
+        Data d;
+        if (!_keyCache_KeyName.TryGetValue(key.ToString(), out d))
+        {
+            return null;
+        }
+
+        return d;
+    }
+
+    private void BuildKeyCacheIfNeeded_KeyName()
+    {
+        if (_keyCache_KeyName != null)
+        {
+            return;
+        }
+
+        _keyCache_KeyName = new Dictionary<string, Data>();
+
+        for (int i = 0; i < _table.Count; i++)
+        {
+            Data d = _table[i];
+            if (d == null || string.IsNullOrEmpty(d.KeyName))
+            {
+                continue;
+            }
+
+            if (_keyCache_KeyName.ContainsKey(d.KeyName))
+            {
+                Debug.LogWarning("[Table] 중복 KeyName 스킵: key=" + d.KeyName);
+                continue;
+            }
+
+            _keyCache_KeyName[d.KeyName] = d;
+        }
+    }
+
     public void ParseFromTsv(string tsv)
     {
         _table.Clear();
         _cacheBuilt = false;
         _cache = null;
+        _keyCache_KeyName = null;
 
         TsvTable table = TsvParser.Parse(tsv);
         if (table == null)
