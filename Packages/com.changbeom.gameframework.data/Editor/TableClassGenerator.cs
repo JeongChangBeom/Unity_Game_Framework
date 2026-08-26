@@ -125,12 +125,12 @@ namespace GameFramework.DataParsing.Editor
 
                 string fieldName = ToSafeFieldName(name);
 
-                // 생성되는 Data 클래스는 컬럼 필드 옆에 RowKey 필드를 이미 고정으로
-                // 선언합니다 (WriteTableScript 참고). 컬럼 이름이 sanitize 후 "RowKey"가
+                // 생성되는 Data 클래스는 컬럼 필드 옆에 Id 필드를 이미 고정으로
+                // 선언합니다 (WriteTableScript 참고). 컬럼 이름이 sanitize 후 "Id"가
                 // 되면 같은 클래스에 필드가 두 번 선언되어 생성 스크립트가 컴파일되지 않습니다.
-                if (fieldName == "RowKey")
+                if (fieldName == "Id")
                 {
-                    error = "컬럼 이름 \"" + name + "\"는 sanitize 후 \"RowKey\"가 되어, 모든 테이블에 이미 고정으로 있는 RowKey 필드와 충돌합니다. 컬럼 이름을 다르게 바꿔주세요.";
+                    error = "컬럼 이름 \"" + name + "\"는 sanitize 후 \"Id\"가 되어, 모든 테이블에 이미 고정으로 있는 Id 필드와 충돌합니다. 컬럼 이름을 다르게 바꿔주세요.";
                     return false;
                 }
 
@@ -203,7 +203,7 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine("    [Serializable]");
             sb.AppendLine("    public class Data");
             sb.AppendLine("    {");
-            sb.AppendLine("        public int RowKey;");
+            sb.AppendLine("        public int Id;");
 
             for (int i = 0; i < columns.Count; i++)
             {
@@ -216,12 +216,12 @@ namespace GameFramework.DataParsing.Editor
 
             sb.AppendLine("    }");
             sb.AppendLine();
-            sb.AppendLine("    public Data Get(int rowKey)");
+            sb.AppendLine("    public Data Get(int id)");
             sb.AppendLine("    {");
             sb.AppendLine("        BuildCacheIfNeeded();");
             sb.AppendLine();
             sb.AppendLine("        Data d;");
-            sb.AppendLine("        if (!_cache.TryGetValue(rowKey, out d))");
+            sb.AppendLine("        if (!_cache.TryGetValue(id, out d))");
             sb.AppendLine("        {");
             sb.AppendLine("            return null;");
             sb.AppendLine("        }");
@@ -246,7 +246,7 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine("                continue;");
             sb.AppendLine("            }");
             sb.AppendLine();
-            sb.AppendLine("            _cache[d.RowKey] = d;");
+            sb.AppendLine("            _cache[d.Id] = d;");
             sb.AppendLine("        }");
             sb.AppendLine();
             sb.AppendLine("        _cacheBuilt = true;");
@@ -281,31 +281,31 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine("            return;");
             sb.AppendLine("        }");
             sb.AppendLine();
-            sb.AppendLine("        HashSet<int> usedRowKeys = new HashSet<int>();");
+            sb.AppendLine("        HashSet<int> usedIds = new HashSet<int>();");
             sb.AppendLine();
             sb.AppendLine("        for (int r = 3; r < table.RowCount; r++)");
             sb.AppendLine("        {");
-            sb.AppendLine("            string rowKeyText = table.GetCell(r, 0).Trim();");
-            sb.AppendLine("            if (string.IsNullOrEmpty(rowKeyText))");
+            sb.AppendLine("            string idText = table.GetCell(r, 0).Trim();");
+            sb.AppendLine("            if (string.IsNullOrEmpty(idText))");
             sb.AppendLine("            {");
             sb.AppendLine("                continue;");
             sb.AppendLine("            }");
             sb.AppendLine();
-            sb.AppendLine("            int rowKey;");
-            sb.AppendLine("            if (!int.TryParse(rowKeyText, out rowKey))");
+            sb.AppendLine("            int id;");
+            sb.AppendLine("            if (!int.TryParse(idText, out id))");
             sb.AppendLine("            {");
-            sb.AppendLine("                Debug.LogWarning(\"[Table] rowKey 파싱 실패: row=\" + (r + 1) + \", value=\" + rowKeyText);");
+            sb.AppendLine("                Debug.LogWarning(\"[Table] id 파싱 실패: row=\" + (r + 1) + \", value=\" + idText);");
             sb.AppendLine("                continue;");
             sb.AppendLine("            }");
             sb.AppendLine();
-            sb.AppendLine("            if (!usedRowKeys.Add(rowKey))");
+            sb.AppendLine("            if (!usedIds.Add(id))");
             sb.AppendLine("            {");
-            sb.AppendLine("                Debug.LogWarning(\"[Table] 중복 rowKey 스킵: key=\" + rowKey + \", row=\" + (r + 1));");
+            sb.AppendLine("                Debug.LogWarning(\"[Table] 중복 id 스킵: key=\" + id + \", row=\" + (r + 1));");
             sb.AppendLine("                continue;");
             sb.AppendLine("            }");
             sb.AppendLine();
             sb.AppendLine("            Data data = new Data();");
-            sb.AppendLine("            data.RowKey = rowKey;");
+            sb.AppendLine("            data.Id = id;");
 
             for (int i = 0; i < columns.Count; i++)
             {

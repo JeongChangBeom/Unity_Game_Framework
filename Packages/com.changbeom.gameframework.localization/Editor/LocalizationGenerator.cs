@@ -7,14 +7,14 @@ using UnityEngine;
 
 namespace GameFramework.Localization.Editor
 {
-    // ELocKey는 더 이상 이 클래스가 생성하지 않습니다. Localization 시트의 KeyName 컬럼
+    // ELocKey는 더 이상 이 클래스가 생성하지 않습니다. Localization 시트의 Key 컬럼
     // 타입을 "key:ELocKey"로 선언하면, Data Parsing의 TableClassGenerator.SyncKeyEnums가
     // "선택 시트 생성/갱신"마다 자동으로 ELocKey.cs를 만들거나 갱신합니다
     // (LocalizationTable.cs와 같은 폴더). LocalizationTable.Get(ELocKey key)로 그 키의
     // 원본 행(언어별 텍스트 전부)을 바로 조회할 수 있습니다.
     //
-    // ELanguage는 계속 이 클래스가 생성합니다 - 컬럼 "값"이 아니라 컬럼 "이름"(RowKey/
-    // KeyName을 제외한 나머지 string 컬럼들의 헤더)에서 만들어지는, Localization 시트에만
+    // ELanguage는 계속 이 클래스가 생성합니다 - 컬럼 "값"이 아니라 컬럼 "이름"(Id/
+    // Key를 제외한 나머지 string 컬럼들의 헤더)에서 만들어지는, Localization 시트에만
     // 있는 특수한 패턴이라 Data Parsing의 범용 key: 컬럼으로 일반화할 수 없습니다.
     public static class LocalizationGenerator
     {
@@ -49,7 +49,7 @@ namespace GameFramework.Localization.Editor
 
             if (languageColumns.Count == 0)
             {
-                Debug.LogError("Localization 테이블에서 언어 컬럼을 찾지 못했습니다 (RowKey/KeyName을 제외한 string 컬럼이 없습니다).");
+                Debug.LogError("Localization 테이블에서 언어 컬럼을 찾지 못했습니다 (Id/Key를 제외한 string 컬럼이 없습니다).");
                 return;
             }
 
@@ -125,11 +125,11 @@ namespace GameFramework.Localization.Editor
             new System.Text.RegularExpressions.Regex("^[A-Za-z]{2,3}$");
 
         // 언어 컬럼은 첫 번째 행 하나만 봐도 됩니다 - Data Parsing이 생성하는 Data
-        // 클래스는 모든 행이 같은 필드 구조를 공유하기 때문입니다. RowKey(int)는
-        // string이 아니라서 자동으로 제외되고, KeyName은 (key: 컬럼이 되어도 필드
+        // 클래스는 모든 행이 같은 필드 구조를 공유하기 때문입니다. Id(int)는
+        // string이 아니라서 자동으로 제외되고, Key는 (key: 컬럼이 되어도 필드
         // 타입은 여전히 string이라) 이름으로 명시적으로 제외합니다.
         //
-        // RowKey/KeyName을 제외한 string 타입 컬럼은 전부 "언어 컬럼"으로 간주합니다.
+        // Id/Key를 제외한 string 타입 컬럼은 전부 "언어 컬럼"으로 간주합니다.
         // Data Parsing 시트는 임의의 string 컬럼(예: 작업자용 "Notes"/"Comment")을
         // 자유롭게 추가할 수 있는데, Localization 탭에 그런 컬럼이 섞이면 여기서
         // 그대로 가짜 ELanguage 멤버로 생성되고 런타임에 그 텍스트가 "번역"처럼
@@ -147,7 +147,7 @@ namespace GameFramework.Localization.Editor
             {
                 enterChildren = false;
 
-                if (iterator.propertyType == SerializedPropertyType.String && iterator.name != "KeyName")
+                if (iterator.propertyType == SerializedPropertyType.String && iterator.name != "Key")
                 {
                     if (!LanguageCodePattern.IsMatch(iterator.name))
                     {

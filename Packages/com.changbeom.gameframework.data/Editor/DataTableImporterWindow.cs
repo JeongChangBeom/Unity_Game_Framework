@@ -559,14 +559,14 @@ namespace GameFramework.DataParsing.Editor
                         System.Reflection.BindingFlags.Public |
                         System.Reflection.BindingFlags.Instance);
 
-                    // RowKey를 제외한 나머지 필드를 선언 순서 그대로 사용합니다. .NET 명세는
+                    // Id를 제외한 나머지 필드를 선언 순서 그대로 사용합니다. .NET 명세는
                     // GetFields()의 반환 순서를 보장하지 않지만, 이 프레임워크가 생성하는
                     // 클래스는 항상 TableClassGenerator.WriteTableScript가 쓴 순서 그대로
                     // 컴파일되고 Mono/CoreCLR 둘 다 실제로는 선언 순서를 반환하므로 기댑니다.
                     List<System.Reflection.FieldInfo> orderedFields = new List<System.Reflection.FieldInfo>();
                     for (int f = 0; f < fields.Length; f++)
                     {
-                        if (fields[f].Name != "RowKey")
+                        if (fields[f].Name != "Id")
                         {
                             orderedFields.Add(fields[f]);
                         }

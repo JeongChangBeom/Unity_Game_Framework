@@ -183,7 +183,7 @@ namespace GameFramework.Localization
         }
 
         // Data Parsing이 생성한 LocalizationTable을 리플렉션으로 읽습니다 (SoundManager의
-        // LoadSoundData와 동일한 패턴). 언어 컬럼은 RowKey(int)/KeyName(언어 아님)을 제외한
+        // LoadSoundData와 동일한 패턴). 언어 컬럼은 Id(int)/Key(언어 아님)을 제외한
         // string 타입 필드를 전부 언어 컬럼으로 간주해서 찾습니다 - LocalizationGenerator.
         // ExtractLanguageColumns(에디터, SerializedProperty 기반)와 동일한 판별 기준을
         // 런타임 리플렉션으로 재현한 것이라, 언어 컬럼 집합이 항상 실제 테이블과
@@ -225,8 +225,8 @@ namespace GameFramework.Localization
                     languageFieldNames = ExtractLanguageFieldNames(rowType);
                 }
 
-                string keyName = GetFieldValue<string>(rowType, row, "KeyName");
-                if (string.IsNullOrEmpty(keyName))
+                string key = GetFieldValue<string>(rowType, row, "Key");
+                if (string.IsNullOrEmpty(key))
                 {
                     continue;
                 }
@@ -246,12 +246,12 @@ namespace GameFramework.Localization
                     perLanguage[languageName] = text;
                 }
 
-                if (data.ContainsKey(keyName))
+                if (data.ContainsKey(key))
                 {
-                    Debug.LogWarning($"[LocalizationManager] KeyName \"{keyName}\"이(가) 테이블에 중복으로 있어 나중 행으로 덮어씁니다.");
+                    Debug.LogWarning($"[LocalizationManager] Key \"{key}\"이(가) 테이블에 중복으로 있어 나중 행으로 덮어씁니다.");
                 }
 
-                data[keyName] = perLanguage;
+                data[key] = perLanguage;
             }
 
             return data;
@@ -266,7 +266,7 @@ namespace GameFramework.Localization
             {
                 FieldInfo field = fields[i];
 
-                if (field.FieldType != typeof(string) || field.Name == "KeyName")
+                if (field.FieldType != typeof(string) || field.Name == "Key")
                 {
                     continue;
                 }

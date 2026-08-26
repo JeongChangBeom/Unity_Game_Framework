@@ -176,7 +176,7 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 2. 원하는 탭 선택 후 **선택 시트 생성** - `{ScriptFolder}/{TabName}Table.cs`와 `Resources/GeneratedTables/{TabName}Table.asset`이 만들어집니다 (탭 이름이 이미 `Table`로 끝나면 중복으로 붙지 않습니다)
 3. 시트 내용이 바뀌면 **선택 시트 갱신**, 탭을 지우려면 **선택 시트 삭제**
 
-> 시트 형식: 1행=컬럼명, 3행=타입, 4행부터 데이터. 1열은 항상 `RowKey`(int)로 취급됩니다. 컬럼명이 `~`로 시작하면 무시됩니다.
+> 시트 형식: 1행=컬럼명, 3행=타입, 4행부터 데이터. 1열은 항상 `Id`(int)로 취급됩니다. 컬럼명이 `~`로 시작하면 무시됩니다.
 
 지원 타입(3행에 그대로 적으면 됨):
 
@@ -195,10 +195,10 @@ Editor 툴이 시트 다운로드 대기에 **Unity 공식 Editor Coroutines 패
 ---
 
 ### key 컬럼 - 시트 값으로 만드는 조회용 enum
-`enum:`은 **이미 존재하는** enum을 참조하는 용도지만, `key:EnumName`은 반대로 **그 컬럼의 시트 값 자체로 enum을 자동 생성**하고, 그 enum으로 행 전체를 조회할 수 있게 해줍니다 - "이 행의 고유 이름"에 해당하는 컬럼(예: `KeyName`, `FileName`)에 씁니다.
+`enum:`은 **이미 존재하는** enum을 참조하는 용도지만, `key:EnumName`은 반대로 **그 컬럼의 시트 값 자체로 enum을 자동 생성**하고, 그 enum으로 행 전체를 조회할 수 있게 해줍니다 - "이 행의 고유 이름"에 해당하는 컬럼(예: `Key`, `FileName`)에 씁니다.
 
 ```
-RowKey | Name  | ItemKey
+Id | Name  | ItemKey
        | string| key:EItemKey
 1001   | 불꽃검 | FireSword
 1002   | 돌방패 | IceShield
@@ -241,7 +241,7 @@ enum은 시트에 문자열로 적은 값(`"Fire"` 등)을 실제 C# enum으로 
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/DataTester.cs`를 아무 GameObject에 붙이고 Play하면, RowKey를 입력하고 각 테이블에서 조회한 결과를 버튼으로 확인할 수 있습니다.
+`Assets/00.Scripts/Tests/DataTester.cs`를 아무 GameObject에 붙이고 Play하면, Id를 입력하고 각 테이블에서 조회한 결과를 버튼으로 확인할 수 있습니다.
 
 </details>
 
@@ -1561,15 +1561,15 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 <summary><h2>12. Localization</h2></summary>
 
 ### 기능
-- Data Parsing의 "Localization" 시트 탭으로 텍스트를 관리 (`RowKey`, `KeyName`, 언어별 컬럼)
-- `ELocKey` 자동 생성 - `KeyName` 컬럼 타입을 `key:ELocKey`로 선언하면 Data Parsing이 "선택 시트 생성/갱신"마다 자동 생성/동기화 (Localization 패키지 자체는 이 enum을 만들지 않음)
+- Data Parsing의 "Localization" 시트 탭으로 텍스트를 관리 (`Id`, `Key`, 언어별 컬럼)
+- `ELocalizationKey` 자동 생성 - `Key` 컬럼 타입을 `key:ELocalizationKey`로 선언하면 Data Parsing이 "선택 시트 생성/갱신"마다 자동 생성/동기화 (Localization 패키지 자체는 이 enum을 만들지 않음)
 - `ELanguage` 자동 생성 - 언어 컬럼 이름 기반이라 Localization 패키지가 직접 생성하되, `LocalizationTable`이 (재)생성되는 순간 버튼 조작 없이 자동으로 동기화
-- **언어 컬럼도 완전 자동 인식** - 시트에 새 언어 컬럼(`RowKey`/`KeyName`을 제외한 나머지 전부)을 추가하고 재생성하면 `ELanguage`에 코드 수정 없이 새 멤버가 생깁니다
-- `GetText(string key)` - 현재 언어에 번역이 없으면 Fallback Language로 대체, 그마저 없으면 `"[MISSING:key]"` + 에러 로그로 누락을 눈에 띄게 표시. `ELocKey`로 Key 오타를 컴파일 타임에 잡고 싶으면 `LocalizationTable.Get(ELocKey.X)`로 행을 조회해 `KeyName`을 얻으면 됩니다
+- **언어 컬럼도 완전 자동 인식** - 시트에 새 언어 컬럼(`Id`/`Key`을 제외한 나머지 전부)을 추가하고 재생성하면 `ELanguage`에 코드 수정 없이 새 멤버가 생깁니다
+- `GetText(string key)` - 현재 언어에 번역이 없으면 Fallback Language로 대체, 그마저 없으면 `"[MISSING:key]"` + 에러 로그로 누락을 눈에 띄게 표시. `ELocalizationKey`로 Key 오타를 컴파일 타임에 잡고 싶으면 `LocalizationTable.Get(ELocalizationKey.X)`로 행을 조회해 `Key`을 얻으면 됩니다
 - `OnLanguageChanged` 이벤트 - 언어가 바뀌면 발행되며, `LocalizedText`가 이 이벤트만으로 동작합니다. 나중에 음성 더빙/언어별 이미지가 필요해져도 이 이벤트만 구독하는 새 컴포넌트를 추가하면 되고, `LocalizationManager` 자체는 손댈 필요가 없습니다
 - `SetLanguageAsync(ELanguage)` - v1은 내부적으로 동기 테이블 룩업이라 사실상 즉시 끝나지만, 나중에 언어 전환이 실제 비동기 작업(리소스 로드 등)이 되어도 호출부가 안 바뀌도록 처음부터 `Awaitable`을 반환합니다
 - **첫 실행 시 언어 결정 순서**: 저장된 언어(SaveManager) → `Application.systemLanguage` 매핑(설정으로 끄기 가능) → Settings의 Default Language
-- `LocalizedText` - Key(`KeyName` 문자열)를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트. 레거시 `Text`와 `TextMeshProUGUI`를 둘 다 지원하며, GameObject에 붙어있는 쪽에 자동으로 반영됩니다
+- `LocalizedText` - Key(`Key` 문자열)를 지정해두면 언어 변경 시 자동 갱신되는 컴포넌트. 레거시 `Text`와 `TextMeshProUGUI`를 둘 다 지원하며, GameObject에 붙어있는 쪽에 자동으로 반영됩니다
 - 씬 배치 불필요 - 처음 사용하는 순간 자동 생성
 
 > **주의**: 음성 더빙이나 언어별 이미지는 이 패키지가 직접 다루지 않습니다. 서버 없이는 지원 언어 데이터를 전부 빌드에 포함할 수밖에 없는데, 텍스트는 용량이 작아 문제되지 않지만 음성/이미지는 다릅니다 - 그런 요구가 실제로 생기면(그리고 서버가 생기면) `OnLanguageChanged`를 구독하는 별도 컴포넌트(예: 오디오는 Sound 패키지 확장, 이미지는 Addressables 원격 카탈로그)로 그때 가서 설계하는 걸 권장합니다.
@@ -1584,21 +1584,21 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 ### 사용 방법
 
 #### 1) 시트 작성 (Data Parsing)
-"Localization" 탭에 아래처럼 작성합니다. 언어 컬럼 이름(`KO`/`EN`/`JP` 등)이 그대로 `ELanguage` 멤버 이름이 되므로, 영문/숫자/밑줄로만 짓는 걸 권장합니다. `KeyName` 컬럼의 타입은 `key:ELocKey`로 지정하세요(Data Parsing의 "key 컬럼" 기능 - [1. Data Parsing](#data) 참고).
+"Localization" 탭에 아래처럼 작성합니다. 언어 컬럼 이름(`KO`/`EN`/`JP` 등)이 그대로 `ELanguage` 멤버 이름이 되므로, 영문/숫자/밑줄로만 짓는 걸 권장합니다. `Key` 컬럼의 타입은 `key:ELocalizationKey`로 지정하세요(Data Parsing의 "key 컬럼" 기능 - [1. Data Parsing](#data) 참고).
 
-|RowKey|KeyName|KO|EN|JP|
+|Id|Key|KO|EN|JP|
 |-|-|-|-|-|
 |1|UI_Button_Start|시작|Start|スタート|
 
 `Game Framework/Data Parsing/DataTable Importer`에서 다른 테이블과 완전히 같은 방식으로 "선택 시트 생성"/"선택 시트 갱신"합니다.
 
 `LocalizationTable`이 (재)생성되는 순간 **버튼 조작 없이 자동으로**:
-1. `KeyName` 컬럼이 `key:ELocKey`이므로, Data Parsing이 `ELocKey.cs`를 `LocalizationTable.cs`와 같은 폴더에 생성/갱신
-2. Localization 패키지가 `ELanguage.cs` 재생성 (`RowKey`/`KeyName`을 제외한 나머지 컬럼 기반)
+1. `Key` 컬럼이 `key:ELocalizationKey`이므로, Data Parsing이 `ELocalizationKey.cs`를 `LocalizationTable.cs`와 같은 폴더에 생성/갱신
+2. Localization 패키지가 `ELanguage.cs` 재생성 (`Id`/`Key`을 제외한 나머지 컬럼 기반)
 
-두 enum 모두 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`ELocKey`는 `LocalizationTable.cs`와 같은 폴더, 기본 `Assets/00.Scripts/GeneratedTables/`; `ELanguage`는 `Assets/00.Scripts/GeneratedFramework/`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `LocalizationManager` 자체는 `KeyName`/언어 코드 문자열만 알고 두 enum을 전혀 참조하지 않습니다 - `ELocKey`로 강타입 조회를 하고 싶으면 `LocalizationTable.Get(ELocKey key)`로 행을 얻으면 되고, `SetLanguageAsync(ELanguage.X)`처럼 강타입으로 호출하는 건 `ELanguage.cs`에 같이 생성되는 확장 메서드 덕분입니다. 시트를 아직 한 번도 생성하지 않았다면 두 파일 자체가 없는 상태입니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
+두 enum 모두 프로젝트마다 값이 달라지는 전용 타입이라 패키지가 아니라 프로젝트 쪽(`ELocalizationKey`는 `LocalizationTable.cs`와 같은 폴더, 기본 `Assets/00.Scripts/GeneratedTables/`; `ELanguage`는 `Assets/00.Scripts/GeneratedFramework/`)에 생성됩니다 - git URL로 설치한 패키지는 읽기 전용이라 그 안에 프로젝트별 값을 쓸 수 없기 때문입니다. `LocalizationManager` 자체는 `Key`/언어 코드 문자열만 알고 두 enum을 전혀 참조하지 않습니다 - `ELocalizationKey`로 강타입 조회를 하고 싶으면 `LocalizationTable.Get(ELocalizationKey key)`로 행을 얻으면 되고, `SetLanguageAsync(ELanguage.X)`처럼 강타입으로 호출하는 건 `ELanguage.cs`에 같이 생성되는 확장 메서드 덕분입니다. 시트를 아직 한 번도 생성하지 않았다면 두 파일 자체가 없는 상태입니다. 기존 멤버는 시트에서 지워져도 순서/정수값이 그대로 보존되고, 새로 추가된 것만 맨 뒤에 붙습니다 - 저장된 언어 선택이나 Inspector에 지정해둔 `ELocalizationKey`가 재생성 후 다른 항목을 가리키는 일이 없습니다.
 
-`ELanguage`만 수동으로 다시 실행하고 싶을 때를 위한 메뉴도 있습니다: `Game Framework/Localization/Generate ELanguage From Localization Table` (`ELocKey` 생성은 이 메뉴가 아니라 Data Parsing의 "선택 시트 생성/갱신"이 담당합니다).
+`ELanguage`만 수동으로 다시 실행하고 싶을 때를 위한 메뉴도 있습니다: `Game Framework/Localization/Generate ELanguage From Localization Table` (`ELocalizationKey` 생성은 이 메뉴가 아니라 Data Parsing의 "선택 시트 생성/갱신"이 담당합니다).
 
 ---
 
@@ -1607,16 +1607,16 @@ public void OnAttackCancelable() => _attackState.OnCancelableFrame();
 // Key 문자열을 직접 아는 경우
 string text = LocalizationManager.Instance.GetText("UI_Button_Start");
 
-// ELocKey로 Key 오타를 컴파일 타임에 잡고 싶은 경우
-LocalizationTable.Data row = DataManager.Instance.GetTable<LocalizationTable>().Get(ELocKey.UI_Button_Start);
-string text2 = LocalizationManager.Instance.GetText(row.KeyName);
+// ELocalizationKey로 Key 오타를 컴파일 타임에 잡고 싶은 경우
+LocalizationTable.Data row = DataManager.Instance.GetTable<LocalizationTable>().Get(ELocalizationKey.UI_Button_Start);
+string text2 = LocalizationManager.Instance.GetText(row.Key);
 ```
 
 #### 3) UI에 자동 반영하기
 ```cs
 // Text 또는 TextMeshProUGUI 컴포넌트가 있는 GameObject에 LocalizedText를 붙이고 Key를 지정하면 끝
 ```
-`LocalizedText`는 패키지 자신이 제공하는 컴포넌트라 `ELocKey`를 강타입으로 참조하지 못해, Inspector의 Key 필드는 문자열 입력입니다(`KeyName` 컬럼 값과 정확히 같게 입력). `Text`/`TextMeshProUGUI` 둘 중 GameObject에 실제로 붙어있는 쪽에 자동으로 반영되고, 언어가 바뀔 때마다 알아서 갱신됩니다. 둘 다 없으면 Console에 에러가 남습니다.
+`LocalizedText`는 패키지 자신이 제공하는 컴포넌트라 `ELocalizationKey`를 강타입으로 참조하지 못해, Inspector의 Key 필드는 문자열 입력입니다(`Key` 컬럼 값과 정확히 같게 입력). `Text`/`TextMeshProUGUI` 둘 중 GameObject에 실제로 붙어있는 쪽에 자동으로 반영되고, 언어가 바뀔 때마다 알아서 갱신됩니다. 둘 다 없으면 Console에 에러가 남습니다.
 
 #### 4) 언어 전환
 ```cs
@@ -1645,7 +1645,7 @@ LocalizationManager.Instance.OnLanguageChanged += lang => Debug.Log($"언어 변
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/LocalizationTester.cs`를 아무 GameObject에 붙이고 Play하면 `CurrentLanguage`와 `GetText` 결과가 실시간으로 표시되고, `ELanguage`에 등록된 언어마다 전환 버튼이 자동으로 생깁니다. `ELocKey`/`ELanguage`는 시트를 한 번 생성해야 비로소 만들어지는 프로젝트 쪽 파일이라, Data Parsing으로 Localization 시트를 먼저 생성해야 이 테스터 자체가 컴파일됩니다.
+`Assets/00.Scripts/Tests/LocalizationTester.cs`를 아무 GameObject에 붙이고 Play하면 `CurrentLanguage`와 `GetText` 결과가 실시간으로 표시되고, `ELanguage`에 등록된 언어마다 전환 버튼이 자동으로 생깁니다. `ELocalizationKey`/`ELanguage`는 시트를 한 번 생성해야 비로소 만들어지는 프로젝트 쪽 파일이라, Data Parsing으로 Localization 시트를 먼저 생성해야 이 테스터 자체가 컴파일됩니다.
 
 </details>
 
