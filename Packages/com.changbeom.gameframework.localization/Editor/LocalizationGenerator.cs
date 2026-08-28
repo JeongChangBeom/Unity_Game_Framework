@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.IO;
+using System.Reflection;
 using System.Text;
 using UnityEditor;
 using UnityEngine;
@@ -11,7 +12,8 @@ namespace GameFramework.Localization.Editor
     // 타입을 "key:ELocKey"로 선언하면, Data Parsing의 TableClassGenerator.SyncKeyEnums가
     // "선택 시트 생성/갱신"마다 자동으로 ELocKey.cs를 만들거나 갱신합니다
     // (LocalizationTable.cs와 같은 폴더). LocalizationTable.Get(ELocKey key)로 그 키의
-    // 원본 행(언어별 텍스트 전부)을 바로 조회할 수 있습니다.
+    // 원본 행(언어별 텍스트 전부)을 바로 조회할 수 있습니다. 그 enum으로 GetText를 바로
+    // 부를 수 있는 확장 메서드(GenerateKeyTextExtension 참고)는 이 클래스가 계속 만들어줍니다.
     //
     // ELanguage는 계속 이 클래스가 생성합니다 - 컬럼 "값"이 아니라 컬럼 "이름"(Id/
     // Key를 제외한 나머지 string 컬럼들의 헤더)에서 만들어지는, Localization 시트에만
@@ -19,6 +21,7 @@ namespace GameFramework.Localization.Editor
     public static class LocalizationGenerator
     {
         private const string LanguageOutputPath = "Assets/00.Scripts/GeneratedFramework/ELanguage.cs";
+        private const string KeyTextExtensionOutputPath = "Assets/00.Scripts/GeneratedTables/LocalizationKeyTextExtensions.cs";
 
         [MenuItem("Game Framework/Localization/Generate ELanguage From Localization Table")]
         public static void Generate()
@@ -29,6 +32,8 @@ namespace GameFramework.Localization.Editor
                 Debug.LogError("Localization 테이블 SO를 찾지 못했습니다. Data Parsing으로 Localization 시트를 먼저 생성하세요 (예: 탭 이름 Localization -> 클래스 LocalizationTable).");
                 return;
             }
+
+            GenerateKeyTextExtension(table);
 
             SerializedObject so = new SerializedObject(table);
             SerializedProperty tableProp = FindTableProperty(so);
@@ -69,6 +74,80 @@ namespace GameFramework.Localization.Editor
                 AssetDatabase.Refresh();
 
                 Debug.Log($"[LocalizationGenerator] 생성됨: ELanguage({orderedLanguages.Count}개)");
+            };
+        }
+
+        // LocalizationTable의 Key 컬럼이 "key:EnumName"으로 선언되어 있으면(Data Parsing의
+        // TableClassGenerator가 Get(EnumName key) 오버로드를 만들어줌), 리플렉션으로 그
+        // enum 타입을 찾아서 GetText(EnumName)/LocalizationManager 확장 메서드를 자동
+        // 생성합니다. enum 이름 자체는 시트 작성자가 자유롭게 정하므로(예:
+        // ELocalizationKey) 이름을 하드코딩하지 않고, LocalizationTable.Get(...) 오버로드
+        // 중 int가 아닌 매개변수를 받는 것을 찾아 그 매개변수 타입을 그대로 씁니다. Key
+        // 컬럼이 아직 "key:EnumName"이 아니면(마이그레이션 전) 그런 오버로드가 없으므로
+        // 조용히 넘어갑니다 - GetText(string)만 계속 쓰면 됩니다.
+        private static void GenerateKeyTextExtension(ScriptableObject table)
+        {
+            Type tableType = table.GetType();
+            Type keyEnumType = null;
+
+            MethodInfo[] methods = tableType.GetMethods(BindingFlags.Public | BindingFlags.Instance);
+
+            for (int i = 0; i < methods.Length; i++)
+            {
+                MethodInfo m = methods[i];
+
+                if (m.Name != "Get")
+                {
+                    continue;
+                }
+
+                ParameterInfo[] parameters = m.GetParameters();
+
+                if (parameters.Length != 1 || parameters[0].ParameterType == typeof(int))
+                {
+                    continue;
+                }
+
+                keyEnumType = parameters[0].ParameterType;
+                break;
+            }
+
+            if (keyEnumType == null)
+            {
+                return;
+            }
+
+            string enumTypeName = keyEnumType.Name;
+
+            StringBuilder sb = new StringBuilder();
+            sb.AppendLine("// 자동 생성됨. 직접 편집하지 마세요.");
+            sb.AppendLine();
+            sb.AppendLine("using GameFramework.DataParsing;");
+            sb.AppendLine("using GameFramework.Localization;");
+            sb.AppendLine();
+            sb.AppendLine("// LocalizationManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일");
+            sb.AppendLine("// 타임에 알 수 없습니다. 대신 string 기반 API를 감싸는 확장 메서드로 강타입");
+            sb.AppendLine($"// 호출부(lm.GetText({enumTypeName}.X))를 그대로 제공합니다. LocalizationTable.Get(key)로");
+            sb.AppendLine("// 원본 Key 문자열을 조회한 뒤 넘기므로, 시트 값이 sanitize로 살짝 바뀌어도");
+            sb.AppendLine("// 항상 올바른 원본 키로 조회합니다. row가 없으면(시트에 아직 없는 키)");
+            sb.AppendLine("// key.ToString()으로 폴백해서, LocalizationManager 자체의 \"[MISSING:key]\" 처리를 그대로 탑니다.");
+            sb.AppendLine($"public static class {enumTypeName}TextExtensions");
+            sb.AppendLine("{");
+            sb.AppendLine($"    public static string GetText(this LocalizationManager manager, {enumTypeName} key)");
+            sb.AppendLine("    {");
+            sb.AppendLine("        LocalizationTable.Data row = DataManager.Instance.GetTable<LocalizationTable>()?.Get(key);");
+            sb.AppendLine("        return manager.GetText(row != null ? row.Key : key.ToString());");
+            sb.AppendLine("    }");
+            sb.AppendLine("}");
+
+            WriteFile(KeyTextExtensionOutputPath, sb.ToString());
+
+            EditorApplication.delayCall += () =>
+            {
+                AssetDatabase.ImportAsset(KeyTextExtensionOutputPath);
+                AssetDatabase.Refresh();
+
+                Debug.Log($"[LocalizationGenerator] 생성됨: {enumTypeName}TextExtensions");
             };
         }
 
