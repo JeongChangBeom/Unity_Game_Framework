@@ -634,24 +634,29 @@ namespace GameFramework.UISystem
                 }
             }
 
-            if (_uiRootCanvas != null)
+            if (_uiRootCanvas == null)
             {
-                return;
+                GameObject go = new GameObject("[CanvasRoot]");
+                go.layer = LayerMask.NameToLayer("UI");
+                go.transform.SetParent(transform, false);
+
+                _uiRootCanvas = go.AddComponent<Canvas>();
+                _uiRootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
+
+                CanvasScaler scaler = go.AddComponent<CanvasScaler>();
+                scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
+                scaler.referenceResolution = _settings.ReferenceResolution;
+                scaler.matchWidthOrHeight = _settings.MatchWidthOrHeight;
+
+                go.AddComponent<GraphicRaycaster>();
             }
 
-            GameObject go = new GameObject("[CanvasRoot]");
-            go.layer = LayerMask.NameToLayer("UI");
-            go.transform.SetParent(transform, false);
-
-            _uiRootCanvas = go.AddComponent<Canvas>();
-            _uiRootCanvas.renderMode = RenderMode.ScreenSpaceOverlay;
-
-            CanvasScaler scaler = go.AddComponent<CanvasScaler>();
-            scaler.uiScaleMode = CanvasScaler.ScaleMode.ScaleWithScreenSize;
-            scaler.referenceResolution = _settings.ReferenceResolution;
-            scaler.matchWidthOrHeight = _settings.MatchWidthOrHeight;
-
-            go.AddComponent<GraphicRaycaster>();
+            // 이 Canvas를 씬에서 주워왔든 새로 만들었든, 부팅 순서에 따라 프로젝트가 별도로
+            // 둔 다른 Canvas(예: 게임 화면을 담은 메인 Canvas)와 Sort Order가 동률이 될 수
+            // 있습니다 - 동률일 때 어느 Canvas가 위에 그려지는지는 보장되지 않아서, 팝업이
+            // 다른 화면 뒤에 가려지는 문제로 이어집니다. HUD/팝업/토스트/오버레이는 항상
+            // 게임의 다른 모든 UI보다 위에 있어야 하므로, 매번 명시적으로 설정합니다.
+            _uiRootCanvas.sortingOrder = _settings.CanvasSortOrder;
         }
 
         private void EnsureLayers()

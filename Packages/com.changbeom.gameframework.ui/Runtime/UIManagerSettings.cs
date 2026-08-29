@@ -17,6 +17,8 @@ namespace GameFramework.UISystem
         [Header("Canvas")]
         public Vector2 ReferenceResolution = new Vector2(1920, 1080);
         [Range(0f, 1f)] public float MatchWidthOrHeight = 0.5f;
+        [Tooltip("UIManager가 사용하는 Canvas의 Sort Order입니다. UIManager는 부팅 시점에 씬에서 Canvas를 찾아 재사용하거나(못 찾으면) 새로 만드는데, 부팅 순서에 따라 어느 쪽이든 될 수 있어 이 값을 명시적으로 설정하지 않으면 프로젝트가 별도로 둔 다른 Canvas와 Sort Order가 동률이 되어 렌더링 순서가 보장되지 않습니다. HUD/팝업/토스트/오버레이가 항상 게임의 다른 모든 Canvas보다 위에 그려지도록 충분히 큰 값을 기본값으로 둡니다.")]
+        public int CanvasSortOrder = 100;
 
         [Header("Modal Blocker")]
         public Color ModalBlockerColor = new Color(0f, 0f, 0f, 0.5f);
