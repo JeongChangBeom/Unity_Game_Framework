@@ -329,7 +329,12 @@ namespace GameFramework.DataParsing.Editor
             }
 
             File.WriteAllText(scriptPath, sb.ToString(), Encoding.UTF8);
-            AssetDatabase.ImportAsset(scriptPath);
+
+            // WriteKeyEnumFile과 같은 이유로 AssetDatabase.ImportAsset을 여기서 바로
+            // 부르지 않습니다 - 이 메서드는 "선택 시트 생성" 코루틴의 탭 반복문 안에서
+            // 탭마다 호출되고, 그 루프가 끝나면 호출부가 AssetDatabase.Refresh()를 한
+            // 번 더 호출합니다. 디스크에 쓰기만 해두면 그 Refresh가 이 파일도 함께
+            // 잡아서 임포트/컴파일합니다.
         }
 
         // Get(EnumName key)는 항상 문자열 필드(col.fieldName) 값으로 조회합니다 - 필드
@@ -596,8 +601,16 @@ namespace GameFramework.DataParsing.Editor
             }
 
             File.WriteAllText(path, content, new UTF8Encoding(false));
-            AssetDatabase.ImportAsset(path);
 
+            // 여기서 AssetDatabase.ImportAsset을 바로 부르면 안 됩니다 - 이 메서드는
+            // "선택 시트 생성/갱신" 코루틴의 탭 반복문 안에서 탭마다 호출되는데, 그
+            // 루프가 끝나면 호출부가 AssetDatabase.SaveAssets()/Refresh()를 한 번 더
+            // 호출합니다. 이미 진행 중인 임포트 배치 도중에 또 다른 ImportAsset을
+            // 끼워 넣으면(특히 key: 컬럼이 바뀐 시트가 여러 개 선택된 경우 겹쳐서
+            // 호출됨) 에디터가 멈출 수 있습니다 - PoolFolderSync가 OnPostprocessAllAssets
+            // 콜백 안에서 SaveAssets를 미루는 것과 같은 이유입니다. File.WriteAllText로
+            // 디스크에 쓰기만 해두면, 호출부가 루프 종료 후 한 번 호출하는
+            // AssetDatabase.Refresh()가 이 파일도 함께 잡아서 임포트/컴파일합니다.
             Debug.Log("[TableClassGenerator] 생성됨: " + enumName + "(" + count + "개)");
         }
 
