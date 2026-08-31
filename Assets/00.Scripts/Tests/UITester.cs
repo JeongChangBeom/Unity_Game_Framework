@@ -53,13 +53,21 @@ namespace GameFramework.Tests
             if (GUILayout.Button("4) Close Top Popup"))
             {
                 UIManager.Instance.CloseTopPopup();
-                Log("CloseTopPopup()");
+                Log("CloseTopPopup() -- 즉시표시 팝업이 열려 있으면 그것부터 닫힙니다");
             }
 
             if (GUILayout.Button("5) Close All + Clear Queue"))
             {
                 UIManager.Instance.CloseAll();
                 Log("CloseAll()");
+            }
+
+            GUILayout.Space(10);
+            GUILayout.Label("Immediate (대기열/현재 팝업 무시하고 즉시 맨 위에, 여러 번 눌러 스택 확인)");
+            if (GUILayout.Button("7) Request Popup B Immediate"))
+            {
+                UIManager.Instance.RequestPopup(_popupB, EPopupPriority.Normal, unique: false, policy: EPopupPolicy.Immediate);
+                Log("RequestPopup(B, Immediate) -- 다른 팝업이 열려 있어도 그 위에 바로 뜹니다");
             }
 
             GUILayout.Space(10);

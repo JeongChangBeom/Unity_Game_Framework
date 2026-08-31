@@ -34,6 +34,22 @@ namespace GameFramework.UISystem
         private Action<object> _currentResultCallback;
         private bool _isClosingCurrent;
 
+        // EPopupPolicy.Immediate로 열린 팝업들의 스택입니다. _current/_pending/_forcedNext와
+        // 완전히 독립적으로 관리되어(대기열/선점/교체 대상이 아님), _current가 열려 있어도
+        // 그 위에 바로 열립니다. 맨 뒤(마지막 요소)가 항상 화면에서 가장 위입니다.
+        private sealed class ImmediatePopupEntry
+        {
+            public UIPopupBase instance;
+            public Action<object> onResult;
+            public bool isClosing;
+        }
+
+        private readonly List<ImmediatePopupEntry> _immediateStack = new();
+
+        /// <summary>지금 화면에서 가장 위에 있는 팝업입니다 - 즉시표시 팝업이 하나라도 열려
+        /// 있으면 그중 맨 위, 없으면 _current입니다. 둘 다 없으면 null입니다.</summary>
+        private UIPopupBase TopmostPopup => _immediateStack.Count > 0 ? _immediateStack[^1].instance : _current;
+
         private int _sequenceCounter;
         private bool _processScheduled;
 
@@ -49,12 +65,13 @@ namespace GameFramework.UISystem
         /// <summary>UIManagerSettings.OverlayPrefabOverride로 미리 생성해둔 인스턴스입니다(설정 안 했으면 null). 시작 시 비활성화 상태이므로 필요할 때 SetActive(true)로 켜세요.</summary>
         public GameObject OverlayInstance => _overlayInstance;
 
-        public bool IsAnyPopupOpen => _current != null;
+        public bool IsAnyPopupOpen => _current != null || _immediateStack.Count > 0;
         public bool HasPendingPopups => _pending.Count > 0;
-        public bool IsBlockingInput => _current != null;
+        public bool IsBlockingInput => _current != null || _immediateStack.Count > 0;
 
-        /// <summary>현재 열려 있는 팝업이 뒤로가기/취소 입력으로 닫혀도 되는지 여부입니다. 팝업이 없으면 false입니다.</summary>
-        public bool CurrentPopupCloseableByBackButton => _current != null && _current.CloseableByBackButton;
+        /// <summary>지금 화면에서 가장 위에 있는 팝업(즉시표시 팝업이 있으면 그 팝업, 없으면
+        /// 현재 팝업)이 뒤로가기/취소 입력으로 닫혀도 되는지 여부입니다. 팝업이 없으면 false입니다.</summary>
+        public bool CurrentPopupCloseableByBackButton => TopmostPopup != null && TopmostPopup.CloseableByBackButton;
 
         protected override void OnInitialize()
         {
@@ -88,7 +105,11 @@ namespace GameFramework.UISystem
                 return;
             }
 
-            if (_current == null || _current.CloseableByBackButton == false)
+            // 즉시표시 팝업이 열려 있으면 그게 화면상 맨 위이므로 뒤로가기는 그것부터
+            // 대상으로 합니다 (CloseTopPopup이 동일한 우선순위로 처리합니다).
+            UIPopupBase topmost = TopmostPopup;
+
+            if (topmost == null || topmost.CloseableByBackButton == false)
             {
                 return;
             }
@@ -143,6 +164,11 @@ namespace GameFramework.UISystem
                 {
                     return;
                 }
+
+                if (IsAlreadyImmediateType(t) == true)
+                {
+                    return;
+                }
             }
 
             PopupRequest req = new PopupRequest();
@@ -153,6 +179,15 @@ namespace GameFramework.UISystem
             req.onResult = onResult;
             req.sequence = _sequenceCounter;
             _sequenceCounter++;
+
+            // Immediate는 _current/_pending/_forcedNext와 완전히 무관하게 항상 즉시 새
+            // 오버레이로 열립니다 - 다른 팝업이 열려 있어도(심지어 그 팝업이 닫히는 중이어도)
+            // 대기하지 않고 바로 그 위에 뜹니다.
+            if (policy == EPopupPolicy.Immediate)
+            {
+                OpenImmediatePopup(req);
+                return;
+            }
 
             // _isClosingCurrent인 동안(닫기 애니메이션이 아직 진행 중인 동안)에는 _current를
             // 건드리지 않습니다. 여기서 SuspendCurrentToPending/ClosePopup을 또 호출하면,
@@ -283,8 +318,15 @@ namespace GameFramework.UISystem
             return prefab;
         }
 
+        /// <summary>화면상 가장 위(즉시표시 팝업이 있으면 그중 맨 위, 없으면 현재 팝업)를 닫습니다.</summary>
         public void CloseTopPopup(object result = null)
         {
+            if (_immediateStack.Count > 0)
+            {
+                CloseImmediatePopupAt(_immediateStack.Count - 1, result);
+                return;
+            }
+
             if (_current == null)
             {
                 return;
@@ -301,6 +343,13 @@ namespace GameFramework.UISystem
         /// <summary><paramref name="result"/>은 이 팝업의 RequestPopup 호출 시 전달된 onResult 콜백으로 전달됩니다.</summary>
         public void ClosePopup(UIPopupBase target, object result)
         {
+            int immediateIndex = FindImmediateIndex(target);
+            if (immediateIndex >= 0)
+            {
+                CloseImmediatePopupAt(immediateIndex, result);
+                return;
+            }
+
             // _isClosingCurrent를 확인하지 않으면, 닫기 애니메이션이 끝나기 전에
             // ClosePopup이 한 번 더 호출됐을 때 target.RequestClose가 두 번 걸리면서
             // 두 번째 호출의 onResult(이미 null로 비워진 상태)가 첫 번째 호출의
@@ -317,11 +366,6 @@ namespace GameFramework.UISystem
 
             target.RequestClose(() =>
             {
-                // 닫기 애니메이션이 끝나기 전까지는 모달 블로커를 켜둔 채로 둡니다 -
-                // 미리 꺼버리면 팝업이 화면에서 아직 사라지는 중인데도 그 뒤의 UI가
-                // 클릭을 받아버리는 입력 누수가 있었습니다.
-                _modalBlocker.SetActive(false);
-
                 // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
                 // 이미 null일 수 있습니다.
                 if (PoolManager.Instance != null)
@@ -338,6 +382,14 @@ namespace GameFramework.UISystem
 
                 _isClosingCurrent = false;
                 _processScheduled = true;
+
+                // 닫기 애니메이션이 끝나기 전까지는 모달 블로커를 켜둔 채로 둡니다 -
+                // 미리 꺼버리면 팝업이 화면에서 아직 사라지는 중인데도 그 뒤의 UI가
+                // 클릭을 받아버리는 입력 누수가 있었습니다. 즉시표시 팝업이 이 위에
+                // 여전히 떠 있을 수도 있으므로, 무조건 끄지 않고 RestackBlocker로
+                // 지금 남은 맨 위 팝업 기준으로 다시 배치합니다.
+                RestackBlocker();
+
                 onResult?.Invoke(result);
             });
         }
@@ -358,6 +410,20 @@ namespace GameFramework.UISystem
             }
 
             _pending.Clear();
+
+            // 즉시표시 팝업들도 전부 정리합니다. CloseAll은 "즉시 비우기"가 목적인
+            // 긴급 정리 경로(씬 전환 등)라, 이미 화면에 나와 있는 상태여도 닫기
+            // 애니메이션 없이 _pending의 suspended 인스턴스와 동일하게 즉시 Despawn합니다.
+            for (int i = 0; i < _immediateStack.Count; i++)
+            {
+                UIPopupBase instance = _immediateStack[i].instance;
+                if (instance != null && PoolManager.Instance != null)
+                {
+                    PoolManager.Instance.Despawn(instance.gameObject);
+                }
+            }
+
+            _immediateStack.Clear();
 
             // 토스트는 비모달이라 팝업과 독립적으로 여러 개 동시에 떠 있을 수 있습니다.
             // 여기서 비워주지 않으면 씬 전환 등으로 CloseAll이 호출돼도 이미 떠 있던
@@ -389,6 +455,9 @@ namespace GameFramework.UISystem
 
             if (_current == null || _isClosingCurrent)
             {
+                // 위에서 즉시표시 팝업을 이미 정리했을 수 있으므로, 그 경우를 반영해
+                // 블로커 상태를 다시 계산합니다(둘 다 없으면 꺼짐).
+                RestackBlocker();
                 return;
             }
 
@@ -402,8 +471,6 @@ namespace GameFramework.UISystem
 
             target.RequestClose(() =>
             {
-                _modalBlocker.SetActive(false);
-
                 if (PoolManager.Instance != null)
                 {
                     PoolManager.Instance.Despawn(target.gameObject);
@@ -416,6 +483,7 @@ namespace GameFramework.UISystem
 
                 _isClosingCurrent = false;
                 _processScheduled = true;
+                RestackBlocker();
             });
         }
 
@@ -528,9 +596,110 @@ namespace GameFramework.UISystem
                 instance.OnOpen(req.payload);
             }
 
+            RestackBlocker();
+        }
+
+        // 즉시표시(Immediate) 팝업을 대기열/현재 팝업과 무관하게 곧바로 엽니다. 선점/재개
+        // 개념이 없어(OpenRequestNow와 달리) 항상 새로 스폰하고, 닫히면 그대로 사라집니다.
+        private void OpenImmediatePopup(PopupRequest req)
+        {
+            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
+            // 이미 null일 수 있습니다.
+            if (PoolManager.Instance == null)
+            {
+                req.onResult?.Invoke(null);
+                return;
+            }
+
+            UIPopupBase instance = PoolManager.Instance.Spawn(req.prefab, Vector3.zero, Quaternion.identity, _popupRoot);
+            if (instance == null)
+            {
+                Debug.LogWarning($"[UIManager] {req.prefab.GetType().Name} 즉시표시 팝업을 스폰하지 못했습니다 (풀이 가득 찼을 수 있습니다). 이 요청은 건너뜁니다.");
+                req.onResult?.Invoke(null);
+                return;
+            }
+
+            AttachToRoot(instance.transform);
+
+            instance.InitializePopupMeta(
+                req.prefab.GetType(),
+                (int)req.priority,
+                req.sequence
+            );
+
+            ImmediatePopupEntry entry = new ImmediatePopupEntry
+            {
+                instance = instance,
+                onResult = req.onResult,
+            };
+
+            _immediateStack.Add(entry);
+
+            instance.OnOpen(req.payload);
+
+            RestackBlocker();
+        }
+
+        private int FindImmediateIndex(UIPopupBase target)
+        {
+            for (int i = 0; i < _immediateStack.Count; i++)
+            {
+                if (_immediateStack[i].instance == target)
+                {
+                    return i;
+                }
+            }
+
+            return -1;
+        }
+
+        private void CloseImmediatePopupAt(int index, object result)
+        {
+            ImmediatePopupEntry entry = _immediateStack[index];
+
+            // ClosePopup의 _isClosingCurrent 가드와 동일한 이유입니다 - 닫기 애니메이션이
+            // 끝나기 전에 같은 팝업에 대해 또 닫기 요청이 오면 onResult가 중복/유실될 수
+            // 있습니다.
+            if (entry.isClosing)
+            {
+                return;
+            }
+
+            entry.isClosing = true;
+
+            Action<object> onResult = entry.onResult;
+            entry.onResult = null;
+
+            entry.instance.RequestClose(() =>
+            {
+                if (PoolManager.Instance != null)
+                {
+                    PoolManager.Instance.Despawn(entry.instance.gameObject);
+                }
+
+                _immediateStack.Remove(entry);
+                RestackBlocker();
+                onResult?.Invoke(result);
+            });
+        }
+
+        // 모달 블로커를 지금 화면상 맨 위 팝업(TopmostPopup) 바로 아래로 옮깁니다.
+        // 즉시표시 팝업이 열려 있으면 그게 맨 위이고, 없으면 _current가 맨 위입니다 -
+        // 어느 쪽이든 그 아래의 모든 것(다른 즉시표시 팝업, _current, 게임 화면)을 이
+        // 블로커 하나로 전부 가려서 입력을 막습니다. 아무 팝업도 없으면 꺼집니다.
+        private void RestackBlocker()
+        {
+            UIPopupBase topmost = TopmostPopup;
+
+            if (topmost == null)
+            {
+                _modalBlocker.SetActive(false);
+                return;
+            }
+
             _modalBlocker.SetActive(true);
             _modalBlocker.transform.SetAsLastSibling();
-            instance.transform.SetAsLastSibling();
+            topmost.transform.SetAsLastSibling();
         }
 
         // ---- 토스트 ----
@@ -783,6 +952,19 @@ namespace GameFramework.UISystem
             }
 
             return _current.PopupType == t;
+        }
+
+        private bool IsAlreadyImmediateType(Type t)
+        {
+            for (int i = 0; i < _immediateStack.Count; i++)
+            {
+                if (_immediateStack[i].instance.PopupType == t)
+                {
+                    return true;
+                }
+            }
+
+            return false;
         }
     }
 }

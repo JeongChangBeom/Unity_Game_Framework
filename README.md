@@ -356,9 +356,9 @@ Orc orcComp = PoolManager.Instance.Spawn<Orc>("Orc", spawnPosition, Quaternion.i
 <summary><h2>3. UI System</h2></summary>
 
 ### 기능
-- 단일 팝업 표시 (Single Active Popup)
+- 단일 팝업 표시 (Single Active Popup) - 대기열이 관리하는 "메인" 팝업은 항상 하나. `EPopupPolicy.Immediate`로 연 팝업만 예외로, 메인 팝업과 별개로 그 위에 몇 개든 겹쳐 띄울 수 있음(아래 "정책 지정" 참고)
 - 우선순위 처리 (Low / Normal / High / Critical)
-- 선점 / 대기 / 교체 정책
+- 선점 / 대기 / 교체 / 즉시표시 정책
 - Suspend / Resume 흐름
 - Open / Resume / Suspend / Close, Toast Show / Hide 전 구간에 애니메이션 훅 제공 (기본 스케일 연출 포함, 원하는 연출 코드로 교체 가능)
 - Modal 입력 차단
@@ -406,6 +406,24 @@ UIManager.Instance.RequestPopup(
     popupPrefab,
     EPopupPriority.High,
     policy: EPopupPolicy.ReplaceCurrent
+);
+```
+
+|정책|동작|
+|-|-|
+|`QueueOnly`|무조건 대기열에 넣고 순서(우선순위 -> 요청 순서)를 기다림|
+|`PreemptIfHigher`(기본값)|현재 팝업보다 우선순위가 높으면 현재 팝업을 대기열로 미루고 즉시 선점, 아니면 대기|
+|`ReplaceCurrent`|현재 팝업을 즉시 닫고(Suspend 아님 - 인스턴스가 사라짐) 다음 차례에 이 팝업이 반드시 열림|
+|`Immediate`|대기열/현재 팝업과 완전히 무관하게 지금 당장 그 위에 새로 열림. 다른 팝업이 열려 있어도(심지어 여러 개 열려 있어도) 기다리지 않음|
+
+**`Immediate`**는 대기열이 관리하는 "메인 팝업 슬롯" 자체를 건드리지 않고, 별도의 오버레이 스택에 쌓입니다 - 그래서 메인 팝업(들)을 그대로 둔 채 그 위에 경고창/강제 알림 같은 걸 바로 띄우고 싶을 때 씁니다. 여러 번 요청하면(`unique: false`) 그 위에 계속 쌓이고, `CloseTopPopup()`/뒤로가기·Escape는 항상 화면상 가장 위(즉시표시 팝업이 있으면 그중 맨 위)부터 LIFO로 닫습니다. `CloseAll()`을 부르면 즉시표시 팝업도 메인 팝업/대기열과 함께 전부 정리됩니다.
+
+```cs
+// 다른 팝업이 열려 있어도 그 위에 바로 뜨는 경고창
+UIManager.Instance.RequestPopup(
+    warningPopupPrefab,
+    EPopupPriority.Normal,
+    policy: EPopupPolicy.Immediate
 );
 ```
 
@@ -500,7 +518,7 @@ public class MandatoryConfirmPopup : UIPopupBase
 ---
 
 ### 테스트 방법
-`Assets/00.Scripts/Tests/UITester.cs`를 빈 GameObject에 붙이고 `_popupA`/`_popupB`에 `UIPopup_TestA`/`UIPopup_TestB` 프리팹을 연결하면 팝업/결과 콜백/토스트/전체 닫기를 확인할 수 있는 OnGUI 버튼이 표시됩니다.
+`Assets/00.Scripts/Tests/UITester.cs`를 빈 GameObject에 붙이고 `_popupA`/`_popupB`에 `UIPopup_TestA`/`UIPopup_TestB` 프리팹을 연결하면 팝업/결과 콜백/토스트/전체 닫기를 확인할 수 있는 OnGUI 버튼이 표시됩니다. "Request Popup B Immediate" 버튼은 여러 번 눌러서 즉시표시 팝업이 다른 팝업(들) 위에 계속 쌓이는지, `Close Top Popup`/Escape가 그중 맨 위부터 순서대로 닫는지 확인할 수 있습니다.
 
 </details>
 
