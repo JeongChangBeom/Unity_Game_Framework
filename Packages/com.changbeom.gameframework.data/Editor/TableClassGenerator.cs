@@ -20,10 +20,7 @@ namespace GameFramework.DataParsing.Editor
             /// <summary>정규화된(fully-qualified) enum 타입 이름입니다 (type == Enum일 때만 설정됨).</summary>
             public string enumTypeFullName;
 
-            /// <summary>"key:EnumName" 컬럼일 때만 설정됩니다. 필드 타입은 계속 string으로
-            /// 남고(enum: 컬럼과 다름), 이 값이 있으면 WriteTableScript가 생성 클래스에
-            /// Get(EnumName key) 오버로드를 추가하고, SyncKeyEnums가 이 컬럼의 실제 시트 값들로
-            /// 그 EnumName의 .cs 파일을 자동으로 만들거나 갱신합니다.</summary>
+            /// <summary>"key:EnumName" 컬럼일 때만 설정됩니다(필드 타입은 계속 string).</summary>
             public string keyEnumName;
         }
 
@@ -73,7 +70,6 @@ namespace GameFramework.DataParsing.Editor
 
                 if (baseTypeText.StartsWith("enum:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // enum 타입 이름은 대소문자를 구분하므로, 이 분기에서는 소문자로 바꾸면 안 됩니다.
                     string enumTypeName = baseTypeText.Substring("enum:".Length).Trim();
 
                     Type resolvedType;
@@ -88,10 +84,6 @@ namespace GameFramework.DataParsing.Editor
                 }
                 else if (baseTypeText.StartsWith("key:", StringComparison.OrdinalIgnoreCase))
                 {
-                    // "enum:"과 달리 이 시점엔 enum 타입이 존재할 필요가 없습니다(오히려
-                    // 존재하지 않는 게 정상인 첫 생성 경우가 있습니다). 필드는 계속 string으로
-                    // 남습니다 - SyncKeyEnums가 이 컬럼의 실제 시트 값들로 그 enum을 만들거나
-                    // 갱신합니다(WriteTableScript 참고).
                     keyEnumName = baseTypeText.Substring("key:".Length).Trim();
 
                     if (string.IsNullOrEmpty(keyEnumName))
@@ -125,9 +117,6 @@ namespace GameFramework.DataParsing.Editor
 
                 string fieldName = ToSafeFieldName(name);
 
-                // 생성되는 Data 클래스는 컬럼 필드 옆에 Id 필드를 이미 고정으로
-                // 선언합니다 (WriteTableScript 참고). 컬럼 이름이 sanitize 후 "Id"가
-                // 되면 같은 클래스에 필드가 두 번 선언되어 생성 스크립트가 컴파일되지 않습니다.
                 if (fieldName == "Id")
                 {
                     error = "컬럼 이름 \"" + name + "\"는 sanitize 후 \"Id\"가 되어, 모든 테이블에 이미 고정으로 있는 Id 필드와 충돌합니다. 컬럼 이름을 다르게 바꿔주세요.";
@@ -142,9 +131,6 @@ namespace GameFramework.DataParsing.Editor
                         return false;
                     }
 
-                    // 컬럼 이름 자체는 달라도(예: "Item Name" vs "Item-Name") sanitize 후
-                    // 필드 이름이 같아지면, 생성되는 클래스에 같은 이름의 필드가 두 번
-                    // 선언되어 컴파일이 깨집니다. sanitize된 이름 기준으로도 검사합니다.
                     if (columns[i].fieldName == fieldName)
                     {
                         error = "컬럼 이름 \"" + columns[i].columnName + "\"와(과) \"" + name +
@@ -329,17 +315,8 @@ namespace GameFramework.DataParsing.Editor
             }
 
             File.WriteAllText(scriptPath, sb.ToString(), Encoding.UTF8);
-
-            // WriteKeyEnumFile과 같은 이유로 AssetDatabase.ImportAsset을 여기서 바로
-            // 부르지 않습니다 - 이 메서드는 "선택 시트 생성" 코루틴의 탭 반복문 안에서
-            // 탭마다 호출되고, 그 루프가 끝나면 호출부가 AssetDatabase.Refresh()를 한
-            // 번 더 호출합니다. 디스크에 쓰기만 해두면 그 Refresh가 이 파일도 함께
-            // 잡아서 임포트/컴파일합니다.
         }
 
-        // Get(EnumName key)는 항상 문자열 필드(col.fieldName) 값으로 조회합니다 - 필드
-        // 타입은 절대 enum으로 바꾸지 않으므로(SyncKeyEnums 참고), "선택 시트 갱신"이
-        // 스키마 불변 시 이 클래스를 재컴파일하지 않고도 계속 동작합니다.
         private static void AppendKeyAccessor(StringBuilder sb, ColumnInfo col)
         {
             string cache = "_keyCache_" + col.fieldName;
@@ -387,14 +364,9 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine();
         }
 
-        /// <summary>
-        /// "key:EnumName" 컬럼들의 실제 시트 값(행)을 읽어, 필요하면 그 EnumName의 .cs 파일을
-        /// outputDir에 새로 쓰거나 갱신합니다. WriteTableScript(스키마 기반)와 달리 이 메서드는
-        /// 행 값에만 의존하므로, 스키마가 그대로라 WriteTableScript가 실행되지 않는 "선택 시트
-        /// 갱신"에서도 반드시 호출되어야 새로 추가/삭제된 행의 키 값이 enum에 반영됩니다
-        /// (DataTableImporterWindow의 생성/갱신 두 경로 모두에서 호출). outputDir은 보통
-        /// 테이블 클래스 스크립트와 같은 폴더를 넘깁니다.
-        /// </summary>
+        /// <summary>"key:EnumName" 컬럼들의 실제 시트 값으로 그 EnumName의 .cs 파일을
+        /// outputDir(보통 테이블 클래스 스크립트와 같은 폴더)에 생성/갱신합니다. "선택 시트
+        /// 생성"과 "선택 시트 갱신" 양쪽에서 호출해야 합니다.</summary>
         public static void SyncKeyEnums(string tsv, List<ColumnInfo> columns, string outputDir)
         {
             TsvTable table = TsvParser.Parse(tsv);
@@ -431,8 +403,6 @@ namespace GameFramework.DataParsing.Editor
 
             if (!TryGetExistingGlobalEnumNames(col.keyEnumName, out string[] existingNames))
             {
-                // 동일 이름의 enum이 여러 개 있어 모호합니다 - 로그는
-                // TryGetExistingGlobalEnumNames가 이미 남겼으므로 여기서는 그냥 건너뜁니다.
                 return;
             }
 
@@ -449,12 +419,6 @@ namespace GameFramework.DataParsing.Editor
             WriteKeyEnumFile(path, content, col.keyEnumName, ordered.Count);
         }
 
-        /// <summary>이미 컴파일된 프로젝트 어셈블리들에서 같은 이름의 "전역 네임스페이스"
-        /// enum을 찾습니다(key: enum은 항상 전역에 생성되므로, 다른 네임스페이스의 동명
-        /// enum은 무시합니다 - 예: 마이그레이션 중 남아있는 구 GameFramework.SoundSystem.ESound와
-        /// 헷갈리지 않도록). 한 번도 생성된 적 없으면(첫 실행) 못 찾는 게 정상이라 빈 배열을
-        /// 반환합니다. 전역 네임스페이스에 동일 이름 enum이 여러 개면(있을 수 없어야 정상이지만)
-        /// 어느 걸 "기존 값"으로 봐야 할지 알 수 없어 실패로 처리합니다.</summary>
         private static bool TryGetExistingGlobalEnumNames(string enumTypeName, out string[] names)
         {
             names = Array.Empty<string>();
@@ -488,11 +452,8 @@ namespace GameFramework.DataParsing.Editor
             return true;
         }
 
-        /// <summary>새로 생성할 때 이름을 시트 순서 그대로 두면, enum은 값을 안 주면 선언
-        /// 순서대로 0,1,2...가 매겨지기 때문에, 기존 멤버는 시트에서 지워졌더라도 순서/값을
-        /// 그대로 보존하고(저장된 데이터/Inspector 참조가 조용히 다른 값을 가리키지 않도록)
-        /// 새로 추가된 이름만 맨 뒤에 붙입니다. "None"은 항상 0번으로 별도 예약되어 있어
-        /// 결과 목록에서 제외합니다(BuildKeyEnumFileContent가 항상 맨 앞에 붙임).</summary>
+        /// <summary>기존 멤버는 시트에서 지워졌더라도 순서/값을 보존하고, 새 값만 뒤에
+        /// 붙입니다("None"은 항상 0번 예약이라 결과 목록에서 제외).</summary>
         private static List<string> BuildOrderedKeyNames(List<string> sheetValues, string[] existingNames)
         {
             List<string> result = new List<string>();
@@ -528,10 +489,6 @@ namespace GameFramework.DataParsing.Editor
 
                 if (safe != raw)
                 {
-                    // Get(enum)은 key.ToString()(=enum 멤버 이름)으로 원본 문자열 필드 값을
-                    // 그대로 조회합니다. 여기서 이름이 sanitize로 바뀌면 둘이 달라져서 이
-                    // 항목은 Get(enum)으로 절대 조회되지 않습니다 - 조용히 넘어가지 않고
-                    // 바로 알려줍니다.
                     Debug.LogError("[TableClassGenerator] \"" + raw + "\"은(는) 유효한 식별자가 아니라서 enum 멤버는 \"" + safe + "\"로 생성되지만, Get(enum) 조회는 원본 값(\"" + raw + "\")으로 이루어지므로 이 항목은 조회되지 않습니다. 시트 값을 영문/숫자/밑줄로만 바꿔주세요.");
                 }
 
@@ -602,23 +559,11 @@ namespace GameFramework.DataParsing.Editor
 
             File.WriteAllText(path, content, new UTF8Encoding(false));
 
-            // 여기서 AssetDatabase.ImportAsset을 바로 부르면 안 됩니다 - 이 메서드는
-            // "선택 시트 생성/갱신" 코루틴의 탭 반복문 안에서 탭마다 호출되는데, 그
-            // 루프가 끝나면 호출부가 AssetDatabase.SaveAssets()/Refresh()를 한 번 더
-            // 호출합니다. 이미 진행 중인 임포트 배치 도중에 또 다른 ImportAsset을
-            // 끼워 넣으면(특히 key: 컬럼이 바뀐 시트가 여러 개 선택된 경우 겹쳐서
-            // 호출됨) 에디터가 멈출 수 있습니다 - PoolFolderSync가 OnPostprocessAllAssets
-            // 콜백 안에서 SaveAssets를 미루는 것과 같은 이유입니다. File.WriteAllText로
-            // 디스크에 쓰기만 해두면, 호출부가 루프 종료 후 한 번 호출하는
-            // AssetDatabase.Refresh()가 이 파일도 함께 잡아서 임포트/컴파일합니다.
             Debug.Log("[TableClassGenerator] 생성됨: " + enumName + "(" + count + "개)");
         }
 
-        // MakeEnumName: 공백/하이픈을 밑줄로 바꾸고, 영문/숫자/밑줄이 아닌 문자는 제거해서
-        // 유효한 C# 식별자를 만듭니다. 숫자로 시작하면 앞에 밑줄을 붙입니다. ToSafeFieldName과
-        // 달리 여기서는 잘못된 문자를 "_"로 치환하지 않고 아예 제거합니다 - 결과가 원본과
-        // 달라지면(BuildOrderedKeyNames에서) 에러로 알리는 쪽이 필드 이름 sanitize보다
-        // 엄격해야 하기 때문입니다(치환하면 서로 다른 원본 값이 같은 이름으로 뭉개질 수 있음).
+        /// <summary>공백/하이픈을 밑줄로 바꾸고, 영문/숫자/밑줄이 아닌 문자는 제거해서 유효한
+        /// C# 식별자를 만듭니다. 숫자로 시작하면 앞에 밑줄을 붙입니다.</summary>
         private static string MakeEnumName(string raw)
         {
             if (string.IsNullOrEmpty(raw))
@@ -671,9 +616,6 @@ namespace GameFramework.DataParsing.Editor
                 return;
             }
 
-            // ParseEnum 호출부와 동일한 방식으로, 생성되는 코드 안에 "클래스.필드 row=" + (r + 1)
-            // 형태의 C# 문자열 연결식을 그대로 심어 넣습니다. contextLiteral 자체가 이미
-            // 여는/닫는 큰따옴표를 포함한 완성된 식이므로 별도로 감쌀 필요가 없습니다.
             string contextLiteral = "\"" + className + "." + col.fieldName + " row=\" + (r + 1)";
 
             if (col.isArray)
@@ -728,13 +670,8 @@ namespace GameFramework.DataParsing.Editor
             sb.AppendLine("                " + field + " = TableValueParser." + scalarMethod + "(raw, " + defaultLiteral + ", " + contextLiteral + ");");
         }
 
-        /// <summary>
-        /// 로드된 모든 어셈블리에서 짧은 이름으로 기존 enum 타입을 찾습니다.
-        /// enum은 반드시 프로젝트 코드에 이미 정의되어 있어야 하며, 이 메서드는 절대
-        /// enum을 생성하지 않습니다. 타입이 없거나 이름이 모호하면 (명확한 이유와 함께)
-        /// 실패하여, 오타난 타입 참조가 조용히 깨진 테이블을 만드는 대신 테이블 생성
-        /// 자체를 막습니다.
-        /// </summary>
+        /// <summary>프로젝트 코드에 이미 정의된 enum 타입을 이름으로 찾습니다. 없거나
+        /// 이름이 모호하면 실패합니다(이 메서드는 enum을 생성하지 않음).</summary>
         private static bool TryFindEnumType(string enumTypeName, out Type foundType, out string error)
         {
             foundType = null;
@@ -895,9 +832,6 @@ namespace GameFramework.DataParsing.Editor
                 }
             }
 
-            // 시트 탭 이름이 나중에 게임플레이 클래스(예: Monster, Item)와 겹치는 것을
-            // 원천적으로 막기 위해, 생성되는 클래스 이름에는 항상 Table 접미사를 붙입니다.
-            // 이미 Table로 끝나는 이름(예: "ItemTable")에는 중복으로 붙이지 않습니다.
             if (!result.EndsWith("Table", StringComparison.Ordinal))
             {
                 result += "Table";
@@ -956,9 +890,6 @@ namespace GameFramework.DataParsing.Editor
             return s;
         }
 
-        // 컬럼 이름이 int/new/string 같은 C# 예약어와 그대로 겹치면 생성된 필드 선언이
-        // 컴파일 에러가 나므로, 일부(class/namespace/public/private)만이 아니라 전체
-        // 예약어 목록과 대조합니다.
         private static readonly HashSet<string> CSharpKeywords = new HashSet<string>
         {
             "abstract", "as", "base", "bool", "break", "byte", "case", "catch", "char",

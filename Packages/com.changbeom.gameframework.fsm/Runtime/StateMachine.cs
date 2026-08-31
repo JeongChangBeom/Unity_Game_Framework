@@ -75,9 +75,6 @@ namespace GameFramework.FSM
                 return;
             }
 
-            // 아직 한 번도 상태가 없었던 첫 ChangeState라면(_currentState == null), 진짜
-            // "이전 상태"가 없는 거라 OnStateChanged를 쏘지 않습니다 - 안 그러면
-            // default(TStateKey)가 마치 진짜 이전 상태인 것처럼 이벤트에 실려나갑니다.
             bool hadPreviousState = _currentState != null;
             TStateKey previousKey = _currentKey;
 
@@ -90,10 +87,6 @@ namespace GameFramework.FSM
                 _currentKey = key;
                 _currentState.OnEnter();
 
-                // OnStateChanged가 끝날 때까지도 재진입을 막습니다. 여기서 먼저 플래그를
-                // 풀어버리면, 구독자가 이벤트 핸들러 안에서 다시 ChangeState를 호출했을 때
-                // 그 중첩 호출이 곧바로 완료돼버려서, 아직 도는 중인 이 Invoke의 나머지
-                // 구독자들이 이미 낡아버린 (previousKey, key) 인자를 받게 됩니다.
                 if (hadPreviousState)
                 {
                     InvokeStateChanged(previousKey, key);
@@ -101,15 +94,10 @@ namespace GameFramework.FSM
             }
             finally
             {
-                // OnEnter/OnExit/OnStateChanged 구독자 중 하나가 예외를 던져도 이 플래그가
-                // 영원히 true로 남아 상태 머신 전체가 이후 모든 ChangeState 호출을 조용히
-                // 무시해버리는(경고 로그만 남기고 복구 불가) 상황을 막기 위해 finally에서 해제합니다.
                 _isTransitioning = false;
             }
         }
 
-        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나가 예외를 던져도 나머지
-        // 구독자에게는 정상적으로 전달되도록 각각 개별 try/catch로 격리합니다.
         private void InvokeStateChanged(TStateKey previousKey, TStateKey key)
         {
             if (OnStateChanged == null)

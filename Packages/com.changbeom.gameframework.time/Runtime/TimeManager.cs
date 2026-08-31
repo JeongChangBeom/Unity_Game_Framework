@@ -74,8 +74,6 @@ namespace GameFramework.TimeSystem
             _lastWeeklyKey = ResetKey.GetWeeklyKey(now, _settings.DailyResetHour, _settings.WeeklyResetDay);
             _lastMonthlyKey = ResetKey.GetMonthlyKey(now, _settings.DailyResetHour);
 
-            // 다음 AutoFlush 시점이나 쿨타임 변경 전에 앱이 크래시하더라도, 이번 Init에서의
-            // 스키마/쿨타임 상태가 확실히 디스크에 기록되도록 합니다.
             _store.Flush();
         }
 
@@ -285,9 +283,6 @@ namespace GameFramework.TimeSystem
             }
         }
 
-        // Dictionary 키로 바로 쓰이기 때문에, id가 null이면 TryGetValue/인덱서에서
-        // ArgumentNullException이 그대로 튀어나와 원인을 알기 어려운 크래시가 됩니다.
-        // TimeStore.MakeKey와 동일한 방식으로 명확한 예외를 던집니다.
         private static void ValidateCooldownId(string id)
         {
             if (string.IsNullOrWhiteSpace(id))
@@ -345,18 +340,10 @@ namespace GameFramework.TimeSystem
 
             if (pause)
             {
-                // RecordLastSeen으로 기준선을 검증 없이 덮어쓰면, 기기 시계를 되돌린 뒤
-                // 곧바로 백그라운드로 보내는 것만으로 CheckBackward의 forward-only 보호를
-                // 완전히 우회해 기준선을 조작할 수 있었습니다(치트 플래그도 안 남음).
-                // Resume/재시작 시점과 똑같이 CheckBackward를 거치게 해서, 백그라운드
-                // 전환 경로도 동일하게 검증되도록 합니다.
                 _cheatGuard.CheckBackward(now, IsTrusted);
                 return;
             }
 
-            // 백그라운드 상태에서 기기 시계를 되돌린 뒤 앱을 재개하는 경로는 완전
-            // 재시작을 거치지 않으므로, OnInitialize의 1회성 CheckBackward만으로는
-            // 세션 중에 감지되지 않습니다. Resume 시점에도 다시 검사해야 합니다.
             _cheatGuard.CheckBackward(now, IsTrusted);
         }
 
@@ -364,9 +351,6 @@ namespace GameFramework.TimeSystem
         {
             base.OnApplicationQuit();
 
-            // 위 OnApplicationPause(true)와 동일한 이유로, 종료 시점에도 검증 없는
-            // RecordLastSeen 대신 CheckBackward를 거쳐 기준선을 기록합니다 - 시계를
-            // 되돌린 뒤 종료하는 것만으로 기준선이 조용히 조작되는 것을 막습니다.
             _cheatGuard.CheckBackward(UtcNow, IsTrusted);
         }
     }

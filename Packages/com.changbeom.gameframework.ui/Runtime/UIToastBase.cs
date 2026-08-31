@@ -13,9 +13,6 @@ namespace GameFramework.UISystem
     {
         [SerializeField] private float _animationDuration = 0.2f;
 
-        // destroyCancellationToken은 실제 Destroy에서만 취소되는데, 풀링된 오브젝트는
-        // Destroy가 아니라 SetActive(false)로만 반환됩니다. 애니메이션은 이 자체 토큰을
-        // 쓰고, OnBeforeReturnToPool에서 확실히 취소해서 재활용 후에도 살아남지 않게 합니다.
         private CancellationTokenSource _animCts = new CancellationTokenSource();
         protected CancellationToken AnimationToken => _animCts.Token;
 
@@ -70,20 +67,12 @@ namespace GameFramework.UISystem
             _onHidden = null;
         }
 
+        /// <summary>풀에 반환되기 전 처리. override하는 경우 base.OnBeforeReturnToPool()을 호출하세요.</summary>
         public virtual void OnBeforeReturnToPool()
         {
-            // 풀에 반환되기 전 처리. 진행 중이던 애니메이션이 이 인스턴스가 다른
-            // 토스트로 재활용된 뒤에도 계속 돌다가 CompleteX()를 부르는 걸 막기 위해
-            // 반드시 취소합니다. override하는 경우 base.OnBeforeReturnToPool()을 호출하세요.
             RestartAnimationToken();
         }
 
-        // Show/RequestHide는 같은 인스턴스 안에서(풀 반환 없이) 서로를 가로챌 수 있습니다
-        // (예: duration이 매우 짧거나 0으로 호출되어 Hide가 Show 애니메이션이 끝나기 전에
-        // 시작되는 경우, 혹은 HideSelf로 수동 조기 종료). 풀 반환 시점에만 토큰을 갱신하면
-        // 먼저 시작한 Show와 나중에 시작한 Hide가 같은 프레임 동안 같은 Transform.localScale을
-        // 동시에 애니메이션하며 서로의 결과를 덮어씁니다. UIPopupBase와 동일하게 전환
-        // 시작 시점마다 토큰을 갱신해 이전 애니메이션을 취소합니다.
         private void RestartAnimationToken()
         {
             _animCts.Cancel();

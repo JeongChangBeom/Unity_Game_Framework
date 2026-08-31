@@ -20,10 +20,7 @@ namespace GameFramework.Localization
         public string TableResourcePath = "GeneratedTables/LocalizationTable";
 
         [Header("Language")]
-        [Tooltip("저장된 언어도 없고 시스템 언어 매핑도 실패했을 때 사용할 기본 언어 코드입니다 " +
-            "(Localization 시트의 언어 컬럼명과 정확히 같아야 함, 예: KO). ELanguage는 이 " +
-            "프로젝트 쪽에 생성되는 타입이라 패키지 설정에서 강타입으로 참조할 수 없어 " +
-            "문자열로 직접 입력합니다.")]
+        [Tooltip("저장된 언어도 없고 시스템 언어 매핑도 실패했을 때 사용할 기본 언어 코드입니다 (Localization 시트의 언어 컬럼명과 정확히 같아야 함, 예: KO).")]
         public string DefaultLanguage = "";
 
         [Tooltip("현재 언어에 번역이 비어있을 때 대신 사용할 언어 코드입니다.")]

@@ -4,11 +4,9 @@ using UnityEngine.UI;
 namespace GameFramework.SceneLoading
 {
     /// <summary>
-    /// 별도 프리팹을 지정하지 않았을 때 쓰이는 기본 로딩 화면입니다. 검은 배경과
-    /// 진행률 텍스트만 있는 최소 구성이며, 코드로 절차적으로 생성됩니다.
-    /// UI 패키지 Runtime이 TextMeshPro에 의존하지 않는 것과 일관되게 레거시 Text를
-    /// 사용합니다. 다른 비주얼이 필요하면 SceneLoadingManagerSettings의
-    /// LoadingScreenPrefabOverride로 원하는 프리팹(TMP 포함)으로 교체하세요.
+    /// 별도 프리팹을 지정하지 않았을 때 쓰이는 기본 로딩 화면입니다(검은 배경 + 진행률 텍스트).
+    /// 다른 비주얼이 필요하면 SceneLoadingManagerSettings의 LoadingScreenPrefabOverride로
+    /// 원하는 프리팹(TMP 포함)으로 교체하세요.
     /// </summary>
     internal sealed class DefaultSceneLoadingScreen : SceneLoadingScreenBase
     {

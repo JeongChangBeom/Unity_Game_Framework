@@ -9,22 +9,14 @@ using UnityEngine;
 
 namespace GameFramework.SceneLoading.Editor
 {
-    // Assets/01.Scenes/ 폴더에 씬을 넣기만 하면 Build Settings와 Addressables("Scene" 그룹,
-    // 주소=씬 파일 이름)에 자동 등록되고, Build Settings가 바뀌었으면 곧바로 ESceneKey도
-    // 재생성됩니다 -- 버튼을 누를 필요가 없습니다. Pooling의 PoolFolderSync와 동일한 패턴입니다.
-    //
-    // Build Settings 등록은 이미 있으면 건드리지 않지만(중복 추가 방지), Addressables 등록은
-    // ESoundGenerator처럼 매번 그룹/주소를 최신 상태로 맞춰줍니다 -- 씬 파일 이름이 나중에
-    // 바뀌어도 주소가 그대로 따라가게 하기 위함입니다(Addressables의 흔한 함정 중 하나가
-    // 에셋을 리네임해도 주소는 그대로 안 바뀌는 것입니다).
+    // Assets/01.Scenes/ 폴더에 씬을 넣으면 Build Settings와 Addressables("Scene" 그룹,
+    // 주소=씬 파일 이름)에 자동 등록되고, ESceneKey도 함께 재생성됩니다.
     public sealed class SceneFolderSync : AssetPostprocessor
     {
         private const string WatchFolder = "Assets/01.Scenes";
         private const string AddressablesGroupName = "Scene";
 
-        // 이미 폴더에 있었지만 한 번도 (재)임포트된 적이 없어서 자동 감지를 못한 씬들을 한
-        // 번에 몰아서 등록하고 싶을 때 쓰는 수동 보조 명령입니다. 평소 워크플로우에서는
-        // 필요 없습니다 (새 씬을 넣으면 자동으로 등록되므로).
+        /// <summary>이미 폴더에 있었지만 자동 감지를 못한 씬들을 한 번에 등록합니다.</summary>
         [MenuItem("Game Framework/Scene Loading/Sync Scenes From Folder")]
         public static void SyncNow()
         {
@@ -98,9 +90,6 @@ namespace GameFramework.SceneLoading.Editor
                     continue;
                 }
 
-                // 이미 등록은 되어 있습니다. Assets/01.Scenes/에 있는 씬은 항상 빌드에
-                // 포함되는 게 이 자동화의 목적이므로, 비활성화되어 있으면 다시 켭니다
-                // (경로 자체는 Unity가 GUID 기준으로 알아서 최신 상태로 유지함).
                 if (!scenes[i].enabled)
                 {
                     scenes[i].enabled = true;

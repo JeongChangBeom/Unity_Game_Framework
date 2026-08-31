@@ -40,11 +40,7 @@ namespace GameFramework.TimeSystem
                 return TimeSpan.Zero;
             }
 
-            // 시작 전에는 "활성 구간 안에서 남은 시간"이 아직 존재하지 않습니다.
-            // 이전에는 여기서 전체 이벤트 길이(EndUtc - StartUtc)를 반환해,
-            // IsActive를 먼저 확인하지 않고 Remaining만 바인딩하는 UI가 시작하지도
-            // 않은 이벤트에 대해 그럴듯한 "남은 시간"을 표시하는 함정이 있었습니다.
-            // 시작까지 남은 시간이 필요하면 UntilStart를 쓰세요.
+            // 시작 전에는 0을 반환합니다 - 시작까지 남은 시간이 필요하면 UntilStart를 쓰세요.
             if (n < StartUtc)
             {
                 return TimeSpan.Zero;

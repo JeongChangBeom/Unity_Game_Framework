@@ -39,11 +39,6 @@ namespace GameFramework.Pooling
             _owner.Despawn(gameObject);
         }
 
-        // Despawn을 거치지 않고 파괴되는 경우(씬 언로드에 딸려 파괴되는 등 - 예를 들어
-        // Spawn 시 parent를 씬 오브젝트로 넘긴 경우 그 씬이 언로드되면 같이 파괴됨)를
-        // 위한 안전망입니다. 이게 없으면 Pool의 생성 카운트가 영원히 안 줄어들어서,
-        // maxCount에 도달한 풀이 실제로는 살아있는 인스턴스가 없는데도 Spawn을 계속
-        // 거부하게 됩니다.
         private void OnDestroy()
         {
             if (_owner != null)

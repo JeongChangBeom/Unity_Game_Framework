@@ -34,9 +34,8 @@ namespace GameFramework.UISystem
         private Action<object> _currentResultCallback;
         private bool _isClosingCurrent;
 
-        // EPopupPolicy.Immediate로 열린 팝업들의 스택입니다. _current/_pending/_forcedNext와
-        // 완전히 독립적으로 관리되어(대기열/선점/교체 대상이 아님), _current가 열려 있어도
-        // 그 위에 바로 열립니다. 맨 뒤(마지막 요소)가 항상 화면에서 가장 위입니다.
+        // EPopupPolicy.Immediate로 열린 팝업들의 스택입니다. 맨 뒤(마지막 요소)가 항상
+        // 화면에서 가장 위입니다.
         private sealed class ImmediatePopupEntry
         {
             public UIPopupBase instance;
@@ -105,8 +104,6 @@ namespace GameFramework.UISystem
                 return;
             }
 
-            // 즉시표시 팝업이 열려 있으면 그게 화면상 맨 위이므로 뒤로가기는 그것부터
-            // 대상으로 합니다 (CloseTopPopup이 동일한 우선순위로 처리합니다).
             UIPopupBase topmost = TopmostPopup;
 
             if (topmost == null || topmost.CloseableByBackButton == false)
@@ -180,30 +177,17 @@ namespace GameFramework.UISystem
             req.sequence = _sequenceCounter;
             _sequenceCounter++;
 
-            // Immediate는 _current/_pending/_forcedNext와 완전히 무관하게 항상 즉시 새
-            // 오버레이로 열립니다 - 다른 팝업이 열려 있어도(심지어 그 팝업이 닫히는 중이어도)
-            // 대기하지 않고 바로 그 위에 뜹니다.
             if (policy == EPopupPolicy.Immediate)
             {
                 OpenImmediatePopup(req);
                 return;
             }
 
-            // _isClosingCurrent인 동안(닫기 애니메이션이 아직 진행 중인 동안)에는 _current를
-            // 건드리지 않습니다. 여기서 SuspendCurrentToPending/ClosePopup을 또 호출하면,
-            // 같은 인스턴스가 "닫히는 중"이면서 동시에 "_pending에서 재개 가능"한 모순된
-            // 상태가 되어, 닫기 완료 콜백이 풀에 반환한 인스턴스를 ProcessPending이 다시
-            // 꺼내 쓰려고 하는 이중 사용으로 이어질 수 있습니다. 이 창에서는 그냥 대기열에
-            // 넣어두면, 닫기가 끝나는 순간 _processScheduled로 자연스럽게 처리됩니다.
             if (_current != null && _isClosingCurrent == false)
             {
                 if (policy == EPopupPolicy.PreemptIfHigher &&
                     priority > (EPopupPriority)_current.OpenPriority)
                 {
-                    // req를 바로 OpenRequestNow로 열어버리면, 이미 _pending에 req보다도
-                    // 더 우선순위가 높은 요청이 대기 중이더라도 무시하고 req가 먼저
-                    // 열려버립니다. 대신 대기열에 넣고 ProcessPending이 정렬된 순서로
-                    // 고르게 합니다.
                     SuspendCurrentToPending();
                     _pending.Add(req);
                     _processScheduled = true;
@@ -214,17 +198,8 @@ namespace GameFramework.UISystem
                 {
                     ClosePopup(_current);
 
-                    // ProcessPending은 항상 SortPending으로 우선순위 정렬을 하기 때문에,
-                    // _pending.Insert(0, ...)로 앞쪽에 끼워 넣어도 정렬 후에는 위치가
-                    // 의미 없어집니다(우선순위가 낮으면 다른 대기 요청에 밀림) - "교체"라는
-                    // 이름과 다르게 동작했습니다. 정렬 대상이 아닌 별도의 "다음에 반드시
-                    // 열릴 요청" 슬롯에 넣어서, 우선순위와 무관하게 다음 차례에 확실히
-                    // 열리도록 합니다.
                     if (_forcedNext != null)
                     {
-                        // 아직 처리 안 된 이전 ReplaceCurrent 요청이 있다면 덮어씁니다.
-                        // onResult를 그냥 버리면 결과를 기다리던 호출부가 영원히 안
-                        // 풀릴 수 있으니 null로라도 반드시 한 번 불러줍니다.
                         _forcedNext.onResult?.Invoke(null);
                     }
 
@@ -296,8 +271,6 @@ namespace GameFramework.UISystem
                 return null;
             }
 
-            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
-            // 이미 null일 수 있습니다.
             if (PoolManager.Instance == null)
             {
                 return null;
@@ -350,10 +323,6 @@ namespace GameFramework.UISystem
                 return;
             }
 
-            // _isClosingCurrent를 확인하지 않으면, 닫기 애니메이션이 끝나기 전에
-            // ClosePopup이 한 번 더 호출됐을 때 target.RequestClose가 두 번 걸리면서
-            // 두 번째 호출의 onResult(이미 null로 비워진 상태)가 첫 번째 호출의
-            // onResult를 덮어써 원래 콜백이 영영 호출되지 않는 문제가 있었습니다.
             if (_current != target || _isClosingCurrent)
             {
                 return;
@@ -366,15 +335,11 @@ namespace GameFramework.UISystem
 
             target.RequestClose(() =>
             {
-                // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
-                // 이미 null일 수 있습니다.
                 if (PoolManager.Instance != null)
                 {
                     PoolManager.Instance.Despawn(target.gameObject);
                 }
 
-                // _current가 그 사이 다른 팝업으로 바뀌어 있다면(정상 흐름에서는 위의
-                // RequestPopup 가드 때문에 일어나지 않아야 하지만) 덮어쓰지 않습니다.
                 if (_current == target)
                 {
                     _current = null;
@@ -382,12 +347,6 @@ namespace GameFramework.UISystem
 
                 _isClosingCurrent = false;
                 _processScheduled = true;
-
-                // 닫기 애니메이션이 끝나기 전까지는 모달 블로커를 켜둔 채로 둡니다 -
-                // 미리 꺼버리면 팝업이 화면에서 아직 사라지는 중인데도 그 뒤의 UI가
-                // 클릭을 받아버리는 입력 누수가 있었습니다. 즉시표시 팝업이 이 위에
-                // 여전히 떠 있을 수도 있으므로, 무조건 끄지 않고 RestackBlocker로
-                // 지금 남은 맨 위 팝업 기준으로 다시 배치합니다.
                 RestackBlocker();
 
                 onResult?.Invoke(result);
@@ -397,9 +356,6 @@ namespace GameFramework.UISystem
         /// <summary>대기열을 즉시 비우고 현재 팝업을 닫습니다 (결과값 전달 없음). 씬 전환 시 정리용입니다.</summary>
         public void CloseAll()
         {
-            // 대기열에는 선점(Preempt)으로 인해 정지된 채 인스턴스를 들고 있는 요청이
-            // 섞여 있을 수 있습니다. 그냥 Clear만 하면 그 인스턴스가 풀로 반환되지 않고
-            // 비활성 상태로 영구히 남아 풀의 maxCount를 잠식하므로, 반드시 Despawn한 뒤 비웁니다.
             for (int i = 0; i < _pending.Count; i++)
             {
                 UIPopupBase suspended = _pending[i].instance;
@@ -411,9 +367,6 @@ namespace GameFramework.UISystem
 
             _pending.Clear();
 
-            // 즉시표시 팝업들도 전부 정리합니다. CloseAll은 "즉시 비우기"가 목적인
-            // 긴급 정리 경로(씬 전환 등)라, 이미 화면에 나와 있는 상태여도 닫기
-            // 애니메이션 없이 _pending의 suspended 인스턴스와 동일하게 즉시 Despawn합니다.
             for (int i = 0; i < _immediateStack.Count; i++)
             {
                 UIPopupBase instance = _immediateStack[i].instance;
@@ -425,11 +378,6 @@ namespace GameFramework.UISystem
 
             _immediateStack.Clear();
 
-            // 토스트는 비모달이라 팝업과 독립적으로 여러 개 동시에 떠 있을 수 있습니다.
-            // 여기서 비워주지 않으면 씬 전환 등으로 CloseAll이 호출돼도 이미 떠 있던
-            // 토스트 인스턴스가 디스폰되지 않고 남거나, _activeToasts에 계속 남아있는
-            // 항목 때문에 나중에 파괴된 인스턴스를 대상으로 HideToast/자동 숨김 타이머가
-            // 동작하려 드는 누수로 이어집니다. 숨김 연출을 기다리지 않고 즉시 디스폰합니다.
             if (_activeToasts.Count > 0)
             {
                 foreach (UIToastBase toast in _activeToasts)
@@ -443,9 +391,6 @@ namespace GameFramework.UISystem
                 _activeToasts.Clear();
             }
 
-            // _pending과 마찬가지로 아직 처리 안 된 ReplaceCurrent 예약도 정리 대상입니다.
-            // onResult를 그냥 버리면 결과를 기다리던 호출부가 영원히 안 풀릴 수 있으니
-            // null로라도 반드시 한 번 불러줍니다.
             if (_forcedNext != null)
             {
                 PopupRequest forced = _forcedNext;
@@ -455,16 +400,10 @@ namespace GameFramework.UISystem
 
             if (_current == null || _isClosingCurrent)
             {
-                // 위에서 즉시표시 팝업을 이미 정리했을 수 있으므로, 그 경우를 반영해
-                // 블로커 상태를 다시 계산합니다(둘 다 없으면 꺼짐).
                 RestackBlocker();
                 return;
             }
 
-            // ClosePopup과 마찬가지로 _current는 RequestClose의 완료 콜백에서만 비웁니다.
-            // 여기서 미리 null로 만들면, 애니메이션이 끝나기 전 그 사이에 들어온
-            // RequestPopup이 "열려 있는 팝업이 없다"고 착각해 새 팝업을 바로 열어버려서
-            // 옛 팝업이 화면에서 채 사라지기도 전에 두 팝업이 동시에 보이는 경쟁 상태가 있었습니다.
             _isClosingCurrent = true;
             UIPopupBase target = _current;
             _currentResultCallback = null;
@@ -551,17 +490,11 @@ namespace GameFramework.UISystem
                 );
 
                 _currentResultCallback = req.onResult;
-
-                // OnResume 안에서 재진입 호출(예: CloseAll, RequestPopup)이 있을 경우
-                // _current가 이미 이 인스턴스를 가리키고 있어야 그 호출들이 정확한
-                // 상태를 보고 판단합니다 - 그래서 OnResume을 부르기 전에 대입합니다.
                 _current = instance;
                 instance.OnResume(req.payload);
             }
             else
             {
-                // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
-                // 이미 null일 수 있습니다. 스폰 실패와 동일하게 취급해 요청을 흘려보냅니다.
                 if (PoolManager.Instance == null)
                 {
                     req.onResult?.Invoke(null);
@@ -571,10 +504,6 @@ namespace GameFramework.UISystem
                 instance = PoolManager.Instance.Spawn(req.prefab, Vector3.zero, Quaternion.identity, _popupRoot);
                 if (instance == null)
                 {
-                    // 스폰 실패(풀이 가득 찼을 가능성)로 이 요청은 버리지만, 대기열에 남은
-                    // 다른 요청까지 같이 멈추면 안 되므로 다음 LateUpdate에 처리를 재예약합니다.
-                    // onResult를 그냥 버리면 결과를 기다리던 호출부가 영원히 콜백을 못 받고
-                    // 멈출 수 있으므로, null로라도 반드시 한 번 호출해서 풀어줍니다.
                     Debug.LogWarning($"[UIManager] {req.prefab.GetType().Name} 팝업을 스폰하지 못했습니다 (풀이 가득 찼을 수 있습니다). 이 요청은 건너뜁니다.");
                     req.onResult?.Invoke(null);
                     _processScheduled = true;
@@ -590,8 +519,6 @@ namespace GameFramework.UISystem
                 );
 
                 _currentResultCallback = req.onResult;
-
-                // 위와 동일한 이유로 OnOpen 호출 전에 _current를 먼저 대입합니다.
                 _current = instance;
                 instance.OnOpen(req.payload);
             }
@@ -599,12 +526,8 @@ namespace GameFramework.UISystem
             RestackBlocker();
         }
 
-        // 즉시표시(Immediate) 팝업을 대기열/현재 팝업과 무관하게 곧바로 엽니다. 선점/재개
-        // 개념이 없어(OpenRequestNow와 달리) 항상 새로 스폰하고, 닫히면 그대로 사라집니다.
         private void OpenImmediatePopup(PopupRequest req)
         {
-            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
-            // 이미 null일 수 있습니다.
             if (PoolManager.Instance == null)
             {
                 req.onResult?.Invoke(null);
@@ -657,9 +580,6 @@ namespace GameFramework.UISystem
         {
             ImmediatePopupEntry entry = _immediateStack[index];
 
-            // ClosePopup의 _isClosingCurrent 가드와 동일한 이유입니다 - 닫기 애니메이션이
-            // 끝나기 전에 같은 팝업에 대해 또 닫기 요청이 오면 onResult가 중복/유실될 수
-            // 있습니다.
             if (entry.isClosing)
             {
                 return;
@@ -683,10 +603,6 @@ namespace GameFramework.UISystem
             });
         }
 
-        // 모달 블로커를 지금 화면상 맨 위 팝업(TopmostPopup) 바로 아래로 옮깁니다.
-        // 즉시표시 팝업이 열려 있으면 그게 맨 위이고, 없으면 _current가 맨 위입니다 -
-        // 어느 쪽이든 그 아래의 모든 것(다른 즉시표시 팝업, _current, 게임 화면)을 이
-        // 블로커 하나로 전부 가려서 입력을 막습니다. 아무 팝업도 없으면 꺼집니다.
         private void RestackBlocker()
         {
             UIPopupBase topmost = TopmostPopup;
@@ -712,8 +628,6 @@ namespace GameFramework.UISystem
                 return;
             }
 
-            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 PoolManager.Instance가
-            // 이미 null일 수 있습니다.
             if (PoolManager.Instance == null)
             {
                 return;
@@ -765,10 +679,6 @@ namespace GameFramework.UISystem
 
         private async Awaitable AutoHideToastAfterDelay(UIToastBase toast, float delay, CancellationToken despawnToken)
         {
-            // despawnToken은 이 toast 인스턴스가 (수동으로 먼저 숨겨지는 등의 이유로) 풀에
-            // 반환되는 순간 취소됩니다. 취소 없이 그냥 두면, 이 타이머가 나중에 발동했을 때
-            // 이 인스턴스가 이미 다른 토스트로 재활용된 뒤일 수 있어 방금 새로 표시된
-            // 토스트를 엉뚱하게 조기 숨김 처리해버릴 수 있습니다.
             try
             {
                 await Awaitable.WaitForSecondsAsync(Mathf.Max(0.01f, delay), despawnToken);
@@ -791,14 +701,6 @@ namespace GameFramework.UISystem
 
                 if (_uiRootCanvas != null)
                 {
-                    // 씬에 이미 배치돼 있던 Canvas를 그대로 재사용하는 경로입니다. 아래의
-                    // "새로 생성" 경로는 go.transform.SetParent(transform, ...)로 UIManager
-                    // 자신(DontDestroyOnLoad 적용됨) 밑에 붙어 자동으로 영속되지만, 이렇게
-                    // 주워온 Canvas는 원래 자기가 배치된 씬에 그대로 속해 있어 영속 대상이
-                    // 아닙니다. HudRoot/PopupRoot/ToastRoot/OverlayRoot가 전부 이 Canvas
-                    // 밑에 생성되므로, 손대지 않으면 이 Canvas가 배치된 씬이 언로드될 때
-                    // UIManager의 UI 레이어 전체가 함께 파괴됩니다. DontDestroyOnLoad는
-                    // 루트 GameObject에만 적용되므로 transform.root 기준으로 호출합니다.
                     UnityEngine.Object.DontDestroyOnLoad(_uiRootCanvas.transform.root.gameObject);
                 }
             }
@@ -820,11 +722,6 @@ namespace GameFramework.UISystem
                 go.AddComponent<GraphicRaycaster>();
             }
 
-            // 이 Canvas를 씬에서 주워왔든 새로 만들었든, 부팅 순서에 따라 프로젝트가 별도로
-            // 둔 다른 Canvas(예: 게임 화면을 담은 메인 Canvas)와 Sort Order가 동률이 될 수
-            // 있습니다 - 동률일 때 어느 Canvas가 위에 그려지는지는 보장되지 않아서, 팝업이
-            // 다른 화면 뒤에 가려지는 문제로 이어집니다. HUD/팝업/토스트/오버레이는 항상
-            // 게임의 다른 모든 UI보다 위에 있어야 하므로, 매번 명시적으로 설정합니다.
             _uiRootCanvas.sortingOrder = _settings.CanvasSortOrder;
         }
 
@@ -852,11 +749,6 @@ namespace GameFramework.UISystem
             return rt;
         }
 
-        // HUD/Overlay는 프로젝트가 그때그때 필요할 때 Instantiate하기보다, 초기화 시점에
-        // 미리 만들어두고 활성/비활성만 토글하는 편이 낫습니다(반복 Instantiate/Destroy
-        // 비용, 그 사이 참조 유실 방지). 시작 시 비활성화해두는 이유는 이 인스턴스들이
-        // 무엇을 보여줄지(HUD 수치, 오버레이 내용)는 UIManager가 알 수 없는 프로젝트
-        // 고유 로직이라, 언제 보여줄지도 프로젝트가 직접 결정해야 하기 때문입니다.
         private void EnsurePersistentLayerInstances()
         {
             _hudInstance = InstantiateInactive(_settings.HudPrefabOverride, _hudRoot);
@@ -923,9 +815,6 @@ namespace GameFramework.UISystem
             });
         }
 
-        // _forcedNext는 아직 애니메이션 대기 중일 뿐 _pending에 들어있지 않으므로,
-        // 이 체크가 없으면 unique=true 요청도 여기 걸리지 않고 통과해 같은 타입이
-        // 중복으로 열리게 됩니다.
         private bool IsAlreadyForcedNextType(Type t)
         {
             return _forcedNext != null && _forcedNext.PopupType == t;

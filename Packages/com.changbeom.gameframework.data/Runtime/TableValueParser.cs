@@ -16,10 +16,6 @@ namespace GameFramework.DataParsing
     {
         private static readonly char[] ArrayDelimiter = { ',' };
 
-        // context는 하위 호환을 위해 선택 인자입니다 - 이미 생성되어 있는(재생성 전)
-        // 테이블 스크립트는 이 인자 없이 예전 시그니처로 호출하므로, 기본값 null을 받아도
-        // 컴파일이 깨지지 않습니다. 다음에 시트를 재생성하면 TableClassGenerator가
-        // context까지 채워서 호출하게 됩니다.
         public static int ParseInt(string raw, int defaultValue, string context = null)
         {
             if (string.IsNullOrEmpty(raw))
@@ -107,9 +103,6 @@ namespace GameFramework.DataParsing
             return defaultValue;
         }
 
-        // ParseEnum과 달리 기본 Parse* 메서드들은 셀 값이 비어 있는 것과 형식이 잘못된
-        // 것을 구분하지 않고 defaultValue로 조용히 넘어갔었습니다. 시트 오타(예: 숫자
-        // 칸에 문자열 실수 입력)를 놓치지 않도록 ParseEnum과 동일하게 ERROR로 남깁니다.
         private static void LogParseFailure(string typeName, string raw, string context)
         {
             if (string.IsNullOrEmpty(context))

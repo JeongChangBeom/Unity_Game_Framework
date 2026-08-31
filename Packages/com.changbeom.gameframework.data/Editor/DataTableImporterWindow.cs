@@ -26,9 +26,7 @@ namespace GameFramework.DataParsing.Editor
 
             public bool assetExists;
 
-            /// <summary>다른 탭과 sanitize 후 className이 겹치는지 여부입니다 (예: "Item Table"과
-            /// "ItemTable" 둘 다 -> "ItemTable"). 겹친 채로 생성하면 나중 탭이 먼저 만든 탭의
-            /// 스크립트/에셋을 조용히 덮어쓰므로, 생성 단계에서 이 값을 보고 걸러냅니다.</summary>
+            /// <summary>다른 탭과 sanitize 후 className이 겹치는지 여부입니다. 겹치면 생성에서 제외됩니다.</summary>
             public bool duplicateClassName;
         }
 
@@ -284,9 +282,6 @@ namespace GameFramework.DataParsing.Editor
                     continue;
                 }
 
-                // 스크립트 파일명/클래스명/에셋 파일명이 전부 같은 className에서 나와야
-                // DataManager.GetTable<T>()의 "Resources/GeneratedTables/{타입명}" 관례가
-                // 항상 실제 저장된 .asset 파일명과 일치합니다 (따로 sanitize하면 어긋날 수 있음).
                 string className = TableClassGenerator.ToSafeClassName(p.title);
 
                 SheetTabInfo item = new SheetTabInfo();
@@ -335,9 +330,6 @@ namespace GameFramework.DataParsing.Editor
             Repaint();
         }
 
-        // 시트 탭 제목이 서로 달라도(예: "Item Table" vs "Item-Table") ToSafeClassName을
-        // 거치면 같은 className으로 sanitize될 수 있습니다. 이 상태로 둘 다 생성하면
-        // 나중 탭이 먼저 만든 탭의 .cs/.asset을 파일명이 같다는 이유로 조용히 덮어씁니다.
         private static void MarkDuplicateClassNames(List<SheetTabInfo> tabs)
         {
             Dictionary<string, int> countByClassName = new Dictionary<string, int>();
@@ -399,10 +391,6 @@ namespace GameFramework.DataParsing.Editor
 
         private IEnumerator CreateCoroutine(List<SheetTabInfo> targets)
         {
-            // try 안에 yield가 있으면 catch는 같이 못 쓰지만(C# 컴파일 제약), finally는
-            // 됩니다. 루프 중간에 예외가 나도 ClearProgressBar/_isBusy 해제가 반드시
-            // 실행되도록 해서, 안 그러면 진행바가 뜬 채로 멈추고 _isBusy가 영원히 true로
-            // 남아 창의 모든 버튼이 막혀버리는 문제를 방지합니다.
             List<string> pending = new List<string>();
 
             try
@@ -443,12 +431,6 @@ namespace GameFramework.DataParsing.Editor
                         TableClassGenerator.WriteTableScript(tab.scriptPath, tab.className, cols);
                     }
 
-                    // WriteTableScript가 "key:" 컬럼의 Get(EnumName) 메서드를 이미 새로 쓴
-                    // 스크립트에 넣었더라도, 그 EnumName 타입 자체는 아직 존재하지 않을 수
-                    // 있습니다(첫 생성). 재컴파일 전에(AssetDatabase.Refresh() 이전) 여기서
-                    // 미리 만들어둬야 컴파일이 깨지지 않습니다. 스키마가 그대로라
-                    // WriteTableScript를 건너뛴 경우에도, 그 사이 시트 행이 바뀌었을 수
-                    // 있으므로 항상 호출합니다.
                     TableClassGenerator.SyncKeyEnums(tsv, cols, Path.GetDirectoryName(tab.scriptPath));
 
                     string payloadLine = tab.className + "|" + tab.assetPath + "|" + EscapeForPrefs(tsv);
@@ -559,10 +541,6 @@ namespace GameFramework.DataParsing.Editor
                         System.Reflection.BindingFlags.Public |
                         System.Reflection.BindingFlags.Instance);
 
-                    // Id를 제외한 나머지 필드를 선언 순서 그대로 사용합니다. .NET 명세는
-                    // GetFields()의 반환 순서를 보장하지 않지만, 이 프레임워크가 생성하는
-                    // 클래스는 항상 TableClassGenerator.WriteTableScript가 쓴 순서 그대로
-                    // 컴파일되고 Mono/CoreCLR 둘 다 실제로는 선언 순서를 반환하므로 기댑니다.
                     List<System.Reflection.FieldInfo> orderedFields = new List<System.Reflection.FieldInfo>();
                     for (int f = 0; f < fields.Length; f++)
                     {
@@ -578,10 +556,6 @@ namespace GameFramework.DataParsing.Editor
                     {
                         for (int c = 0; c < columns.Count; c++)
                         {
-                            // 이름만 비교하면 컬럼 순서가 바뀌거나 타입이 바뀐 경우를 놓칩니다.
-                            // 이미 컴파일된 ParseFromTsv는 예전 컬럼 인덱스/타입으로 셀을
-                            // 읽으므로, 순서가 바뀌면 엉뚱한 필드에 값이 들어가고 타입이
-                            // 바뀌면 조용히 잘못 파싱됩니다. 둘 다 여기서 걸러냅니다.
                             if (orderedFields[c].Name != columns[c].fieldName ||
                                 !ColumnTypeMatchesField(columns[c], orderedFields[c].FieldType))
                             {
@@ -609,9 +583,6 @@ namespace GameFramework.DataParsing.Editor
                     method.Invoke(asset, new object[] { tsv });
                     EditorUtility.SetDirty(asset);
 
-                    // "선택 시트 갱신"은 스키마가 그대로면 WriteTableScript를 다시 실행하지
-                    // 않으므로(위 스키마 검증 참고), "key:" 컬럼의 enum 동기화는 여기서
-                    // 별도로 호출해야 새로 추가/삭제된 행의 키 값이 반영됩니다.
                     TableClassGenerator.SyncKeyEnums(tsv, columns, Path.GetDirectoryName(tab.scriptPath));
                 }
 
@@ -634,8 +605,6 @@ namespace GameFramework.DataParsing.Editor
             }
         }
 
-        // ColumnInfo가 기대하는 C# 타입과 이미 컴파일된 Data 클래스 필드의 실제 타입이
-        // 일치하는지 확인합니다 (배열 여부 포함).
         private static bool ColumnTypeMatchesField(TableClassGenerator.ColumnInfo col, Type fieldType)
         {
             if (col.isArray != fieldType.IsArray)
@@ -856,11 +825,6 @@ namespace GameFramework.DataParsing.Editor
                 return "";
             }
 
-            // payloadLine이 "className|assetPath|tsv" 형태로 '|'를 구분자로 쓰기 때문에,
-            // 시트 셀 내용에 들어있는 '|'를 공백으로 지워버리면 데이터가 조용히
-            // 손상됩니다. 대신 역이스케이프 가능한 형태로 바꿔서 원본을 보존합니다.
-            // '\'를 가장 먼저 이스케이프해야 이후 삽입하는 "\\n"/"\\p" 시퀀스와
-            // 원본 데이터에 있던 문자를 구분할 수 있습니다.
             string s = tsv.Replace("\\", "\\\\");
             s = s.Replace("|", "\\p");
             s = s.Replace("\r\n", "\n").Replace("\r", "\n");
@@ -869,11 +833,6 @@ namespace GameFramework.DataParsing.Editor
             return s;
         }
 
-        // EditorPrefs 대신 EditorUserSettings를 씁니다. EditorPrefs는 이 머신에 설치된
-        // 모든 Unity 프로젝트에 걸쳐 전역으로 공유되므로, 같은 PC에서 다른 프로젝트로
-        // 전환하면 시트 URL/API Key가 서로 덮어써지거나 새어나갑니다. EditorUserSettings는
-        // 프로젝트 로컬의 UserSettings/ 폴더에 저장되고(.gitignore에도 이미 제외되어 있음),
-        // 값이 없으면 null을 반환하므로 GetConfig에서 기본값 처리를 대신합니다.
         private static string GetConfig(string key, string defaultValue)
         {
             string value = EditorUserSettings.GetConfigValue(PrefPrefix + key);

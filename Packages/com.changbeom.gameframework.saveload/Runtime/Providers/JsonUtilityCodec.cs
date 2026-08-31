@@ -21,11 +21,6 @@ namespace GameFramework.SaveLoad
             public T Value;
         }
 
-        // 저장된 값의 타입 이름만 가볍게 확인하기 위한 프로브입니다. Value 필드가 T와
-        // 구조적으로 안 맞아도 JsonUtility는 존재하는 필드만 채우고 나머지는 기본값으로
-        // 두고 "성공"해버리므로, 타입이 다른 값을 잘못된 T로 로드해도 조용히 통과하는
-        // 문제가 있었습니다. 그래서 저장할 때 타입 이름을 같이 적어두고, 로드할 때
-        // 이 프로브로 먼저 비교합니다.
         [Serializable]
         private sealed class TypeNameOnly
         {
@@ -49,11 +44,6 @@ namespace GameFramework.SaveLoad
 
             try
             {
-                // TypeName이 저장돼 있는데 지금 요청한 T와 다르면, 구조가 우연히 겹쳐
-                // 로드에 "성공"하더라도 실제로는 잘못된 데이터이므로 여기서 바로 거부합니다.
-                // 이 필드를 추가하기 전에 저장된 기존 데이터는 TypeName이 비어 있으므로
-                // (JsonUtility가 누락 필드를 null로 둠) 검사 없이 그대로 통과시켜 하위
-                // 호환을 유지합니다.
                 TypeNameOnly probe = JsonUtility.FromJson<TypeNameOnly>(json);
                 string expectedTypeName = typeof(T).FullName;
 

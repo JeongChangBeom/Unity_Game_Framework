@@ -60,10 +60,6 @@ namespace GameFramework.Utility
             OnValueChanged = null;
         }
 
-        // 구독자 하나가 예외를 던져도 나머지 구독자는 계속 알림을 받도록 각각 try/catch로
-        // 감쌉니다 - 그렇지 않으면 UI 쪽 구독자의 버그가 Value를 세팅한 게임 로직
-        // 코드(예: Health.TakeDamage)까지 예외로 끊어버릴 수 있습니다. EventBus.Publish와
-        // 동일한 원칙입니다.
         private void Notify(T value)
         {
             if (OnValueChanged == null)

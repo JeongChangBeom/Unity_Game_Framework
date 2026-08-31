@@ -8,16 +8,9 @@ using UnityEngine;
 
 namespace GameFramework.Localization.Editor
 {
-    // ELocKey는 더 이상 이 클래스가 생성하지 않습니다. Localization 시트의 Key 컬럼
-    // 타입을 "key:ELocKey"로 선언하면, Data Parsing의 TableClassGenerator.SyncKeyEnums가
-    // "선택 시트 생성/갱신"마다 자동으로 ELocKey.cs를 만들거나 갱신합니다
-    // (LocalizationTable.cs와 같은 폴더). LocalizationTable.Get(ELocKey key)로 그 키의
-    // 원본 행(언어별 텍스트 전부)을 바로 조회할 수 있습니다. 그 enum으로 GetText를 바로
-    // 부를 수 있는 확장 메서드(GenerateKeyTextExtension 참고)는 이 클래스가 계속 만들어줍니다.
-    //
-    // ELanguage는 계속 이 클래스가 생성합니다 - 컬럼 "값"이 아니라 컬럼 "이름"(Id/
-    // Key를 제외한 나머지 string 컬럼들의 헤더)에서 만들어지는, Localization 시트에만
-    // 있는 특수한 패턴이라 Data Parsing의 범용 key: 컬럼으로 일반화할 수 없습니다.
+    // Localization 테이블의 언어 컬럼들로 ELanguage.cs를 생성하고, ELocKey(Key 컬럼이
+    // "key:ELocKey"로 선언되어 있으면 Data Parsing이 이미 생성해둔 타입)로 GetText를
+    // 바로 호출할 수 있는 확장 메서드도 함께 생성합니다.
     public static class LocalizationGenerator
     {
         private const string LanguageOutputPath = "Assets/00.Scripts/GeneratedFramework/ELanguage.cs";
@@ -62,12 +55,6 @@ namespace GameFramework.Localization.Editor
 
             WriteFile(LanguageOutputPath, BuildLanguageCode(orderedLanguages));
 
-            // Generate()는 LocalizationTableSync(AssetPostprocessor.OnPostprocessAllAssets)
-            // 안에서 호출될 수 있습니다. 그 콜백이 아직 끝나지 않은 도중에
-            // AssetDatabase.ImportAsset/Refresh를 바로 부르면, 지금 진행 중인 임포트
-            // 배치와 겹치면서 에디터가 멈출 수 있습니다(여러 시트를 한꺼번에 "선택 시트
-            // 갱신"할 때 재현됨). 그래서 파일 쓰기까지만 동기로 하고, 실제 재임포트는
-            // 지금 콜백이 완전히 끝난 다음 프레임으로 미룹니다.
             EditorApplication.delayCall += () =>
             {
                 AssetDatabase.ImportAsset(LanguageOutputPath);
@@ -77,14 +64,9 @@ namespace GameFramework.Localization.Editor
             };
         }
 
-        // LocalizationTable의 Key 컬럼이 "key:EnumName"으로 선언되어 있으면(Data Parsing의
-        // TableClassGenerator가 Get(EnumName key) 오버로드를 만들어줌), 리플렉션으로 그
-        // enum 타입을 찾아서 GetText(EnumName)/LocalizationManager 확장 메서드를 자동
-        // 생성합니다. enum 이름 자체는 시트 작성자가 자유롭게 정하므로(예:
-        // ELocalizationKey) 이름을 하드코딩하지 않고, LocalizationTable.Get(...) 오버로드
-        // 중 int가 아닌 매개변수를 받는 것을 찾아 그 매개변수 타입을 그대로 씁니다. Key
-        // 컬럼이 아직 "key:EnumName"이 아니면(마이그레이션 전) 그런 오버로드가 없으므로
-        // 조용히 넘어갑니다 - GetText(string)만 계속 쓰면 됩니다.
+        /// <summary>Key 컬럼이 "key:EnumName"으로 선언되어 있으면, 그 enum으로
+        /// LocalizationManager.GetText를 바로 호출할 수 있는 확장 메서드를 생성합니다.
+        /// 아직 아니면 아무것도 만들지 않습니다 - GetText(string)만 쓰면 됩니다.</summary>
         private static void GenerateKeyTextExtension(ScriptableObject table)
         {
             Type tableType = table.GetType();
@@ -125,12 +107,6 @@ namespace GameFramework.Localization.Editor
             sb.AppendLine("using GameFramework.DataParsing;");
             sb.AppendLine("using GameFramework.Localization;");
             sb.AppendLine();
-            sb.AppendLine("// LocalizationManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일");
-            sb.AppendLine("// 타임에 알 수 없습니다. 대신 string 기반 API를 감싸는 확장 메서드로 강타입");
-            sb.AppendLine($"// 호출부(lm.GetText({enumTypeName}.X))를 그대로 제공합니다. LocalizationTable.Get(key)로");
-            sb.AppendLine("// 원본 Key 문자열을 조회한 뒤 넘기므로, 시트 값이 sanitize로 살짝 바뀌어도");
-            sb.AppendLine("// 항상 올바른 원본 키로 조회합니다. row가 없으면(시트에 아직 없는 키)");
-            sb.AppendLine("// key.ToString()으로 폴백해서, LocalizationManager 자체의 \"[MISSING:key]\" 처리를 그대로 탑니다.");
             sb.AppendLine($"public static class {enumTypeName}TextExtensions");
             sb.AppendLine("{");
             sb.AppendLine($"    public static string GetText(this LocalizationManager manager, {enumTypeName} key)");
@@ -151,10 +127,6 @@ namespace GameFramework.Localization.Editor
             };
         }
 
-        // ELanguage는 프로젝트 쪽(Assets)에 생성되어 이 패키지가 컴파일 타임에 직접
-        // 참조할 수 없으므로, 이미 컴파일된 프로젝트 어셈블리들에서 TypeCache로 찾습니다
-        // (Data Parsing의 TableClassGenerator.TryFindEnumType과 동일한 패턴). 한 번도
-        // 생성된 적 없으면(첫 실행) 못 찾는 게 정상이라 빈 배열을 반환합니다.
         private static string[] GetExistingEnumNames(string enumTypeName)
         {
             TypeCache.TypeCollection candidates = TypeCache.GetTypesDerivedFrom<Enum>();
@@ -195,25 +167,12 @@ namespace GameFramework.Localization.Editor
             return null;
         }
 
-        // 언어 코드처럼 보이는지에 대한 느슨한 판별입니다(대문자 2~3자, 예: KO/EN/ZH).
-        // 엄격한 화이트리스트는 아닙니다 - 프로젝트마다 쓰는 코드가 다를 수 있어서
-        // (LocalizationManager의 SystemLanguageToCode는 시스템 언어 자동 감지용일
-        // 뿐, 시트에서 실제로 쓸 수 있는 코드를 제한하는 목록이 아닙니다) 여기 안
-        // 맞아도 컬럼을 빼지는 않고 경고만 남깁니다.
+        /// <summary>언어 코드처럼 보이는지에 대한 느슨한 판별입니다(대문자 2~3자, 예: KO/EN/ZH).
+        /// 안 맞아도 컬럼을 빼지는 않고 경고만 남깁니다.</summary>
         private static readonly System.Text.RegularExpressions.Regex LanguageCodePattern =
             new System.Text.RegularExpressions.Regex("^[A-Za-z]{2,3}$");
 
-        // 언어 컬럼은 첫 번째 행 하나만 봐도 됩니다 - Data Parsing이 생성하는 Data
-        // 클래스는 모든 행이 같은 필드 구조를 공유하기 때문입니다. Id(int)는
-        // string이 아니라서 자동으로 제외되고, Key는 (key: 컬럼이 되어도 필드
-        // 타입은 여전히 string이라) 이름으로 명시적으로 제외합니다.
-        //
-        // Id/Key를 제외한 string 타입 컬럼은 전부 "언어 컬럼"으로 간주합니다.
-        // Data Parsing 시트는 임의의 string 컬럼(예: 작업자용 "Notes"/"Comment")을
-        // 자유롭게 추가할 수 있는데, Localization 탭에 그런 컬럼이 섞이면 여기서
-        // 그대로 가짜 ELanguage 멤버로 생성되고 런타임에 그 텍스트가 "번역"처럼
-        // 취급돼버립니다. 완전히 막을 방법은(시트 작성자의 의도를 알 수 없어) 없지만,
-        // 언어 코드처럼 안 보이는 컬럼이 감지되면 최소한 눈에 띄게 경고합니다.
+        /// <summary>Id/Key를 제외한 string 타입 컬럼을 전부 "언어 컬럼"으로 간주합니다.</summary>
         private static List<string> ExtractLanguageColumns(SerializedProperty firstItem)
         {
             List<string> list = new List<string>();
@@ -240,11 +199,8 @@ namespace GameFramework.Localization.Editor
             return list;
         }
 
-        // 새로 생성할 때 이름을 알파벳순으로 정렬하면, enum은 값을 안 주면 선언 순서대로
-        // 0,1,2...가 매겨지기 때문에 기존 멤버의 정수 값이 조용히 바뀌어버립니다 (저장된
-        // 언어 선택, Inspector에 지정해둔 ELanguage 등이 다른 항목을 가리키게 됨). 그래서
         // 기존 멤버는 시트에서 지워졌더라도 순서/값을 그대로 보존하고, 새로 추가된
-        // 이름만 맨 뒤에 붙입니다.
+        // 이름만 맨 뒤에 붙입니다(기존 ELanguage 값이 다른 언어를 가리키지 않도록).
         private static List<string> BuildOrderedNames(List<string> sheetNames, string[] existingNames)
         {
             List<string> result = new List<string>();
@@ -273,19 +229,12 @@ namespace GameFramework.Localization.Editor
 
                 if (safe == "None")
                 {
-                    // "None"은 항상 0번 값으로 미리 예약되어 있어서(비어있는/미설정
-                    // 상태를 나타냄), 시트에 "None"이라는 이름의 언어 컬럼이 있으면 이
-                    // 예약된 값과 조용히 합쳐져 버립니다.
                     Debug.LogWarning($"[LocalizationGenerator] \"{raw}\"은(는) 예약된 이름 \"None\"과 겹쳐서 별도 멤버로 생성되지 않고 기존 None(0)과 합쳐집니다. 시트의 이름을 바꿔주세요.");
                     continue;
                 }
 
                 if (safe != raw)
                 {
-                    // LocalizationManager는 런타임에 테이블에 적힌 원본 언어 컬럼명을
-                    // 그대로 키로 쓰기 때문에, 여기서 이름이 바뀌면(공백/하이픈 등) enum
-                    // 멤버로 호출해도 실제로는 다른 문자열을 찾게 되어 그 언어는 절대
-                    // 조회되지 않습니다. 조용히 넘어가지 않고 바로 알려줍니다.
                     Debug.LogError($"[LocalizationGenerator] \"{raw}\"은(는) 유효한 식별자가 아니라서 enum 멤버는 \"{safe}\"로 생성되지만, 런타임에는 원본 이름으로 조회하므로 이 항목은 인식되지 않습니다. 시트의 언어 컬럼명을 영문/숫자/밑줄로만 바꿔주세요.");
                 }
 
@@ -304,11 +253,6 @@ namespace GameFramework.Localization.Editor
             AppendEnumHeader(sb, "ELanguage", names);
 
             sb.AppendLine();
-            sb.AppendLine("    // LocalizationManager는 패키지 쪽 코드라 이 프로젝트 전용 enum을 컴파일");
-            sb.AppendLine("    // 타임에 알 수 없습니다. 대신 언어 코드(string) 기반 API를 감싸는 확장");
-            sb.AppendLine("    // 메서드로 강타입 호출부(lm.SetLanguageAsync(ELanguage.X))를 그대로");
-            sb.AppendLine("    // 제공합니다. OnLanguageChanged는 이벤트라서 확장 메서드로 감쌀 수 없어");
-            sb.AppendLine("    // string 그대로 노출됩니다.");
             sb.AppendLine("    public static class ELanguageExtensions");
             sb.AppendLine("    {");
             sb.AppendLine("        public static Awaitable SetLanguageAsync(this LocalizationManager manager, ELanguage language)");

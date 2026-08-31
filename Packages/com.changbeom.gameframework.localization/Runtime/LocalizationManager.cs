@@ -10,20 +10,10 @@ namespace GameFramework.Localization
 {
     /// <summary>
     /// Data Parsing이 생성한 Localization 테이블을 읽어 텍스트를 제공하는 매니저입니다.
-    /// 패키지가 프로젝트가 생성한 LocalizationTable 타입을 직접 참조할 수 없기 때문에
-    /// (Sound의 SoundManager와 동일한 이유), 부팅 시 리플렉션으로 1회 읽어 자체
-    /// Dictionary로 캐싱합니다.
-    ///
-    /// 번역 키와 언어 코드는 전부 문자열입니다 - 예전에는 이 패키지 자신의 Runtime 폴더
-    /// 안에 재생성되는 ELocKey/ELanguage enum이었지만, git URL로 설치된 패키지는 읽기
-    /// 전용 캐시에서 로드되어 그 방식이 성립하지 않습니다(SceneLoading의 ESceneKey와
-    /// 동일한 이유). 강타입 호출부(GetText(ELocKey.X), SetLanguageAsync(ELanguage.X))는
-    /// 프로젝트 쪽에 생성되는 ELocKeyExtensions 확장 메서드가 담당합니다. 다만
-    /// OnLanguageChanged는 이벤트라서(확장 메서드로 감쌀 수 없음) string 그대로 노출됩니다.
-    ///
-    /// 언어가 바뀔 때마다 OnLanguageChanged가 발행되므로, 음성 더빙/언어별 이미지처럼
-    /// 나중에 추가될 수 있는 기능도 이 이벤트만 구독하면 됩니다 - LocalizationManager
-    /// 자체를 다시 고칠 필요가 없습니다.
+    /// 번역 키와 언어 코드는 전부 문자열로 다룹니다 - 강타입으로 쓰고 싶으면
+    /// `LocalizationTable.Get(ELocKey key)`로 행을 조회해 Key를 얻으세요. 언어가 바뀔
+    /// 때마다 OnLanguageChanged가 발행되므로, 음성 더빙/언어별 이미지 등도 이 이벤트만
+    /// 구독하면 됩니다.
     /// </summary>
     public sealed class LocalizationManager : MonoSingleton<LocalizationManager>
     {
@@ -105,10 +95,6 @@ namespace GameFramework.Localization
             return Awaitable.NextFrameAsync();
         }
 
-        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나(예: 파괴된 컴포넌트를 참조하는
-        // 핸들러)가 예외를 던져도 나머지 구독자에게는 정상적으로 전달되도록 각각 개별
-        // try/catch로 격리합니다. 격리가 없으면 한 구독자의 예외로 그 뒤 구독자들이
-        // 언어 변경 알림을 통째로 못 받아 일부 UI만 예전 언어로 남는 문제가 있었습니다.
         private void SafeInvokeLanguageChanged(string language)
         {
             if (OnLanguageChanged == null)
@@ -133,10 +119,6 @@ namespace GameFramework.Localization
 
         private string DetermineInitialLanguage()
         {
-            // LocalizationManager는 BootPriority 없이 지연 초기화되므로, 이 첫 접근이
-            // 다른 매니저의 종료 처리 도중(예: 어떤 오브젝트의 OnDestroy가 이 시점에
-            // 처음으로 GetText를 호출) 일어나면 SaveManager는 이미 종료되어
-            // Instance가 null일 수 있습니다.
             if (SaveManager.Instance == null)
             {
                 return _settings.DefaultLanguage;
@@ -159,7 +141,6 @@ namespace GameFramework.Localization
 
         private void SaveLanguage(string language)
         {
-            // 위 DetermineInitialLanguage와 동일한 이유의 방어입니다.
             if (SaveManager.Instance == null)
             {
                 return;
@@ -182,12 +163,6 @@ namespace GameFramework.Localization
             return false;
         }
 
-        // Data Parsing이 생성한 LocalizationTable을 리플렉션으로 읽습니다 (SoundManager의
-        // LoadSoundData와 동일한 패턴). 언어 컬럼은 Id(int)/Key(언어 아님)을 제외한
-        // string 타입 필드를 전부 언어 컬럼으로 간주해서 찾습니다 - LocalizationGenerator.
-        // ExtractLanguageColumns(에디터, SerializedProperty 기반)와 동일한 판별 기준을
-        // 런타임 리플렉션으로 재현한 것이라, 언어 컬럼 집합이 항상 실제 테이블과
-        // 자체적으로 일치합니다(더 이상 별도 enum과 동기화될 필요가 없음).
         private static Dictionary<string, Dictionary<string, string>> LoadLocalizationData(string resourcePath)
         {
             Dictionary<string, Dictionary<string, string>> data = new Dictionary<string, Dictionary<string, string>>();
@@ -219,7 +194,6 @@ namespace GameFramework.Localization
 
                 Type rowType = row.GetType();
 
-                // 모든 행이 같은 필드 구조를 공유하므로 첫 번째 행에서 한 번만 찾습니다.
                 if (languageFieldNames == null)
                 {
                     languageFieldNames = ExtractLanguageFieldNames(rowType);

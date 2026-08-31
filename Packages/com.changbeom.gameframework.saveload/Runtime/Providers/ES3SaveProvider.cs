@@ -8,10 +8,6 @@ namespace GameFramework.SaveLoad
     /// <summary>
     /// Easy Save 3를 감싸는 provider. ES3 에셋 설치 + Project Settings -> Player ->
     /// Scripting Define Symbols에 USE_ES3 추가가 필요합니다.
-    ///
-    /// 참고: 이 프로젝트에는 ES3 에셋이 설치되지 않은 상태로 작성되어, 실제 API 형태
-    /// (ES3.Save/Load/KeyExists/DeleteKey)는 ES3 공식 문서상의 관례를 기준으로 했습니다.
-    /// USE_ES3를 활성화하면 실제로 설치한 ES3 버전과 맞는지 다시 확인하세요.
     /// </summary>
     public sealed class ES3SaveProvider : ISaveProvider, ISaveBackupProvider
     {
@@ -28,10 +24,6 @@ namespace GameFramework.SaveLoad
             _settings = new ES3Settings(fileName);
         }
 
-        // JsonFile/PlayerPrefs/Memory는 실패를 안전하게 삼키고 기본값(false/no-op)을
-        // 반환하는데, ES3의 각 호출(KeyExists/Save/Load/DeleteKey)은 전부 실제 파일 I/O라
-        // 던질 수 있습니다. 여기서 잡지 않으면 이 Provider만 SaveManager 호출부까지
-        // 예외가 그대로 전파되어 Provider 간 동작이 달라집니다.
         public bool HasKey(string key)
         {
             try
@@ -95,7 +87,6 @@ namespace GameFramework.SaveLoad
 
         public bool Flush()
         {
-            // ES3는 Save 호출마다 즉시 기록하므로, 별도로 flush할 것이 없습니다.
             return true;
         }
 

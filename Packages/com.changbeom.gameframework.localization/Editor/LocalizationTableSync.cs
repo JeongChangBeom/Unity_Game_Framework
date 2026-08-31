@@ -3,9 +3,7 @@ using UnityEditor;
 
 namespace GameFramework.Localization.Editor
 {
-    // Data Parsing이 생성한 Localization 테이블(LocalizationTable)이 (재)임포트될
-    // 때마다 ELocKey + ELanguage 재생성을 자동으로 실행합니다 -- 버튼을 누를 필요가
-    // 없습니다. Sound 패키지의 SoundTableSync와 동일한 방식입니다.
+    // LocalizationTable이 (재)임포트될 때마다 ELanguage 재생성을 자동으로 실행합니다.
     public sealed class LocalizationTableSync : AssetPostprocessor
     {
         private static void OnPostprocessAllAssets(

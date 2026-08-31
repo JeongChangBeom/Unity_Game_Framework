@@ -30,8 +30,6 @@ namespace GameFramework.Localization
 
         private void OnEnable()
         {
-            // 앱 종료 중에는 매니저 종료 순서가 보장되지 않아 LocalizationManager.Instance가
-            // 이미 null일 수 있습니다 (아래 OnDisable과 동일한 이유의 방어).
             if (LocalizationManager.Instance == null)
             {
                 return;

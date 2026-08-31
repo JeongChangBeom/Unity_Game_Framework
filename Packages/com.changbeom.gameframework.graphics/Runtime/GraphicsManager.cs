@@ -56,9 +56,6 @@ namespace GameFramework.Graphics
 
         private GraphicsSaveData LoadOrCreateData()
         {
-            // GraphicsManager는 BootPriority 없이 지연 초기화되므로, 이 첫 접근이 다른
-            // 매니저의 종료 처리 도중 처음 일어나면 SaveManager는 이미 종료되어
-            // Instance가 null일 수 있습니다.
             if (SaveManager.Instance == null)
             {
                 return new GraphicsSaveData
@@ -87,10 +84,6 @@ namespace GameFramework.Graphics
 
         private void ApplyAll()
         {
-            // 저장된 QualityLevel이 지금 프로젝트의 Quality Settings 단계 수보다 클
-            // 수 있습니다 (예: 예전엔 6단계였다가 프로젝트에서 3단계로 줄인 경우).
-            // Unity가 알아서 클램프해줄 수도 있지만, 우리가 노출하는 QualityLevel
-            // getter가 실제 적용된 값과 어긋나지 않도록 여기서 직접 보정합니다.
             _data.QualityLevel = Mathf.Clamp(_data.QualityLevel, 0, QualitySettings.names.Length - 1);
             _data.TargetFrameRate = ClampTargetFrameRate(_data.TargetFrameRate);
             _data.ResolutionWidth = Mathf.Max(1, _data.ResolutionWidth);
@@ -100,19 +93,13 @@ namespace GameFramework.Graphics
             Application.targetFrameRate = _data.TargetFrameRate;
             QualitySettings.vSyncCount = _data.VSyncEnabled ? 1 : 0;
 
-            // 이미 그 해상도/모드로 떠 있으면(대부분의 경우) 굳이 다시 호출하지 않습니다 -
-            // 매 부팅마다 불필요하게 창을 다시 그리는 깜빡임을 방지합니다.
             if (Screen.width != _data.ResolutionWidth || Screen.height != _data.ResolutionHeight || Screen.fullScreen != _data.IsFullscreen)
             {
                 Screen.SetResolution(_data.ResolutionWidth, _data.ResolutionHeight, _data.IsFullscreen);
             }
         }
 
-        // Application.targetFrameRate는 -1(플랫폼 기본/무제한)이 의도된 "제한 없음"
-        // 값이고, 0은 아예 다른 의미로 프레임레이트를 심하게 제한해버리는 잘 알려진
-        // Unity 함정입니다. 예전 버전 저장 데이터에 이 필드가 없거나(기본값 0) 손상된
-        // 값이 들어있으면 그대로 적용했을 때 부팅부터 심각한 프레임 드랍이 생기므로,
-        // -1(무제한)과 양수만 그대로 두고 나머지(0 포함)는 -1로 보정합니다.
+        /// <summary>-1(무제한)과 양수만 유효하게 취급하고, 0을 포함한 나머지는 -1로 보정합니다.</summary>
         private static int ClampTargetFrameRate(int fps)
         {
             if (fps == -1 || fps > 0)
@@ -129,10 +116,6 @@ namespace GameFramework.Graphics
 
             _data.QualityLevel = level;
             QualitySettings.SetQualityLevel(level, true);
-
-            // Quality Level 프리셋 자체가 자기만의 VSync 값을 갖고 있어서, 위 호출이
-            // 우리가 따로 저장해둔 VSyncEnabled를 조용히 덮어쓸 수 있습니다. 사용자가
-            // 선택한 VSync 값을 다시 강제로 맞춰줍니다.
             QualitySettings.vSyncCount = _data.VSyncEnabled ? 1 : 0;
 
             Save();
@@ -182,7 +165,6 @@ namespace GameFramework.Graphics
 
         private void Save()
         {
-            // LoadOrCreateData와 동일한 이유의 방어입니다.
             if (SaveManager.Instance == null)
             {
                 return;
@@ -193,8 +175,6 @@ namespace GameFramework.Graphics
             SaveManager.Instance.Flush();
         }
 
-        // EventBus.Publish와 동일한 패턴입니다: 구독자 하나가 예외를 던져도 나머지
-        // 구독자에게는 정상적으로 전달되도록 각각 개별 try/catch로 격리합니다.
         private static void SafeInvoke<T>(Action<T> action, T arg, string eventName)
         {
             if (action == null)

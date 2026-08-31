@@ -12,11 +12,6 @@ namespace GameFramework.SceneLoading
     {
         [SerializeField] private float _fadeDuration = 0.25f;
 
-        // destroyCancellationToken은 실제 Destroy에서만 취소되는데, 이 인스턴스는 앱 수명
-        // 내내 살아남아 Show/Hide를 반복합니다. 풀링된 팝업/토스트에서 "재활용 이후에도
-        // 이전 생애의 애니메이션이 살아남는" 버그를 겪은 적이 있어, 여기서는 애초에 매
-        // Show/Hide 요청 시작 시점마다 토큰을 갱신해서 이전 전환의 애니메이션을 확실히
-        // 취소합니다 (예: 숨김 애니메이션이 끝나기 전에 다시 표시 요청이 들어오는 경우).
         private CancellationTokenSource _animCts = new CancellationTokenSource();
         protected CancellationToken AnimationToken => _animCts.Token;
 
@@ -106,10 +101,6 @@ namespace GameFramework.SceneLoading
             _animCts = new CancellationTokenSource();
         }
 
-        // RestartAnimationToken()이 진행 중이던 애니메이션을 취소하면, DefaultSceneLoadingAnimation은
-        // 취소된 애니메이션의 onComplete(CompleteShow/CompleteHide)를 부르지 않습니다. 그러면 그
-        // 완료를 기다리던 쪽(SceneLoadingManager의 AwaitableCompletionSource)이 영원히 멈추므로,
-        // 새 요청이 이전 요청을 밀어내기 전에 이전 콜백을 여기서 즉시 완료 처리해 대기를 풀어줍니다.
         private void FlushPendingCallback()
         {
             if (_onShown != null)

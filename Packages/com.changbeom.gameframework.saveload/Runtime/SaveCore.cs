@@ -111,10 +111,6 @@ namespace GameFramework.SaveLoad
 
             bool ok = backup.BackupNow();
 
-            // BackupNow는 Provider 내부에서 자체적으로 Flush까지 수행하므로, 성공했다면
-            // SaveCore가 들고 있는 dirty 플래그도 함께 내려줘야 IsDirty가 실제 디스크
-            // 상태와 어긋나지 않습니다 (Provider의 Flush()는 SaveCore.Flush()를 거치지
-            // 않고 직접 호출되어 이 플래그를 모릅니다).
             if (ok)
             {
                 _dirty = false;
@@ -132,10 +128,6 @@ namespace GameFramework.SaveLoad
 
             bool ok = backup.RestoreFromBackup();
 
-            // RestoreFromBackup은 in-memory 데이터를 백업 시점 상태로 통째로 되돌리므로,
-            // 그 전까지 쌓여 있던 미반영 변경 사항은 더 이상 유효하지 않습니다. dirty를
-            // 그대로 두면 다음 Flush가 이미 되돌려진 데이터 위에 옛 상태를 다시 써버릴
-            // 여지가 생기므로 여기서 같이 내려줍니다.
             if (ok)
             {
                 _dirty = false;
@@ -144,10 +136,6 @@ namespace GameFramework.SaveLoad
             return ok;
         }
 
-        // 공개 API가 SaveKey가 아니라 string을 받기 때문에, 호출자가 SaveKey 생성자의
-        // 검증/정규화(null/공백 거부, 백슬래시 통일, 중복 슬래시 정리)를 그냥 건너뛰고
-        // 다듬어지지 않은 문자열을 바로 넘길 수 있었습니다. 여기서 SaveKey를 한 번 거치게
-        // 해서, SaveKey를 거쳐 온 값이든 리터럴 문자열이든 항상 같은 규칙이 적용되도록 합니다.
         private string WithRoot(string key)
         {
             string normalized = new SaveKey(key).Value;
