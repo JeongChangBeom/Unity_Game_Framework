@@ -102,6 +102,14 @@ namespace GameFramework.SaveLoad
             _core.Delete(key);
         }
 
+        /// <summary>이 프로젝트가 저장한 모든 데이터를 삭제하고 메타 정보를 새로 씁니다
+        /// (테스트/QA용 초기화 - 신중히 호출하세요).</summary>
+        public void DeleteAllData()
+        {
+            _core.DeleteAll();
+            _core.EnsureMeta(_settings.CurrentVersion);
+        }
+
         /// <summary>실제로 영속 저장소에 쓰기까지 성공했으면 true입니다. false면 다음 Flush(자동 저장 포함)에서 재시도됩니다.</summary>
         public bool Flush()
         {

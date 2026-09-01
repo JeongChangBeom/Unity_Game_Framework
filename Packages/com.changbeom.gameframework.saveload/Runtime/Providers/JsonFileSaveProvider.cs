@@ -156,6 +156,32 @@ namespace GameFramework.SaveLoad
             return true;
         }
 
+        /// <summary>메모리상 데이터와 파일(본파일 + 자동/수동 백업)을 모두 지웁니다.</summary>
+        public void DeleteAll()
+        {
+            _data = new Dictionary<string, string>();
+            _dirty = false;
+
+            DeleteFileIfExists(_filePath);
+            DeleteFileIfExists(_backupPath);
+            DeleteFileIfExists(_manualBackupPath);
+        }
+
+        private static void DeleteFileIfExists(string path)
+        {
+            try
+            {
+                if (File.Exists(path))
+                {
+                    File.Delete(path);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[JsonFileSaveProvider] {path} 삭제 실패: {e}");
+            }
+        }
+
         private void Load()
         {
             bool fileExists = File.Exists(_filePath);

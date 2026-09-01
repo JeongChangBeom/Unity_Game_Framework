@@ -1,0 +1,18 @@
+{
+    "name": "GameFramework.SaveLoad.Editor",
+    "rootNamespace": "GameFramework.SaveLoad.Editor",
+    "references": [
+        "GameFramework.SaveLoad"
+    ],
+    "includePlatforms": [
+        "Editor"
+    ],
+    "excludePlatforms": [],
+    "allowUnsafeCode": false,
+    "overrideReferences": false,
+    "precompiledReferences": [],
+    "autoReferenced": true,
+    "defineConstraints": [],
+    "versionDefines": [],
+    "noEngineReferences": false
+}

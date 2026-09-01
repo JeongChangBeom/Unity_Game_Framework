@@ -61,6 +61,13 @@ namespace GameFramework.SaveLoad
             _dirty = true;
         }
 
+        /// <summary>이 저장소가 관리하는 모든 데이터를 삭제합니다 (테스트/QA용 초기화). RootKey 범위와 무관하게 provider 전체를 지웁니다.</summary>
+        public void DeleteAll()
+        {
+            _provider.DeleteAll();
+            _dirty = false;
+        }
+
         /// <summary>실제로 영속 저장소에 쓰기까지 성공했으면 true입니다. false면 dirty 상태가 유지되어 다음 Flush에서 재시도됩니다.</summary>
         public bool Flush()
         {

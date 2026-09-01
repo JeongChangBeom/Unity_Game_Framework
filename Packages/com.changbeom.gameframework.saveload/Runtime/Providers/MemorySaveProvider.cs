@@ -46,5 +46,10 @@ namespace GameFramework.SaveLoad
         {
             return true;
         }
+
+        public void DeleteAll()
+        {
+            _data.Clear();
+        }
     }
 }

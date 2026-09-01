@@ -90,6 +90,33 @@ namespace GameFramework.SaveLoad
             return true;
         }
 
+        public void DeleteAll()
+        {
+            try
+            {
+                if (ES3.FileExists(_settings))
+                {
+                    ES3.DeleteFile(_settings);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] 전체 삭제 실패: {e}");
+            }
+
+            try
+            {
+                if (File.Exists(_backupPath))
+                {
+                    File.Delete(_backupPath);
+                }
+            }
+            catch (Exception e)
+            {
+                Debug.LogError($"[ES3SaveProvider] 백업 파일 삭제 실패: {e}");
+            }
+        }
+
         public bool HasBackup()
         {
             return File.Exists(_backupPath);

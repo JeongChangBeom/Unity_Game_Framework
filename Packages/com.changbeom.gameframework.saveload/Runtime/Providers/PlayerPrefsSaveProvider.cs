@@ -40,5 +40,14 @@ namespace GameFramework.SaveLoad
             PlayerPrefs.Save();
             return true;
         }
+
+        /// <summary>PlayerPrefs는 키 목록을 조회하는 API가 없어 이 프레임워크가 저장한 키만
+        /// 골라 지울 수 없습니다 - 이 프로젝트의 PlayerPrefs 전체(다른 시스템이 저장한 값
+        /// 포함)를 지웁니다.</summary>
+        public void DeleteAll()
+        {
+            PlayerPrefs.DeleteAll();
+            PlayerPrefs.Save();
+        }
     }
 }

@@ -695,6 +695,9 @@ SoundManager.Instance.SetChannelVolume(ESoundChannel.Voice, 1.0f);
   - `BackupNow()`, `RestoreFromBackup()` 제공
 - **Save Meta 자동 관리**
   - `saveVersion`, `createdAtUtc`, `lastSavedAtUtc` 자동 저장/갱신
+- **전체 초기화 (테스트/QA용)**
+  - `DeleteAllData()` - 저장된 모든 데이터 삭제(백업 포함) 후 메타 정보 재생성
+  - `Game Framework/Save Load/Delete All Data` 메뉴로 확인 대화상자를 거쳐 바로 실행 가능(Play 모드든 아니든 동작)
 
 ---
 
@@ -740,7 +743,7 @@ game/meta/saveVersion
 |Storage Mode|설명|
 |-|-|
 |**JsonFile (default)**|`Application.persistentDataPath`에 JSON 파일 1개로 저장. 원자적 쓰기 + 자동 백업(.bak) 지원|
-|PlayerPrefs|가장 단순한 저장 (키마다 JSON 문자열로 저장). 백업/복구는 지원하지 않음|
+|PlayerPrefs|가장 단순한 저장 (키마다 JSON 문자열로 저장). 백업/복구는 지원하지 않음. `DeleteAllData()`는 PlayerPrefs에 키 목록 조회 API가 없어 이 프로젝트의 PlayerPrefs 전체(다른 시스템이 저장한 값 포함)를 지움|
 |Es3|Easy Save 3 사용. `USE_ES3` 미정의 시 자동으로 JsonFile로 대체되고 경고 로그 출력|
 |Memory|디스크에 저장하지 않음 (테스트/에디터 전용)|
 
@@ -797,6 +800,9 @@ MyData data = SaveManager.Instance.LoadOrCreate(key, () => new MyData(), saveIfM
 // Delete / HasKey
 bool exists = SaveManager.Instance.HasKey(key);
 SaveManager.Instance.Delete(key);
+
+// 저장된 모든 데이터 삭제 (테스트/QA용 - 신중히 호출)
+SaveManager.Instance.DeleteAllData();
 
 
 
@@ -875,6 +881,8 @@ SaveManager.Instance.Save(key, _settings);
 - HasBackup / BackupNow / RestoreFromBackup (JsonFile, Es3 모드에서만 동작 확인 가능)
 
 > `SaveManagerSettings` 에셋을 아직 안 만들었다면 기본값(JsonFile)으로 동작하며 Console에 경고가 남습니다.
+
+전체 초기화는 `Game Framework/Save Load/Delete All Data` 메뉴를 사용하세요(확인 대화상자 포함). Play 모드 중이면 실행 중인 `SaveManager` 인스턴스를 통해 지우고(메모리 캐시까지 함께 비움), 아니면 `SaveManagerSettings`의 Storage Mode를 기준으로 직접 지웁니다 - 둘 다 재생 여부와 무관하게 항상 사용할 수 있습니다.
 
 </details>
 
