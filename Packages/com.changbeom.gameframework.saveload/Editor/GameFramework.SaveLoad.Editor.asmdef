@@ -2,7 +2,8 @@
     "name": "GameFramework.SaveLoad.Editor",
     "rootNamespace": "GameFramework.SaveLoad.Editor",
     "references": [
-        "GameFramework.SaveLoad"
+        "GameFramework.SaveLoad",
+        "GameFramework.Core"
     ],
     "includePlatforms": [
         "Editor"

@@ -2,6 +2,7 @@
   <Project Path="GameFramework.TimeSystem.csproj" />
   <Project Path="GameFramework.SaveLoad.csproj" />
   <Project Path="GameFramework.UISystem.csproj" />
+  <Project Path="GameFramework.SaveLoad.Editor.csproj" />
   <Project Path="Assembly-CSharp.csproj" />
   <Project Path="GameFramework.SoundSystem.csproj" />
   <Project Path="GameFramework.DataParsing.Editor.csproj" />
